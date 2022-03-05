@@ -60,6 +60,7 @@ android {
                 // armeabi is not supported, not building for mips in samples
                 abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
                 arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=c++_static'
+                version '3.18.1'
             }
         }
     }
@@ -76,6 +77,7 @@ android {
 }
 
 dependencies {
+    implementation project(path: ':AqooleEngine')
     def jniFile = "${LAYER_JNILIB_DIR}/arm64-v8a/libVkLayer_khronos_validation.so"
     if(!file("${jniFile}").exists()) {
         implementation files("${jniFile}") {
