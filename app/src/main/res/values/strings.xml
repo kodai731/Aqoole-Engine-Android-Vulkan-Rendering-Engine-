@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- this file is modified by Shigeoka Kodai -->
+<!-- the original file is in https://github.com/googlesamples/android-vulkan-tutorials -->
+<resources>
+    <string name="app_name">Aqoole 00</string>
+</resources>
