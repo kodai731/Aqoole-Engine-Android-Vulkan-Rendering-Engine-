@@ -86,3 +86,12 @@ dependencies {
     }
 }
 
+//buildTypes {
+//    release {
+//        signingConfig signingConfigs.debug
+//    }
+//}
+//
+//aaptOptions {
+//    additionalParameters =["--warn-manifest-validation"]
+//}
