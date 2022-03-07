@@ -27,13 +27,12 @@
 //=====================================================================
 AEInstance::AEInstance()
 {
-	mValidationLayers.push_back("VK_LAYER_LUNARG_standard_validation");
+	mValidationLayers.emplace_back("VK_LAYER_LUNARG_standard_validation");
 	mEnableValidationLayer = true;
 	std::vector<std::string> extensions(0);
 	std::vector<std::string> validationLayer(0);
 	CreateInstance(extensions, true, validationLayer);
 	//SetupCallback();
-	return;
 }
 AEInstance::AEInstance(std::vector<std::string> const& extensions, bool enableValidationLayer,
 	std::vector<std::string> const& validationLayer)
@@ -41,7 +40,6 @@ AEInstance::AEInstance(std::vector<std::string> const& extensions, bool enableVa
 	mEnableValidationLayer = enableValidationLayer;
 	CreateInstance(extensions, enableValidationLayer, validationLayer);
 	//SetupCallback();
-	return;
 }
 
 AEInstance::AEInstance(VkApplicationInfo* appInfo, std::vector<std::string> const& extensions, bool enableValidationLayer,
@@ -50,7 +48,6 @@ AEInstance::AEInstance(VkApplicationInfo* appInfo, std::vector<std::string> cons
     mEnableValidationLayer = enableValidationLayer;
     CreateInstance(appInfo, extensions, enableValidationLayer, validationLayer);
     //SetupCallback();
-    return;
 }
 
 //=====================================================================
@@ -61,7 +58,6 @@ AEInstance::~AEInstance()
     if(mEnableValidationLayer)
 	    DestroyDebugReportCallbackEXT(mInstance, mCallback, nullptr);
 	vkDestroyInstance(mInstance, nullptr);
-	return;
 }
 
 //=====================================================================
@@ -88,16 +84,21 @@ std::vector<std::string> const& validationLayer)
 #endif
 	//validation layer message
 	if (enableValidationLayer)
-		mExtensions.push_back(std::string(VK_EXT_DEBUG_REPORT_EXTENSION_NAME));
+		mExtensions.emplace_back(std::string(VK_EXT_DEBUG_REPORT_EXTENSION_NAME));
 	//export available extensions file
-	std::ofstream ofs("enableExtensions.txt", std::ios::out | std::ios::trunc);
 	uint32_t extensionCount = 0;
 	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 	std::vector<VkExtensionProperties> availableExtensions(extensionCount);
 	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
+#ifndef __ANDROID__
+	std::ofstream ofs("enableExtensions.txt", std::ios::out | std::ios::trunc);
 	ofs << "available extensions : " << std::endl;
 	for (unsigned i = 0; i < availableExtensions.size(); i++)
 		ofs << availableExtensions[i].extensionName << std::endl;
+#else
+	for(uint32_t i = 0; i < availableExtensions.size(); i++)
+    	__android_log_print(ANDROID_LOG_DEBUG, "vulkan available extensions ", availableExtensions[i].extensionName, 0);
+#endif
 	//test augment extensionNames
 	for(uint32_t j = 0; j < extensionNames.size(); j++)
 	{
@@ -112,7 +113,8 @@ std::vector<std::string> const& validationLayer)
 			}
 	}
 	std::sort(mExtensions.begin(), mExtensions.end());
-    decltype(mExtensions)::iterator result = std::unique(mExtensions.begin(), mExtensions.end());
+    //decltype(mExtensions)::iterator result = std::unique(mExtensions.begin(), mExtensions.end());
+	auto result = std::unique(mExtensions.begin(), mExtensions.end());
 	mExtensions.erase(result, mExtensions.end());
 	//
 	//validation layer
@@ -174,16 +176,21 @@ void AEInstance::CreateInstance(VkApplicationInfo* appInfo, std::vector<std::str
 #endif
 	//validation layer message
 	if (enableValidationLayer)
-		mExtensions.push_back(std::string(VK_EXT_DEBUG_REPORT_EXTENSION_NAME));
+		mExtensions.emplace_back(std::string(VK_EXT_DEBUG_REPORT_EXTENSION_NAME));
 	//export available extensions file
-	std::ofstream ofs("enableExtensions.txt", std::ios::out | std::ios::trunc);
 	uint32_t extensionCount = 0;
 	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 	std::vector<VkExtensionProperties> availableExtensions(extensionCount);
 	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
+#ifndef __ANDROID__
+	std::ofstream ofs("enableExtensions.txt", std::ios::out | std::ios::trunc);
 	ofs << "available extensions : " << std::endl;
 	for (unsigned i = 0; i < availableExtensions.size(); i++)
 		ofs << availableExtensions[i].extensionName << std::endl;
+#else
+	for(uint32_t i = 0; i < availableExtensions.size(); i++)
+		__android_log_print(ANDROID_LOG_DEBUG, "vulkan available instance extensions ", availableExtensions[i].extensionName, 0);
+#endif
 	//test augment extensionNames
 	for(uint32_t j = 0; j < extensionNames.size(); j++)
 	{
@@ -198,7 +205,8 @@ void AEInstance::CreateInstance(VkApplicationInfo* appInfo, std::vector<std::str
 		}
 	}
 	std::sort(mExtensions.begin(), mExtensions.end());
-	decltype(mExtensions)::iterator result = std::unique(mExtensions.begin(), mExtensions.end());
+	//decltype(mExtensions)::iterator result = std::unique(mExtensions.begin(), mExtensions.end());
+	auto result = std::unique(mExtensions.begin(), mExtensions.end());
 	mExtensions.erase(result, mExtensions.end());
 	//
 	//validation layer
@@ -244,7 +252,6 @@ void AEInstance::CreateInstance(VkApplicationInfo* appInfo, std::vector<std::str
 		createInfo.ppEnabledLayerNames = nullptr;
 	if (vkCreateInstance(&createInfo, nullptr, &mInstance) != VK_SUCCESS)
 		throw std::runtime_error("failed to create instance");
-	return;
 }
 
 
@@ -658,9 +665,14 @@ void AELogicalDevice::FilterExtensions(const std::vector<const char*> &extension
 	vkEnumerateDeviceExtensionProperties(*GetPhysicalDevice(), nullptr, &extensionCount, nullptr);
 	std::vector<VkExtensionProperties> prop(extensionCount);
 	vkEnumerateDeviceExtensionProperties(*GetPhysicalDevice(), nullptr, &extensionCount, prop.data());
+#ifndef __ANDROID__
 	std::ofstream ofs("enableDeviceExtensions.txt", std::ios::out | std::ios::trunc);
 	for(auto i : prop)
 		ofs << i.extensionName << std::endl;
+#else
+	for(uint32_t i = 0; i < prop.size(); i++)
+		__android_log_print(ANDROID_LOG_DEBUG, "vulkan available device extensions", prop[i].extensionName, 0);
+#endif
 	//filter
 	for(auto extension : extensions)
 	{
