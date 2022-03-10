@@ -1,6 +1,6 @@
 # Aqoole Engine
 
-This project is based on https://github.com/googlesamples/android-vulkan-tutorials.(Apache License 2.0)
+This project is based on https://github.com/googlesamples/android-vulkan-tutorials  (Apache License 2.0)
 
 I have added my original vulkan rendering engine "Aqoole Engine" with Apache License 2.0.
 
