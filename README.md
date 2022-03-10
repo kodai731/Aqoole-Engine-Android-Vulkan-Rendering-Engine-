@@ -8,5 +8,6 @@ If built successfully, you can see many cubes along with auto forwarding.
 You can use gyro operation for camera.
 
 image sample
+----------------------
 <img src="./sample_cubes.png" height="400px">
 
