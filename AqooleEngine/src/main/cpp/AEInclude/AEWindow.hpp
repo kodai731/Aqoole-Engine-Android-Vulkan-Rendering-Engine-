@@ -60,6 +60,9 @@ class AESwapchainImageView;
 class AEDepthImage;
 class AESemaphore;
 class AEFence;
+#ifdef __ANDROID__
+struct ANativeWindow;
+#endif
 //
 
 #ifndef __ANDROID__
