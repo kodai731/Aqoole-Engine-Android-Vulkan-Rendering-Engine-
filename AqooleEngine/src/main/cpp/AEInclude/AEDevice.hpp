@@ -177,9 +177,6 @@ class AELogicalDevice
 	AEPhysicalDevices * mPhysicalDevice;
 	uint32_t mPhysicalIndex;
 	VkDevice mDevice;
-	//AEDeviceQueue* mQueue; to be deleted
-//	std::vector<VkDeviceQueueCreateInfo> mQueueCreateInfos;
-	//std::vector<AEDeviceQueueBase const*> mQueues;  to be deleted
 	std::vector<AEDeviceQueue*> mQueues;
 	//functions
 	void FilterExtensions(const std::vector<const char*> &extensions, std::vector<const char*> &availableExtension);

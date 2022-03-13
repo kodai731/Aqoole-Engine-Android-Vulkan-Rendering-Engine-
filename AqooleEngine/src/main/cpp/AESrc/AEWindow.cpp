@@ -20,6 +20,9 @@
 #include "AEBuffer.hpp"
 #include "AESyncObjects.hpp"
 #include "descriptorSet.hpp"
+#ifdef __ANDROID__
+#include <android_native_app_glue.h>
+#endif
 #ifndef __ANDROID__
 //---------------------------------------------------------------------
 //AE window
@@ -96,7 +99,6 @@ AESurface::~AESurface()
 {
 	vkDestroySurfaceKHR(*mInstance->GetInstance(), mSurface, nullptr);
 	mInstance = nullptr;
-	return;
 }
 
 //---------------------------------------------------------------------
@@ -178,7 +180,6 @@ AESwapchain::AESwapchain(AELogicalDevice* device, AESurface *surface)
 	mFormat = surfaceformat.format;
 	mSwapchainExtents.resize(0);
 	mSwapchainExtents.push_back(extent);
-	return;
 }
 
 /*
@@ -566,7 +567,7 @@ void MyImgui::Present(uint32_t index)
 	VkSubmitInfo submitInfo[] = {submitInfo0/*, submitInfo1*/};
 	vkResetFences(*mDevice->GetDevice(), 1, mFences[index]->GetFence());
 	if (vkQueueSubmit(mQueue->GetQueue(0), 1, submitInfo, *mFences[index]->GetFence()) != VK_SUCCESS)
-		std::runtime_error("failed to submit draw command buffer");
+		throw std::runtime_error("failed to submit draw command buffer");
 	//present info
     VkPresentInfoKHR info = {};
     info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;

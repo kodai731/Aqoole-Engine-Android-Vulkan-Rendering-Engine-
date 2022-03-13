@@ -23,7 +23,6 @@ set(MY_VULKAN_SRC_DIR ${SRC_DIR}/myVulkanSrc)
 set(IMGUI_DIR ${SRC_DIR}/myVulkanInclude/imgui/imgui)
 set(GLM_DIR ${SRC_DIR}/glm)
 add_library(main SHARED
-            ${MY_VULKAN_SRC_DIR}/AEWindow.cpp
             ${SRC_DIR}/VulkanMain.cpp
             ${SRC_DIR}/AndroidMain.cpp
             ${WRAPPER_DIR}/vulkan_wrapper.cpp)
