@@ -194,6 +194,7 @@ class MyImgui
     void Render(uint32_t index);
     void Present(uint32_t index);
     void DefineContents();
+    AECommandBuffer* GetCommandBuffer(){return mCommandBuffer.get();}
 };
 
 #endif

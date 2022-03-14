@@ -474,7 +474,7 @@ MyImgui::MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalD
 	vkDeviceWaitIdle(*mDevice->GetDevice());
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 	//setup semaphore and fence
-	for(uint32_t i = 0; i < MAX_IMAGES; i++)
+	for(uint32_t i = 0; i < mSwapchain->GetSize(); i++)
 	{
 		std::unique_ptr<AESemaphore> semaphore(new AESemaphore(mDevice));
 		mImageSemaphores.push_back(std::move(semaphore));
@@ -550,21 +550,26 @@ void MyImgui::Present(uint32_t index)
 	submitInfo0.pWaitDstStageMask = waitStages;
 	submitInfo0.commandBufferCount = 1;
 	submitInfo0.pCommandBuffers = mCommandBuffer->GetCommandBuffer();
-	submitInfo0.signalSemaphoreCount = 1;
-	submitInfo0.pSignalSemaphores = signalSemaphores;
-	VkSubmitInfo submitInfo[] = {submitInfo0/*, submitInfo1*/};
+//	submitInfo0.signalSemaphoreCount = 1;
+//	submitInfo0.pSignalSemaphores = signalSemaphores;
+	submitInfo0.signalSemaphoreCount = 0;
+	submitInfo0.pSignalSemaphores = nullptr;
+	VkSubmitInfo submitInfo[] = {submitInfo0};
 	vkResetFences(*mDevice->GetDevice(), 1, mFences[index]->GetFence());
 	if (vkQueueSubmit(mQueue->GetQueue(0), 1, submitInfo, *mFences[index]->GetFence()) != VK_SUCCESS)
 		throw std::runtime_error("failed to submit draw command buffer");
+	vkWaitForFences(*mDevice->GetDevice(), 1, mFences[index]->GetFence(), VK_TRUE, 1000000000);
 	//present info
     VkPresentInfoKHR info = {};
     info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    info.waitSemaphoreCount = 1;
-    info.pWaitSemaphores = signalSemaphores;
+//    info.waitSemaphoreCount = 1;
+//    info.pWaitSemaphores = signalSemaphores;
+	info.waitSemaphoreCount = 0;
+	info.pWaitSemaphores = nullptr;
     info.swapchainCount = 1;
     info.pSwapchains = mSwapchain->GetSwapchain();
     info.pImageIndices = &imageIndex;
-    result = vkQueuePresentKHR(mQueuePresent->GetQueue(0), &info);
+    vkQueuePresentKHR(mQueuePresent->GetQueue(0), &info);
 }
 
 /*

@@ -36,19 +36,19 @@
 #define _USE_MATH_DEFINES
 #define _GLM_FORCE_RADIANS
 #include <android_native_app_glue.h>
-#include "myVulkanInclude/AEDevice.hpp"
-#include "myVulkanInclude/AEDeviceQueue.hpp"
-#include "myVulkanInclude/AEWindow.hpp"
-#include "myVulkanInclude/AEPipeline.hpp"
-#include "myVulkanInclude/AEBuffer.hpp"
-#include "myVulkanInclude/AEImage.hpp"
-#include "myVulkanInclude/AEBuffer.hpp"
-#include "myVulkanInclude/AECommand.hpp"
-#include "myVulkanInclude/descriptorSet.hpp"
-#include "myVulkanInclude/AESyncObjects.hpp"
-#include "myVulkanInclude/AEMatrix.hpp"
-#include "myVulkanInclude/AEUBO.hpp"
-#include "myVulkanInclude/AEDrawObjects.hpp"
+#include "AEDevice.hpp"
+#include "AEDeviceQueue.hpp"
+#include "AEWindow.hpp"
+#include "AEPipeline.hpp"
+#include "AEBuffer.hpp"
+#include "AEImage.hpp"
+#include "AEBuffer.hpp"
+#include "AECommand.hpp"
+#include "descriptorSet.hpp"
+#include "AESyncObjects.hpp"
+#include "AEMatrix.hpp"
+#include "AEUBO.hpp"
+#include "AEDrawObjects.hpp"
 
 const int MAX_IN_FLIGHT = 2;
 
