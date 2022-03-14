@@ -191,6 +191,7 @@ class AELogicalDevice
 	void CreateDevice(const std::vector<const char*> &extensions, AEDeviceQueue* queue);
 	//iterator
 	VkDevice const* GetDevice()const{return &mDevice;}
+	VkDevice GetDeviceNotConst(){return mDevice;}
 	VkPhysicalDevice const* GetPhysicalDevice()const{return mPhysicalDevice->GetPhysicalDevice(mPhysicalIndex);}
 	//const std::vector<AEDeviceQueueBase const*>& GetQueues()const{return mQueues;}
     const std::vector<AEDeviceQueue*>& GetQueues()const{return mQueues;}
