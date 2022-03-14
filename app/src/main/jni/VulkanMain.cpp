@@ -157,6 +157,7 @@ uint32_t DetectFingers(uint32_t currentFrame, bool& isTouched, bool& isFocused, 
 bool isPositionInitialized = false;
 void ResetCamera();
 void PrintVector2(glm::vec2* vectors, uint32_t size);
+void RenderImgui(uint32_t currentFrame);
 /*
  * setImageLayout():
  *    Helper function to transition color buffer layout
@@ -704,9 +705,6 @@ bool InitVulkan(android_app* app) {
     vkCmdEndRenderPass(render.cmdBuffer_[bufferIndex]);
 
     CALL_VK(vkEndCommandBuffer(render.cmdBuffer_[bufferIndex]));
-    //init imgui
-//    gImgui = new MyImgui(app->window, gInstance, gDevice, gSwapchain, gQueue, gQueue, gSurface, &gFrameBuffers,
-//                         &gDepthImages, gSwapchainImageView, gRenderPass);
   }
 
   // We need to create a fence to be able, in the main loop, to wait for our
@@ -728,6 +726,9 @@ bool InitVulkan(android_app* app) {
   };
   CALL_VK(vkCreateSemaphore(device.device_, &semaphoreCreateInfo, nullptr,
                             &render.semaphore_));
+  //init imgui
+  gImgui = new MyImgui(app->window, gInstance, gDevice, gSwapchain, gQueue, gQueue, gSurface, &gFrameBuffers,
+                         &gDepthImages, gSwapchainImageView, gRenderPass);
   device.initialized_ = true;
   return true;
 }
@@ -840,6 +841,7 @@ bool VulkanDrawFrame(uint32_t currentFrame, bool& isTouched, bool& isFocused, gl
       .pResults = &result,
   };
   vkQueuePresentKHR(device.queue_, &presentInfo);
+  RenderImgui(currentFrame);
   return true;
 }
 
@@ -1044,4 +1046,31 @@ void ResetCamera()
   cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(1.0f, 0.0f, 0.0f)));
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
   gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
+}
+
+void RenderImgui(uint32_t currentFrame)
+{
+    ImGui_ImplAndroid_NewFrame();
+    ImGui_ImplVulkan_NewFrame();
+    ImGui::NewFrame();
+    static float f = 0.0f;
+    static int counter = 0;
+    ImGui::Begin("Parameters");                          // Create a window called "Hello, world!" and append into it.
+    //ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+    // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+    // ImGui::ColorEdit3("clear color", (float*)&imguiClearColor); // Edit 3 floats representing a color
+    if (ImGui::Button("reset time"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+    {
+//        startTime = lastTime;
+//        *passedTime = 0.0f;
+    }
+    if (ImGui::Button("pause"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+//        paused = !paused;
+    ImGui::SameLine();
+    //ImGui::Text("counter = %d", counter);
+    //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    ImGui::End();
+    gImgui->Render(currentFrame);
+    gImgui->Present(currentFrame);
+
 }

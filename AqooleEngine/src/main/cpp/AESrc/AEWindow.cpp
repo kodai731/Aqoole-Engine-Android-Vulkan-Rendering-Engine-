@@ -444,7 +444,7 @@ MyImgui::MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalD
 	ImGui_ImplVulkan_InitInfo init_info = {};
 	init_info.Instance = *instance->GetInstance();
 	init_info.PhysicalDevice = *mDevice->GetPhysicalDevice();
-	init_info.Device = *mDevice->GetDevice();
+	init_info.Device = mDevice->GetDeviceNotConst();
 	init_info.QueueFamily = mQueue->GetQueueFamilyIndex();
 	init_info.Queue = mQueue->GetQueue(0);
 	init_info.PipelineCache = VK_NULL_HANDLE;
@@ -456,21 +456,9 @@ MyImgui::MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalD
 	init_info.ImageCount = mSwapchain->GetSize();
 	init_info.CheckVkResultFn = nullptr;
 	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-	//test sampler
-	VkSamplerCreateInfo testInfo = {};
-	testInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	testInfo.magFilter = VK_FILTER_LINEAR;
-	testInfo.minFilter = VK_FILTER_LINEAR;
-	testInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	testInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	testInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	testInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	testInfo.minLod = -1000;
-	testInfo.maxLod = 1000;
-	testInfo.maxAnisotropy = 1.0f;
-	VkSampler sampler;
-	auto samplerRes = vkCreateSampler(*mDevice->GetDevice(), &testInfo, nullptr, &sampler);
 	ImGui_ImplVulkan_Init(&init_info, *mRenderPass->GetRenderPass());
+	//android init
+	ImGui_ImplAndroid_Init(platformWindow);
 	//upload fonts
 	mCommandPool = std::make_unique<AECommandPool>(mDevice, mQueue);
 	mCommandBuffer = std::make_unique<AECommandBuffer>(mDevice, mCommandPool.get());
