@@ -646,7 +646,10 @@ bool InitVulkan(android_app* app) {
   };
   CALL_VK(vkAllocateCommandBuffers(device.device_, &cmdBufferCreateInfo,
                                    render.cmdBuffer_));
-
+  //init imgui
+  gImgui = new MyImgui(app->window, gInstance, gDevice, gSwapchain, gQueue, gQueue, gSurface, &gFrameBuffers,
+                       &gDepthImages, gSwapchainImageView, gRenderPass);
+  //register commands
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
     // We start by creating and declare the "beginning" our command buffer
@@ -726,9 +729,6 @@ bool InitVulkan(android_app* app) {
   };
   CALL_VK(vkCreateSemaphore(device.device_, &semaphoreCreateInfo, nullptr,
                             &render.semaphore_));
-  //init imgui
-  gImgui = new MyImgui(app->window, gInstance, gDevice, gSwapchain, gQueue, gQueue, gSurface, &gFrameBuffers,
-                         &gDepthImages, gSwapchainImageView, gRenderPass);
   device.initialized_ = true;
   return true;
 }
