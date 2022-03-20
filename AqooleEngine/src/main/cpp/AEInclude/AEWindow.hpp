@@ -133,6 +133,7 @@ class AESwapchain
     VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
     public:
     AESwapchain(AELogicalDevice* device, AESurface *surface);
+    AESwapchain(AELogicalDevice* device, AESurface *surface, float width, float height);
     ~AESwapchain();
     //iterator
     AELogicalDevice* GetDevice(){return mDevice;}
@@ -156,7 +157,6 @@ class MyImgui
     std::unique_ptr<AESwapchain> mSwapchain;
     std::unique_ptr<AECommandPool> mCommandPool;
     std::unique_ptr<AECommandBuffer> mCommandBuffer;
-    std::unique_ptr<AESurface> mSurface;
     std::vector<std::unique_ptr<AEFrameBuffer>> mFrameBuffers;
     std::unique_ptr<AEDepthImage> mDepthImage;
     std::unique_ptr<AESwapchainImageView> mSwapchainImageView;
@@ -165,18 +165,19 @@ class MyImgui
     std::vector<std::unique_ptr<AESemaphore>> mRenderSemaphores;
     std::vector<std::unique_ptr<AEFence>> mFences;
 #else
-    AESwapchain* mSwapchain;
 #endif
     AEDeviceQueue* mQueue;
     AEDeviceQueue* mQueuePresent;
     AELogicalDevice* mDevice;
+//    std::unique_ptr<AESurface> mSurface;
+    AESurface* mSurface;
+    std::unique_ptr<AESwapchain> mSwapchain;
+    std::vector<std::unique_ptr<AEFrameBuffer>> mFrameBuffers;
+    std::unique_ptr<AEDepthImage> mDepthImage;
+    std::unique_ptr<AESwapchainImageView> mSwapchainImageView;
+    std::unique_ptr<AERenderPass> mRenderPass;
     std::unique_ptr<AECommandPool> mCommandPool;
     std::unique_ptr<AECommandBuffer> mCommandBuffer;
-    AESurface* mSurface;
-    std::vector<AEFrameBuffer*>* mFrameBuffers;
-    std::vector<AEDepthImage*>* mDepthImage;
-    AESwapchainImageView* mSwapchainImageView;
-    AERenderPass* mRenderPass;
     std::vector<std::unique_ptr<AESemaphore>> mImageSemaphores;
     std::vector<std::unique_ptr<AESemaphore>> mRenderSemaphores;
     std::vector<std::unique_ptr<AEFence>> mFences;
