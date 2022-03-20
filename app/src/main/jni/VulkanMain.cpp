@@ -647,8 +647,8 @@ bool InitVulkan(android_app* app) {
   CALL_VK(vkAllocateCommandBuffers(device.device_, &cmdBufferCreateInfo,
                                    render.cmdBuffer_));
   //init imgui
-  gImgui = new MyImgui(app->window, gInstance, gDevice, gSwapchain, gQueue, gQueue, gSurface, &gFrameBuffers,
-                       &gDepthImages, gSwapchainImageView, gRenderPass);
+  //gImgui = new MyImgui(app->window, gInstance, gDevice, gSwapchain, gQueue, gQueue, gSurface, &gFrameBuffers,
+  //                     &gDepthImages, gSwapchainImageView, gRenderPass);
   //register commands
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
@@ -801,12 +801,11 @@ bool VulkanDrawFrame(uint32_t currentFrame, bool& isTouched, bool& isFocused, gl
       lastPositions[0] = touchPositions[0];
       lastPositions[1] = touchPositions[1];
   }
-  RenderImgui(currentFrame);
   LookByGravity(currentFrame, isTouched, isFocused, gravityData, lastGravityData);
   cameraPos += glm::vec3(0.0f, 0.0f, 0.1f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
   gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
-  gImgui->Render(currentFrame);
+  //gImgui->Render(currentFrame);
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
@@ -816,13 +815,13 @@ bool VulkanDrawFrame(uint32_t currentFrame, bool& isTouched, bool& isFocused, gl
 
   VkPipelineStageFlags waitStageMask =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  VkCommandBuffer cmdBuffers[2] = {render.cmdBuffer_[nextIndex], *gImgui->GetCommandBuffer()->GetCommandBuffer()};
+  VkCommandBuffer cmdBuffers[1] = {render.cmdBuffer_[nextIndex]};
   VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                               .pNext = nullptr,
                               .waitSemaphoreCount = 1,
                               .pWaitSemaphores = &render.semaphore_,
                               .pWaitDstStageMask = &waitStageMask,
-                              .commandBufferCount = 2,
+                              .commandBufferCount = 1,
                               .pCommandBuffers = cmdBuffers,
                               .signalSemaphoreCount = 0,
                               .pSignalSemaphores = nullptr};
@@ -844,6 +843,7 @@ bool VulkanDrawFrame(uint32_t currentFrame, bool& isTouched, bool& isFocused, gl
       .pResults = &result,
   };
   vkQueuePresentKHR(device.queue_, &presentInfo);
+  //RenderImgui(currentFrame);
   return true;
 }
 
@@ -1072,7 +1072,7 @@ void RenderImgui(uint32_t currentFrame)
     //ImGui::Text("counter = %d", counter);
     //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     ImGui::End();
-//    gImgui->Render(currentFrame);
-//    gImgui->Present(currentFrame);
+    gImgui->Render(currentFrame);
+    gImgui->Present(currentFrame);
 
 }

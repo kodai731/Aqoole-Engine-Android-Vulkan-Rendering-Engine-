@@ -22,7 +22,7 @@ set(VK_VAL_LAYER_SRC_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src)
 set(AE_DIR ../AqooleEngine/src/main/cpp/AEInclude)
 set(GLM_DIR ${AE_DIR}/../glm)
 set(IMGUI_DIR ${AE_DIR}/imgui/imgui)
-add_library(main SHARED
+add_library(vulkanNativeActivity SHARED
             ${SRC_DIR}/VulkanMain.cpp
             ${SRC_DIR}/AndroidMain.cpp
             ${WRAPPER_DIR}/vulkan_wrapper.cpp)
@@ -38,4 +38,4 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 \
                      -DVK_USE_PLATFORM_ANDROID_KHR")
 
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
-target_link_libraries(main AqooleEngine app-glue log android)
+target_link_libraries(vulkanNativeActivity AqooleEngine app-glue log android)

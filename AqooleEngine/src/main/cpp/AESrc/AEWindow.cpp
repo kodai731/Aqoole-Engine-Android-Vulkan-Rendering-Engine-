@@ -182,14 +182,79 @@ AESwapchain::AESwapchain(AELogicalDevice* device, AESurface *surface)
 	mSwapchainExtents.push_back(extent);
 }
 
+AESwapchain::AESwapchain(AELogicalDevice* device, AESurface *surface, float width, float height)
+{
+    mDevice = device;
+    mSurface = surface;
+    //std::vector<AEDeviceQueueBase const*> queues = mDevice->GetQueues();
+    std::vector<AEDeviceQueue*> queues = mDevice->GetQueues();
+    //
+    SwapchainSupportDetails swapChainDetails = QuerySwapchainSupport();
+    VkSurfaceFormatKHR surfaceformat = ChooseSurfaceFormat(swapChainDetails.formats);
+    VkPresentModeKHR presentMode = ChoosePresentMode(swapChainDetails.presentModes);
+    VkExtent2D extent = ChooseSwapExtent(swapChainDetails.capabilities);
+    extent.width = static_cast<uint32_t>(round((float)extent.width * width));
+    extent.height = static_cast<uint32_t>(round((float)extent.height * height));
+    //
+    uint32_t imageCount = swapChainDetails.capabilities.minImageCount;
+    //uint32_t imageCount = 2;
+    if (swapChainDetails.capabilities.maxImageCount > 0 && imageCount > swapChainDetails.capabilities.maxImageCount)
+        imageCount = swapChainDetails.capabilities.maxImageCount;
+    //
+    VkSwapchainCreateInfoKHR createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface = *mSurface->GetSurface();
+    createInfo.minImageCount = imageCount;
+    createInfo.imageFormat = surfaceformat.format;
+    createInfo.imageColorSpace = surfaceformat.colorSpace;
+    createInfo.imageExtent = extent;
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    createInfo.queueFamilyIndexCount = queues.size();
+    //uint32_t queueFamilyIndices[] = {queues[0]->GetQueueFamilyIndex(), queues[1]->GetQueueFamilyIndex()};
+    std::vector<uint32_t> queueFamilyIndices;
+    for(uint32_t i = 0; i < queues.size(); i++)
+        queueFamilyIndices.push_back(queues[i]->GetQueueFamilyIndex());
+    createInfo.pQueueFamilyIndices = queueFamilyIndices.data();
+    //
+    createInfo.preTransform = swapChainDetails.capabilities.currentTransform;
+#ifdef __ANDROID__
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+#else
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+#endif
+    createInfo.presentMode = presentMode;
+    createInfo.clipped = VK_TRUE;
+#ifdef __ANDROID__
+    createInfo.clipped = VK_TRUE;
+#endif
+    createInfo.oldSwapchain = VK_NULL_HANDLE;
+    auto res = vkCreateSwapchainKHR(*mDevice->GetDevice(), &createInfo, nullptr, &mSwapchain);
+    if (res != VK_SUCCESS)
+#ifndef __ANDROID__
+        throw std::runtime_error("failed in create swap chain");
+#else
+    	__android_log_print(ANDROID_LOG_DEBUG, "vulkan imgui", std::to_string(res).c_str(), 0);
+#endif
+    //images
+    vkGetSwapchainImagesKHR(*mDevice->GetDevice(), mSwapchain, &imageCount, nullptr);
+    mSwapchainImages = new VkImage[imageCount];
+    vkGetSwapchainImagesKHR(*mDevice->GetDevice(), mSwapchain, &imageCount, mSwapchainImages);
+    mSize = imageCount;
+    //store
+    mFormat = surfaceformat.format;
+    mSwapchainExtents.resize(0);
+    mSwapchainExtents.push_back(extent);
+
+}
+
+
 /*
 destructor
  */
 AESwapchain::~AESwapchain()
 {
-//	for(uint32_t i = 0; i < mSize; i++)
-//		vkDestroyImage(*mDevice->GetDevice(), mSwapchainImages[i], nullptr);
-//	delete[] mSwapchainImages;
 	vkDestroySwapchainKHR(*mDevice->GetDevice(), mSwapchain, nullptr);
 }
 
@@ -401,16 +466,20 @@ MyImgui::MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalD
 	mQueuePresent = queuePresent;
 //	//create window
 //	mSurface = std::make_unique<AESurface>(platformWindow, instance);
+    mSurface = surface;
 	//create swapchain
-//	mSwapchain = std::make_unique<AESwapchain>(mDevice, mSurface.get());
-    mSwapchain = swapchain;
-	mSwapchainImageView = swapchainImageView;
+	mSwapchain = std::make_unique<AESwapchain>(mDevice, mSurface, 0.3, 0.1);
+	mSwapchainImageView = std::make_unique<AESwapchainImageView>(mSwapchain.get());
 	//create depth image
-	mDepthImage = depthImages;
+	mDepthImage = std::make_unique<AEDepthImage>(mDevice, mSwapchain.get());
 	//create render pass
-	mRenderPass = renderPass;
+	mRenderPass = std::make_unique<AERenderPass>(mSwapchain.get(), true);
 	//create frame buffers
-	mFrameBuffers = framebuffers;
+	for(uint32_t i = 0; i < mSwapchain->GetSize(); i++)
+	{
+		std::unique_ptr<AEFrameBuffer> ptr(new AEFrameBuffer(i, mSwapchainImageView.get(), mRenderPass.get(), mDepthImage.get()));
+		mFrameBuffers.push_back(std::move(ptr));
+	}
 	//create descriptor pool
 	//descriptor pool for imgui
 	VkDescriptorPoolSize pool_sizes[] =
@@ -523,7 +592,7 @@ void MyImgui::Render(uint32_t index)
 #ifndef __ANDROID__
 	AECommand::BeginRenderPass(index, mCommandBuffer.get(), mFrameBuffers[index].get());
 #else
-	AECommand::BeginRenderPass(index, mCommandBuffer.get(), (*mFrameBuffers)[index]);
+	AECommand::BeginRenderPass(index, mCommandBuffer.get(), mFrameBuffers[index].get());
 #endif
 	ImGui_ImplVulkan_RenderDrawData(drawData, *mCommandBuffer->GetCommandBuffer());
 	AECommand::EndRenderPass(mCommandBuffer.get());
