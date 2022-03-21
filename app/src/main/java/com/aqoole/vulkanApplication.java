@@ -15,6 +15,11 @@
  */
 
 /*
+this file is modified by Shigeoka Kodai
+the original file is at https://github.com/android/ndk-samples/tree/main/teapots
+ */
+
+/*
  * Copyright 2022 Shigeoka Kodai
  *
  * Licensed under the Apache License, Version 2.0 (the "License");

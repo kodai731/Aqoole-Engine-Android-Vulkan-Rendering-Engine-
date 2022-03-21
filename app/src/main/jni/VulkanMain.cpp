@@ -146,6 +146,7 @@ AEDescriptorPool* gDescriptorPool;
 AEDescriptorSet* gDescriptorSet;
 glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
 MyImgui* gImgui;
+void ShowUI(android_app *app);
 
 std::vector<AECube*> gCubes;
 
@@ -730,6 +731,7 @@ bool InitVulkan(android_app* app) {
   CALL_VK(vkCreateSemaphore(device.device_, &semaphoreCreateInfo, nullptr,
                             &render.semaphore_));
   device.initialized_ = true;
+  ShowUI(app);
   return true;
 }
 
@@ -1075,4 +1077,17 @@ void RenderImgui(uint32_t currentFrame)
     gImgui->Render(currentFrame);
     gImgui->Present(currentFrame);
 
+}
+
+void ShowUI(android_app *app_)
+{
+    JNIEnv* jni;
+    app_->activity->vm->AttachCurrentThread(&jni, nullptr);
+
+    // Default class retrieval
+    jclass clazz = jni->GetObjectClass(app_->activity->clazz);
+    jmethodID methodID = jni->GetMethodID(clazz, "showUI", "()V");
+    jni->CallVoidMethod(app_->activity->clazz, methodID);
+
+    app_->activity->vm->DetachCurrentThread();
 }
