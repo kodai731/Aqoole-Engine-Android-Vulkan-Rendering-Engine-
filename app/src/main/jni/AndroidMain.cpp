@@ -31,6 +31,7 @@
 #include <android/sensor.h>
 #include <android_native_app_glue.h>
 #include "VulkanMain.hpp"
+#include <unistd.h>
 
 glm::vec2 touchPositions[2] = {glm::vec2(0.0f), glm::vec2(0.0f)};
 bool isTouched = false;
@@ -152,7 +153,7 @@ void android_main(struct android_app* app) {
   InitSensor(app);
   // Main loop
   do {
-    if ((ident = ALooper_pollAll(IsVulkanReady() ? 160 : -1, nullptr,
+    if ((ident = ALooper_pollAll(IsVulkanReady() ? 60 : -1, nullptr,
                         &events, (void**)&source)) >= 0) {
       if (source != NULL) source->process(app, source);
       if(ident == LOOPER_ID_USER)
@@ -170,8 +171,9 @@ void android_main(struct android_app* app) {
     }
     // render if vulkan is ready
     if (IsVulkanReady()) {
-      VulkanDrawFrame(currentFrame, isTouched, isFocused, touchPositions, &laData, &lastLaData);
+      VulkanDrawFrame(app, currentFrame, isTouched, isFocused, touchPositions, &laData, &lastLaData);
       currentFrame = (currentFrame + 1) % MAX_IN_FLIGHT;
     }
+    usleep(100);
   } while (app->destroyRequested == 0);
 }

@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+this file is modified by Shigeoka Kodai
+the original is at https://github.com/android/ndk-samples/tree/main/teapots (Apache 2.0 License)
+ */
+
 /*
 * Copyright 2022 Shigeoka Kodai
         *
@@ -151,8 +157,8 @@ public class vulkanNativeActivity extends NativeActivity {
         this.runOnUiThread(new Runnable()  {
             @Override
             public void run()  {
-                //_label.setText(String.format("%2.2f FPS", fFPS));
-                _label.setText(String.format("test", "test"));
+                _label.setText(String.format("%2.2f FPS", fFPS));
+                //_label.setText(String.format("test", "test"));
             }});
     }
 }

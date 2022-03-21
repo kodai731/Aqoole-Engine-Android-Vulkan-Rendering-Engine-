@@ -64,7 +64,7 @@ void DeleteVulkan(void);
 bool IsVulkanReady(void);
 
 // Ask Vulkan to Render a frame
-bool VulkanDrawFrame(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* touchPosition,
+bool VulkanDrawFrame(android_app* app, uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* touchPosition,
                      glm::vec3* gravityData, glm::vec3* lastGravityData);
 
 #endif // __VULKANMAIN_HPP__
