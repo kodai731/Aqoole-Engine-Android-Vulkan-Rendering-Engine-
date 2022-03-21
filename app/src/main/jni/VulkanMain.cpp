@@ -147,6 +147,8 @@ AEDescriptorSet* gDescriptorSet;
 glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
 MyImgui* gImgui;
 void ShowUI(android_app *app);
+void UpdateUI(android_app *app, float fps);
+double lastTime;
 
 std::vector<AECube*> gCubes;
 
@@ -159,6 +161,7 @@ bool isPositionInitialized = false;
 void ResetCamera();
 void PrintVector2(glm::vec2* vectors, uint32_t size);
 void RenderImgui(uint32_t currentFrame);
+static double GetTime();
 /*
  * setImageLayout():
  *    Helper function to transition color buffer layout
@@ -732,6 +735,7 @@ bool InitVulkan(android_app* app) {
                             &render.semaphore_));
   device.initialized_ = true;
   ShowUI(app);
+  lastTime = GetTime();
   return true;
 }
 
@@ -775,7 +779,7 @@ void DeleteVulkan(void) {
 }
 
 // Draw one frame
-bool VulkanDrawFrame(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* touchPositions,
+bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* touchPositions,
                      glm::vec3* gravityData, glm::vec3* lastGravityData) {
   if(!isTouched & !isPositionInitialized)
   {
@@ -846,6 +850,9 @@ bool VulkanDrawFrame(uint32_t currentFrame, bool& isTouched, bool& isFocused, gl
   };
   vkQueuePresentKHR(device.queue_, &presentInfo);
   //RenderImgui(currentFrame);
+  double currentTime = GetTime();
+  UpdateUI(app, 1000.0f / (float)(currentTime - lastTime));
+  lastTime = currentTime;
   return true;
 }
 
@@ -1090,4 +1097,24 @@ void ShowUI(android_app *app_)
     jni->CallVoidMethod(app_->activity->clazz, methodID);
 
     app_->activity->vm->DetachCurrentThread();
+}
+
+void UpdateUI(android_app *app_, float fps_)
+{
+  JNIEnv* jni;
+  app_->activity->vm->AttachCurrentThread(&jni, nullptr);
+
+  // Default class retrieval
+  jclass clazz = jni->GetObjectClass(app_->activity->clazz);
+  jmethodID methodID = jni->GetMethodID(clazz, "updateFPS", "(F)V");
+  jni->CallVoidMethod(app_->activity->clazz, methodID, fps_);
+
+  app_->activity->vm->DetachCurrentThread();
+}
+
+double GetTime()
+{
+  timespec res;
+  clock_gettime(CLOCK_REALTIME, &res);
+  return 1000.0 * res.tv_sec + res.tv_nsec / 1e6;
 }
