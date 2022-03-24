@@ -14,4 +14,10 @@
         android:textAppearance="?android:attr/textAppearanceMedium"
         android:textColor="@android:color/white" />
 
+    <Switch
+        android:id="@+id/switch1"
+        android:layout_width="99dp"
+        android:layout_height="wrap_content"
+        android:text="Switch" />
+
 </LinearLayout>
