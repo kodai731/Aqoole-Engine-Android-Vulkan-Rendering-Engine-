@@ -105,6 +105,7 @@ struct VulkanRenderInfo {
   VkCommandBuffer* cmdBuffer_;
   uint32_t cmdBufferLen_;
   VkSemaphore semaphore_;
+  VkSemaphore presentSemaphore_;
   VkFence fence_;
 };
 VulkanRenderInfo render;
@@ -147,8 +148,7 @@ AEDescriptorPool* gDescriptorPool;
 AEDescriptorSet* gDescriptorSet;
 glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
 MyImgui* gImgui;
-void ShowUI(android_app *app);
-void UpdateUI(android_app *app, float fps);
+AECommandBuffer* gImguiCommandBuffer;
 double lastTime;
 
 std::vector<AECube*> gCubes;
@@ -161,10 +161,10 @@ uint32_t DetectFingers(uint32_t currentFrame, bool& isTouched, bool& isFocused, 
 bool isPositionInitialized = false;
 void ResetCamera();
 void PrintVector2(glm::vec2* vectors, uint32_t size);
-void RenderImgui(uint32_t currentFrame);
 static double GetTime();
 VkPipeline imguiPipeline;
 void CreateImguiPipeline();
+void RecordImguiCommand(uint32_t imageNum);
 /*
  * setImageLayout():
  *    Helper function to transition color buffer layout
@@ -399,7 +399,7 @@ VkResult CreateGraphicsPipeline(void) {
       .x = 0,
       .y = 0,
       .width = (float)swapchain.displaySize_.width,
-      .height = (float)swapchain.displaySize_.height * 0.5f,
+      .height = (float)swapchain.displaySize_.height,
       .minDepth = 0.0f,
       .maxDepth = 1.0f,
   };
@@ -660,8 +660,9 @@ bool InitVulkan(android_app* app) {
     render.cmdBuffer_[i] = *gCommandBuffers[i]->GetCommandBuffer();
   }
   //init imgui
+  CreateImguiPipeline();
   gImgui = new MyImgui(app->window, gInstance, gDevice, gSwapchain, gQueue, gQueue, gSurface, &gFrameBuffers,
-                       &gDepthImages, gSwapchainImageView, gRenderPass, gCommandBuffers[0]);
+                       &gDepthImages, gSwapchainImageView, gRenderPass);
   //register commands
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
@@ -704,7 +705,31 @@ bool InitVulkan(android_app* app) {
         .pClearValues = clearVals};
     vkCmdBeginRenderPass(render.cmdBuffer_[bufferIndex], &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
-    // Bind what is necessary to the command buffer
+//    ImGui_ImplAndroid_NewFrame();
+//    ImGui_ImplVulkan_NewFrame();
+//    ImGui::NewFrame();
+//    static float f = 0.0f;
+//    static int counter = 0;
+//    ImGui::Begin("Parameters");                          // Create a window called "Hello, world!" and append into it.
+//    //ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+//    // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+//    // ImGui::ColorEdit3("clear color", (float*)&imguiClearColor); // Edit 3 floats representing a color
+//    if (ImGui::Button("\nreset time\n"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+//    {
+////        startTime = lastTime;
+////        *passedTime = 0.0f;
+//          ResetCamera();
+//    }
+//    if (ImGui::Button("pause"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+////        paused = !paused;
+//      ImGui::SameLine();
+//    //ImGui::Text("counter = %d", counter);
+//    //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+//    ImGui::End();
+//    ImGui::Render();
+//    ImDrawData* drawData = ImGui::GetDrawData();
+//    ImGui_ImplVulkan_RenderDrawData(drawData, render.cmdBuffer_[bufferIndex]);
+      // Bind what is necessary to the command buffer
     vkCmdBindPipeline(render.cmdBuffer_[bufferIndex],
                       VK_PIPELINE_BIND_POINT_GRAPHICS, gfxPipeline.pipeline_);
     VkDeviceSize offset = 0;
@@ -718,31 +743,7 @@ bool InitVulkan(android_app* app) {
     // Draw Triangle
 //    vkCmdDraw(render.cmdBuffer_[bufferIndex], 3, 1, 0, 0);
     vkCmdDrawIndexed(render.cmdBuffer_[bufferIndex], gCubes.size() * gCubes[0]->GetIndexSize(), 1, 0, 0, 0);
-    ImGui_ImplAndroid_NewFrame();
-    ImGui_ImplVulkan_NewFrame();
-    ImGui::NewFrame();
-    static float f = 0.0f;
-    static int counter = 0;
-    ImGui::Begin("Parameters");                          // Create a window called "Hello, world!" and append into it.
-    //ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-    // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-    // ImGui::ColorEdit3("clear color", (float*)&imguiClearColor); // Edit 3 floats representing a color
-    if (ImGui::Button("reset time"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-    {
-//        startTime = lastTime;
-//        *passedTime = 0.0f;
-    }
-    if (ImGui::Button("pause"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-//        paused = !paused;
-      ImGui::SameLine();
-    //ImGui::Text("counter = %d", counter);
-    //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-    ImGui::End();
-    ImGui::Render();
-    ImDrawData* drawData = ImGui::GetDrawData();
-    ImGui_ImplVulkan_RenderDrawData(drawData, render.cmdBuffer_[bufferIndex], imguiPipeline);
     vkCmdEndRenderPass(render.cmdBuffer_[bufferIndex]);
-
     CALL_VK(vkEndCommandBuffer(render.cmdBuffer_[bufferIndex]));
   }
 
@@ -765,10 +766,9 @@ bool InitVulkan(android_app* app) {
   };
   CALL_VK(vkCreateSemaphore(device.device_, &semaphoreCreateInfo, nullptr,
                             &render.semaphore_));
+  vkCreateSemaphore(device.device_, &semaphoreCreateInfo, nullptr, &render.presentSemaphore_);
   device.initialized_ = true;
-  ShowUI(app);
   lastTime = GetTime();
-  CreateImguiPipeline();
   return true;
 }
 
@@ -831,7 +831,8 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
       uint32_t fingers = DetectFingers(currentFrame, isTouched, isFocused, touchPositions);
       if(fingers == 1)
           //Look(currentFrame, isTouched, isFocused, touchPositions);
-          ResetCamera();
+          //ResetCamera();  => reposition to imgui
+        ;
       else if(fingers == 2)
           Zoom(currentFrame, isTouched, isFocused, touchPositions);
       isPositionInitialized = false;
@@ -844,27 +845,25 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   cameraPos += glm::vec3(0.0f, 0.0f, 0.1f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
   gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
-  //gImgui->Render(currentFrame);
-//  RenderImgui(currentFrame);
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
                                 UINT64_MAX, render.semaphore_, VK_NULL_HANDLE,
                                 &nextIndex));
   CALL_VK(vkResetFences(device.device_, 1, &render.fence_));
-
-  VkPipelineStageFlags waitStageMask =
+  RecordImguiCommand(nextIndex);
+    VkPipelineStageFlags waitStageMask =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  VkCommandBuffer cmdBuffers[1] = {render.cmdBuffer_[nextIndex]};
+  VkCommandBuffer cmdBuffers[2] = {render.cmdBuffer_[nextIndex], *gImgui->GetCommandBuffer()->GetCommandBuffer()};
   VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                               .pNext = nullptr,
                               .waitSemaphoreCount = 1,
                               .pWaitSemaphores = &render.semaphore_,
                               .pWaitDstStageMask = &waitStageMask,
-                              .commandBufferCount = 1,
+                              .commandBufferCount = 2,
                               .pCommandBuffers = cmdBuffers,
-                              .signalSemaphoreCount = 0,
-                              .pSignalSemaphores = nullptr};
+                              .signalSemaphoreCount = 1,
+                              .pSignalSemaphores = &render.presentSemaphore_,};
   CALL_VK(vkQueueSubmit(device.queue_, 1, &submit_info, render.fence_));
   CALL_VK(
       vkWaitForFences(device.device_, 1, &render.fence_, VK_TRUE, 100000000));
@@ -875,8 +874,8 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   VkPresentInfoKHR presentInfo{
       .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
       .pNext = nullptr,
-      .waitSemaphoreCount = 0,
-      .pWaitSemaphores = nullptr,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = &render.presentSemaphore_,
       .swapchainCount = 1,
       .pSwapchains = &swapchain.swapchain_,
       .pImageIndices = &nextIndex,
@@ -884,7 +883,7 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   };
   vkQueuePresentKHR(device.queue_, &presentInfo);
   double currentTime = GetTime();
-  UpdateUI(app, 1000.0f / (float)(currentTime - lastTime));
+  //UpdateUI(app, 1000.0f / (float)(currentTime - lastTime));
   lastTime = currentTime;
   return true;
 }
@@ -1092,59 +1091,6 @@ void ResetCamera()
   gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
 }
 
-void RenderImgui(uint32_t currentFrame)
-{
-    ImGui_ImplAndroid_NewFrame();
-    ImGui_ImplVulkan_NewFrame();
-    ImGui::NewFrame();
-    static float f = 0.0f;
-    static int counter = 0;
-    ImGui::Begin("Parameters");                          // Create a window called "Hello, world!" and append into it.
-    //ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-    // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-    // ImGui::ColorEdit3("clear color", (float*)&imguiClearColor); // Edit 3 floats representing a color
-    if (ImGui::Button("reset time"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-    {
-//        startTime = lastTime;
-//        *passedTime = 0.0f;
-    }
-    if (ImGui::Button("pause"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-//        paused = !paused;
-    ImGui::SameLine();
-    //ImGui::Text("counter = %d", counter);
-    //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-    ImGui::End();
-//    gImgui->Render(currentFrame);
-//    gImgui->Present(currentFrame);
-
-}
-
-void ShowUI(android_app *app_)
-{
-    JNIEnv* jni;
-    app_->activity->vm->AttachCurrentThread(&jni, nullptr);
-
-    // Default class retrieval
-    jclass clazz = jni->GetObjectClass(app_->activity->clazz);
-    jmethodID methodID = jni->GetMethodID(clazz, "showUI", "()V");
-    jni->CallVoidMethod(app_->activity->clazz, methodID);
-
-    app_->activity->vm->DetachCurrentThread();
-}
-
-void UpdateUI(android_app *app_, float fps_)
-{
-  JNIEnv* jni;
-  app_->activity->vm->AttachCurrentThread(&jni, nullptr);
-
-  // Default class retrieval
-  jclass clazz = jni->GetObjectClass(app_->activity->clazz);
-  jmethodID methodID = jni->GetMethodID(clazz, "updateFPS", "(F)V");
-  jni->CallVoidMethod(app_->activity->clazz, methodID, fps_);
-
-  app_->activity->vm->DetachCurrentThread();
-}
-
 double GetTime()
 {
   timespec res;
@@ -1152,20 +1098,7 @@ double GetTime()
   return 1000.0 * res.tv_sec + res.tv_nsec / 1e6;
 }
 
-void CreateImguiPipeline()
-{
-    // Create pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-            .pNext = nullptr,
-            .setLayoutCount = 0,
-            .pSetLayouts = nullptr,
-            .pushConstantRangeCount = 0,
-            .pPushConstantRanges = nullptr,
-    };
-    CALL_VK(vkCreatePipelineLayout(device.device_, &pipelineLayoutCreateInfo,
-                                   nullptr, &gfxPipeline.layout_));
-
+void CreateImguiPipeline() {
     VkShaderModule vertexShader, fragmentShader;
     loadShaderFromFile("shaders/tri.vert.spv", &vertexShader, VERTEX_SHADER);
     loadShaderFromFile("shaders/tri.frag.spv", &fragmentShader, FRAGMENT_SHADER);
@@ -1194,15 +1127,15 @@ void CreateImguiPipeline()
     VkViewport viewports{
             .x = 0,
             .y = 0,
-            .width = (float)100.0f,
-            .height = (float)100.0f,
+            .width = (float) 150.0f,
+            .height = (float) 200.0f,
             .minDepth = 0.0f,
             .maxDepth = 1.0f,
     };
 
     VkRect2D scissor = {
-            .offset { .x = 0, .y = 0,},
-            .extent = {.width = 100, .height = 100},
+            .offset {.x = 0, .y = 0,},
+            .extent = {.width = 150, .height = 200},
     };
     // Specify viewport info
     VkPipelineViewportStateCreateInfo viewportInfo{
@@ -1347,5 +1280,53 @@ void CreateImguiPipeline()
     // We don't need the shaders anymore, we can release their memory
     vkDestroyShaderModule(device.device_, vertexShader, nullptr);
     vkDestroyShaderModule(device.device_, fragmentShader, nullptr);
+}
 
+void RecordImguiCommand(uint32_t imageNum)
+{
+  VkCommandBuffer* cb = gImgui->GetCommandBuffer()->GetCommandBuffer();
+  VkCommandBufferBeginInfo cmdBufferBeginInfo{
+          .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+          .pNext = nullptr,
+          .flags = 0,
+          .pInheritanceInfo = nullptr,
+  };
+  CALL_VK(vkBeginCommandBuffer(*cb, &cmdBufferBeginInfo));
+  VkClearValue clearVals[2]{ {.color { .float32 {0.0f, 0.34f, 0.90f, 1.0f}}},{.depthStencil{.depth = 1.0f}}};
+  VkRenderPassBeginInfo renderPassBeginInfo{
+          .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+          .pNext = nullptr,
+          .renderPass = render.renderPass_,
+          .framebuffer = swapchain.framebuffers_[imageNum],
+          .renderArea = {.offset { .x = 0, .y = 0,},
+                  .extent = {.width = 150, .height = 200}},
+          .clearValueCount = 2,
+          .pClearValues = clearVals};
+  vkCmdBeginRenderPass(*cb, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+  ImGui_ImplAndroid_NewFrame();
+  ImGui_ImplVulkan_NewFrame();
+  ImGui::NewFrame();
+  static float f = 0.0f;
+  static int counter = 0;
+  ImGui::Begin("Parameters");                          // Create a window called "Hello, world!" and append into it.
+  //ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+  // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+  // ImGui::ColorEdit3("clear color", (float*)&imguiClearColor); // Edit 3 floats representing a color
+  if (ImGui::Button("\nreset time\n"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+  {
+//      startTime = lastTime;
+//      *passedTime = 0.0f;
+        ResetCamera();
+  }
+  if (ImGui::Button("pause"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+//      paused = !paused;
+    ImGui::SameLine();
+  //ImGui::Text("counter = %d", counter);
+  //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+  ImGui::End();
+  ImGui::Render();
+  ImDrawData* drawData = ImGui::GetDrawData();
+  ImGui_ImplVulkan_RenderDrawData(drawData, *cb);
+  vkCmdEndRenderPass(*cb);
+  vkEndCommandBuffer(*cb);
 }

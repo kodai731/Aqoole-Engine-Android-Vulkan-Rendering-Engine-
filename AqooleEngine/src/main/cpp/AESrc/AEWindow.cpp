@@ -458,8 +458,7 @@ MyImgui::MyImgui(AEInstance* instance, AELogicalDevice* device, AEDeviceQueue *q
 #else
 MyImgui::MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalDevice* device, AESwapchain* swapchain,
 				 AEDeviceQueue *queue, AEDeviceQueue* queuePresent, AESurface* surface, std::vector<AEFrameBuffer*>* framebuffers,
-				 std::vector<AEDepthImage*>* depthImages, AESwapchainImageView* swapchainImageView, AERenderPass* renderPass,
-				 AECommandBuffer* commandBuffer)
+				 std::vector<AEDepthImage*>* depthImages, AESwapchainImageView* swapchainImageView, AERenderPass* renderPass)
 {
 	//member
 	mDevice = device;
@@ -505,7 +504,7 @@ MyImgui::MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalD
 	mContext = ImGui::CreateContext();
 	ImGui::SetCurrentContext(mContext);
 	//ImGui_ImplGlfw_InitForAE(mWindow->GetWindowNC(), true);
-	ImGui_ImplAndroid_Init(platformWindow);
+	//vulkan init
 	ImGui::StyleColorsDark();
 	ImGui_ImplVulkan_InitInfo init_info = {};
 	init_info.Instance = *instance->GetInstance();
@@ -527,11 +526,10 @@ MyImgui::MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalD
 	ImGui_ImplAndroid_Init(platformWindow);
 	//upload fonts
 	mCommandPool = std::make_unique<AECommandPool>(mDevice, mQueue);
-	//mCommandBuffer = std::make_unique<AECommandBuffer>(mDevice, mCommandPool.get());
-	mCommandBuffer = commandBuffer;
-	AECommand::BeginCommand(mCommandBuffer);
+	mCommandBuffer = std::make_unique<AECommandBuffer>(mDevice, mCommandPool.get());
+	AECommand::BeginCommand(mCommandBuffer.get());
 	ImGui_ImplVulkan_CreateFontsTexture(*mCommandBuffer->GetCommandBuffer());
-	AECommand::EndCommand(mCommandBuffer);
+	AECommand::EndCommand(mCommandBuffer.get());
 	VkSubmitInfo end_info = {};
 	end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	end_info.commandBufferCount = 1;
@@ -565,7 +563,7 @@ MyImgui::~MyImgui()
 		mFences[i].reset();
 	}
 	mPool.reset();
-	//mCommandBuffer.reset();
+	mCommandBuffer.reset();
 	mCommandPool.reset();
 #ifndef __ANDROID__
 	for(auto &i : mFrameBuffers)
@@ -586,15 +584,15 @@ void MyImgui::Render(uint32_t index, VkPipeline pipeline)
 {
 	ImGui::Render();
 	ImDrawData* drawData = ImGui::GetDrawData();
-	AECommand::BeginCommand(mCommandBuffer);
+	AECommand::BeginCommand(mCommandBuffer.get());
 #ifndef __ANDROID__
 	AECommand::BeginRenderPass(index, mCommandBuffer.get(), mFrameBuffers[index].get());
 #else
-	AECommand::BeginRenderPass(index, mCommandBuffer, (*mFrameBuffers)[index]);
+	AECommand::BeginRenderPass(index, mCommandBuffer.get(), (*mFrameBuffers)[index]);
 #endif
 	ImGui_ImplVulkan_RenderDrawData(drawData, *mCommandBuffer->GetCommandBuffer(), pipeline);
-	AECommand::EndRenderPass(mCommandBuffer);
-	AECommand::EndCommand(mCommandBuffer);
+	AECommand::EndRenderPass(mCommandBuffer.get());
+	AECommand::EndCommand(mCommandBuffer.get());
 }
 
 /*

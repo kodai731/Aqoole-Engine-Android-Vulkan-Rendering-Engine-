@@ -174,6 +174,6 @@ void android_main(struct android_app* app) {
       VulkanDrawFrame(app, currentFrame, isTouched, isFocused, touchPositions, &laData, &lastLaData);
       currentFrame = (currentFrame + 1) % MAX_IN_FLIGHT;
     }
-    usleep(100);
+    //usleep(100);
   } while (app->destroyRequested == 0);
 }

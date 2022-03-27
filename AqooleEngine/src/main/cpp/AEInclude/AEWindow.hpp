@@ -177,7 +177,7 @@ class MyImgui
     AESwapchainImageView* mSwapchainImageView;
     AERenderPass* mRenderPass;
     std::unique_ptr<AECommandPool> mCommandPool;
-    AECommandBuffer* mCommandBuffer;
+    std::unique_ptr<AECommandBuffer> mCommandBuffer;
     std::vector<std::unique_ptr<AESemaphore>> mImageSemaphores;
     std::vector<std::unique_ptr<AESemaphore>> mRenderSemaphores;
     std::vector<std::unique_ptr<AEFence>> mFences;
@@ -189,14 +189,13 @@ class MyImgui
 #else
     MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalDevice* device, AESwapchain* swapchain,
             AEDeviceQueue *queue, AEDeviceQueue* queuePresent, AESurface* surface, std::vector<AEFrameBuffer*>* framebuffers,
-            std::vector<AEDepthImage*>* depthImages, AESwapchainImageView* swapchainImageView, AERenderPass* renderPass,
-            AECommandBuffer* commandBuffer);
+            std::vector<AEDepthImage*>* depthImages, AESwapchainImageView* swapchainImageView, AERenderPass* renderPass);
 #endif
     ~MyImgui();
     void Render(uint32_t index, VkPipeline pipeline = VK_NULL_HANDLE);
     void Present(uint32_t index);
     void DefineContents();
-    AECommandBuffer* GetCommandBuffer(){return mCommandBuffer;}
+    AECommandBuffer* GetCommandBuffer(){return mCommandBuffer.get();}
 };
 
 #endif
