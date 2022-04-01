@@ -22,10 +22,6 @@
 #ifndef __ANDROID__
 #include <vulkan/vulkan.h>
 #include <glfw3.h>
-#include <glm/glm.hpp>
-//#include <gtc/matrix_transform.hpp>
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
 #endif
 #ifdef __ANDROID__
 #include <vulkan_wrapper.h>
@@ -46,6 +42,10 @@
 #include <unordered_map>
 //#include <gtx/hash.hpp>
 #include <regex>
+#include <glm/glm.hpp>
+//#include <gtc/matrix_transform.hpp>
+#include <glm/vec4.hpp>
+#include <glm/mat4x4.hpp>
 /*
 take measures to include each other
 */
@@ -181,7 +181,7 @@ class AELogicalDevice
 	//functions
 	void FilterExtensions(const std::vector<const char*> &extensions, std::vector<const char*> &availableExtension);
 
-#ifndef __ANDROID__
+#ifdef __RAY_TRACING__
 	PFN_vkGetPhysicalDeviceProperties2KHR pfnGetPhysicalDeviceProperties2KHR;
 #endif
 	public:
@@ -218,6 +218,7 @@ struct BLASGeometryInfo
 	VkBuffer vertexBuffer;
 	VkBuffer indexBuffer;
 };
+
 //base class
 class AERayTracingASBase
 {

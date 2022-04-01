@@ -11,8 +11,12 @@
 //WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //See the License for the specific language governing permissions and
 //        limitations under the License.
+#include <vulkan_wrapper.h>
 #include "AEDevice.hpp"
 #include "AEDeviceQueue.hpp"
+
+class VkPhysicalDeviceRayTracingPipelinePropertiesKHR;
+
 #ifndef __ANDROID__
 #include "AEDrawObjects.hpp"
 #include "AEUBO.hpp"
@@ -631,7 +635,7 @@ void AELogicalDevice::CreateDevice(const std::vector<const char*> &extensions, A
 	two types extension : instance level and device level
 	vkGetInstanceProcAddr() and vkGetDeviceProcAddr()
 	*/
-#ifndef __ANDROID__
+#ifdef __RAY_TRACING__
 	pfnGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>
 		(vkGetInstanceProcAddr(*mPhysicalDevice->GetInstance()->GetInstance(), "vkGetPhysicalDeviceProperties2KHR"));
 #endif
@@ -685,7 +689,6 @@ void AELogicalDevice::FilterExtensions(const std::vector<const char*> &extension
 				}
 		}
 	}
-	return;
 }
 
 #ifdef __RAY_TRACING__

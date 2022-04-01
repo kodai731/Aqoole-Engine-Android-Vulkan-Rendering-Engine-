@@ -40,7 +40,7 @@ task unzip(dependsOn: download, type: Copy) {
 
 android {
     compileSdkVersion 32
-    ndkVersion '23.1.7779620'
+    ndkVersion '25.0.8221429'
     defaultConfig {
         applicationId  "com.aqoole"
         minSdkVersion    26
