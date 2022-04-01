@@ -22,6 +22,8 @@
 #include "string"
 #include <sstream>
 #include <fstream>
+#include <random>
+#include <thread>
 #ifndef __ANDROID__
 #include <cstring>
 #include <limits>
@@ -29,8 +31,6 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
-#include <random>
-#include <thread>
 #endif
 
 /*

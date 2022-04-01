@@ -18,6 +18,7 @@ set_target_properties(AqooleEngine PROPERTIES IMPORTED_LOCATION
 # build vulkan app
 set(SRC_DIR src/main/jni)
 set(WRAPPER_DIR ../../common/vulkan_wrapper)
+set(VK_INCLUDE_DIR ${ANDROID_NDK}/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include)
 set(VK_VAL_LAYER_SRC_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src)
 set(AE_DIR ../AqooleEngine/src/main/cpp/AEInclude)
 set(GLM_DIR ${AE_DIR}/../glm)
@@ -27,7 +28,8 @@ add_library(vulkanNativeActivity SHARED
             ${SRC_DIR}/AndroidMain.cpp
             ${WRAPPER_DIR}/vulkan_wrapper.cpp)
 
-include_directories(${VK_VAL_LAYER_SRC_DIR}/include ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGUI_DIR})
+include_directories(${VK_INCLUDE_DIR} ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGUI_DIR})
+#include_directories(${VK_VAL_LAYER_SRC_DIR}/include ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGUI_DIR})
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall \
 #                     -DVK_USE_PLATFORM_ANDROID_KHR")
