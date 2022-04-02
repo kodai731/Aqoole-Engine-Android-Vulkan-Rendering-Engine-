@@ -223,7 +223,7 @@ struct BLASGeometryInfo
 class AERayTracingASBase
 {
 	protected:
-	AELogicalDevice const* mDevice;
+	AELogicalDevice* mDevice;
 	VkAccelerationStructureKHR mAS;
 	std::unique_ptr<AEBufferUtilOnGPU> mASBuffer;
 	VkDeviceAddress mDeviceAddress;
@@ -233,7 +233,7 @@ class AERayTracingASBase
 	std::vector<VkAccelerationStructureBuildRangeInfoKHR> mRangeInfos;
 	VkTransformMatrixKHR mTransformMatrix;
 	//functions
-	AERayTracingASBase(AELogicalDevice const* device);
+	AERayTracingASBase(AELogicalDevice* device);
 	virtual ~AERayTracingASBase();
 	VkDeviceAddress GetBufferDeviceAddress(VkBuffer buffer);
 	PFN_vkGetBufferDeviceAddressKHR pfnGetBufferDeviceAddressKHR;
@@ -258,17 +258,17 @@ class AERayTracingASBottom : public AERayTracingASBase
 	void GetASProperties(VkPhysicalDeviceAccelerationStructurePropertiesKHR& prop);
 	void GetSupportedVertexFormat();
 	public:
-	AERayTracingASBottom(AELogicalDevice const* device, uint32_t oneVertexSize, uint32_t maxVertex, uint32_t indicesCount,
-		VkBuffer vertexBuffer, VkBuffer indexBuffer, ModelView const* modelView, AEDeviceQueueBase* commandQueue, AECommandPool* commandPool);
-	AERayTracingASBottom(AELogicalDevice const* device, std::vector<BLASGeometryInfo> const& geometries, ModelView const* modelView,
-		AEDeviceQueueBase* commandQueue, AECommandPool* commandPool);
+	AERayTracingASBottom(AELogicalDevice* device, uint32_t oneVertexSize, uint32_t maxVertex, uint32_t indicesCount,
+		VkBuffer vertexBuffer, VkBuffer indexBuffer, ModelView const* modelView, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
+	AERayTracingASBottom(AELogicalDevice* device, std::vector<BLASGeometryInfo> const& geometries, ModelView const* modelView,
+		AEDeviceQueue* commandQueue, AECommandPool* commandPool);
 	~AERayTracingASBottom();
 	//getter
 	AEBufferAS* GetTransformBuffer(){return mTransFormBuffer.get();}
 	VkTransformMatrixKHR* GetTransformMatrix(){return &mTransformMatrix;}
 	VkDeviceAddress GetDeviceAddress(){return mDeviceAddress;}
 	//update transform matrix
-	void Update(ModelView const* m, AEDeviceQueueBase* queue, AECommandPool* commandPool);
+	void Update(ModelView const* m, AEDeviceQueue* queue, AECommandPool* commandPool);
 };
 
 //top level AS class
@@ -279,10 +279,10 @@ class AERayTracingASTop : public AERayTracingASBase
 	std::unique_ptr<AEBufferAS> mInstanceBuffer;
 	//functions
 	public:
-	AERayTracingASTop(AELogicalDevice const* device, std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView,
-		AEDeviceQueueBase* commandQueue, AECommandPool* commandPool);
+	AERayTracingASTop(AELogicalDevice* device, std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView,
+		AEDeviceQueue* commandQueue, AECommandPool* commandPool);
 	~AERayTracingASTop();
-	void Update(std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView, AEDeviceQueueBase* commandQueue, AECommandPool* commandPool);
+	void Update(std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
 };
 #endif
 

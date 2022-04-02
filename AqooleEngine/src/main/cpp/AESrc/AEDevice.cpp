@@ -14,15 +14,10 @@
 #include <vulkan_wrapper.h>
 #include "AEDevice.hpp"
 #include "AEDeviceQueue.hpp"
-
-class VkPhysicalDeviceRayTracingPipelinePropertiesKHR;
-
-#ifndef __ANDROID__
 #include "AEDrawObjects.hpp"
 #include "AEUBO.hpp"
 #include "AEBuffer.hpp"
 #include "AECommand.hpp"
-#endif
 //---------------------------------------------------------------------
 //class AE Instance
 //---------------------------------------------------------------------
@@ -710,7 +705,7 @@ void AELogicalDevice::GetRayTracingPipelineProperties(VkPhysicalDeviceRayTracing
 /*
 constructor
 */
-AERayTracingASBase::AERayTracingASBase(AELogicalDevice const* device)
+AERayTracingASBase::AERayTracingASBase(AELogicalDevice* device)
 {
 	mDevice = device;
 	//get pfn
@@ -770,8 +765,8 @@ void AERayTracingASBase::SetTransformMatrix(glm::mat4 const &m)
 /*
 constructor
 */
-AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice const* device, uint32_t oneVertexSize, uint32_t maxVertex, uint32_t indicesCount,
-		VkBuffer vertexBuffer, VkBuffer indexBuffer, ModelView const* modelView, AEDeviceQueueBase* commandQueue, AECommandPool* commnadPool)
+AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, uint32_t oneVertexSize, uint32_t maxVertex, uint32_t indicesCount,
+		VkBuffer vertexBuffer, VkBuffer indexBuffer, ModelView const* modelView, AEDeviceQueue* commandQueue, AECommandPool* commandPool)
 		: AERayTracingASBase(device)
 {
 	//get acceleration structure info
@@ -798,7 +793,7 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice const* device, uint32
 	SetTransformMatrix(modelView->translate * modelView->rotate * modelView->scale);
 	mTransFormBuffer = std::make_unique<AEBufferAS>(mDevice, sizeof(VkTransformMatrixKHR), (VkBufferUsageFlagBits)0);
 	mTransFormBuffer->CreateBuffer();
-	mTransFormBuffer->CopyData((void*)&mTransformMatrix, 0, sizeof(VkTransformMatrixKHR), commandQueue, commnadPool);
+	mTransFormBuffer->CopyData((void*)&mTransformMatrix, 0, sizeof(VkTransformMatrixKHR), commandQueue, commandPool);
 	transformDataDeviceAddress.deviceAddress = GetBufferDeviceAddress(*mTransFormBuffer->GetBuffer());
 	VkAccelerationStructureGeometryKHR mGeometry = {};
 	mGeometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -854,7 +849,7 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice const* device, uint32
 	mRangeInfo.transformOffset = 0;
 	std::vector<VkAccelerationStructureBuildRangeInfoKHR*> buildRangeInfos = {&mRangeInfo};
 	//build command
-	AECommandBuffer commandBuffer(mDevice, commnadPool);
+	AECommandBuffer commandBuffer(mDevice, commandPool);
 	AECommand::BeginSingleTimeCommands(&commandBuffer);
 	pfnCmdBuildAccelerationStructuresKHR(*commandBuffer.GetCommandBuffer(), 1, &mBuildCommandGeometryInfo, buildRangeInfos.data());
 	AECommand::EndSingleTimeCommands(&commandBuffer, commandQueue);
@@ -871,15 +866,17 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice const* device, uint32
 /*
 constructor v2
 */
-AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice const* device, std::vector<BLASGeometryInfo> const& geometries, ModelView const* modelView,
-	AEDeviceQueueBase* commandQueue, AECommandPool* commandPool)
+AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, std::vector<BLASGeometryInfo> const& geometries, ModelView const* modelView,
+	AEDeviceQueue* commandQueue, AECommandPool* commandPool)
 	: AERayTracingASBase(device)
 {
+#ifndef __ANDROID__
 	//get acceleration structure info
 	VkPhysicalDeviceAccelerationStructurePropertiesKHR ASProp = {};
 	ASProp.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
 	GetASProperties(ASProp);
 	GetSupportedVertexFormat();
+#endif
 	//build geometryinfo
 	//acceleration structure type, and the geometry types, counts, and maximum sizes will be needed
 	VkAccelerationStructureBuildGeometryInfoKHR buildGeometryInfo = {};
@@ -995,11 +992,17 @@ void AERayTracingASBottom
 {
 	//get acceleration structure info
 	ASProp.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
-	VkPhysicalDeviceProperties2 devProp2 = {};
-	devProp2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+	VkPhysicalDeviceProperties2KHR devProp2 = {};
+	devProp2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR;
 	devProp2.pNext = &ASProp;
+#ifndef __ANDROID__
 	vkGetPhysicalDeviceProperties2(*mDevice->GetPhysicalDevice(), &devProp2);
-	std::ofstream ofs("ASProperties", std::ios::out | std::ios::trunc);
+#else
+    PFN_vkGetPhysicalDeviceProperties2KHR pfnvkGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>
+    (vkGetDeviceProcAddr(*mDevice->GetDevice(), "vkGetPhysicalDeviceProperties2KHR"));
+    pfnvkGetPhysicalDeviceProperties2KHR(*mDevice->GetPhysicalDevice(), &devProp2);
+#endif
+    std::ofstream ofs("ASProperties", std::ios::out | std::ios::trunc);
 	ofs << "maxGeometryCount : " << ASProp.maxGeometryCount << std::endl
 		<< "maxInstanceCount : " << ASProp.maxInstanceCount << std::endl
 		<< "maxPrimitiveCount : " << ASProp.maxPrimitiveCount << std::endl;
@@ -1009,7 +1012,7 @@ void AERayTracingASBottom
 /*
 get transform matrix form modelview
 */
-void AERayTracingASBottom::Update(ModelView const* m, AEDeviceQueueBase* queue, AECommandPool* commandPool)
+void AERayTracingASBottom::Update(ModelView const* m, AEDeviceQueue* queue, AECommandPool* commandPool)
 {
 	//update tranform buffer
 	SetTransformMatrix(m->translate * m->rotate * m->scale);
@@ -1040,8 +1043,14 @@ void AERayTracingASBottom
 	prop2.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
 	VkFormatProperties prop = {};
 	prop2.formatProperties = prop;
+#ifndef __ANDROID__
 	vkGetPhysicalDeviceFormatProperties2(*mDevice->GetPhysicalDevice(), VkFormat::VK_FORMAT_R32G32B32_SFLOAT, &prop2);
-	if(!(prop.bufferFeatures & VkFormatFeatureFlagBits::VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR))
+#else
+    PFN_vkGetPhysicalDeviceFormatProperties2 pfnvkGetPhysicalDeviceFormatProperties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceFormatProperties2>
+    (vkGetDeviceProcAddr(*mDevice->GetDevice(), "vkGetPhysicalDeviceFormatProperties2"));
+    pfnvkGetPhysicalDeviceFormatProperties2(*mDevice->GetPhysicalDevice(), VkFormat::VK_FORMAT_R32G32B32_SFLOAT, &prop2);
+#endif
+    if(!(prop.bufferFeatures & VkFormatFeatureFlagBits::VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR))
 		std::cout << "not supported" << std::endl;	
 }
 
@@ -1052,8 +1061,8 @@ void AERayTracingASBottom
 /*
 constructor
 */
-AERayTracingASTop::AERayTracingASTop(AELogicalDevice const* device, std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView,
-	AEDeviceQueueBase* commandQueue, AECommandPool* commandPool)
+AERayTracingASTop::AERayTracingASTop(AELogicalDevice* device, std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView,
+	AEDeviceQueue* commandQueue, AECommandPool* commandPool)
 	: AERayTracingASBase(device)
 {
 	//transform matrix
@@ -1158,7 +1167,7 @@ AERayTracingASTop::~AERayTracingASTop()
 /*
 update transform matrix
 */
-void AERayTracingASTop::Update(std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView, AEDeviceQueueBase* commandQueue,
+void AERayTracingASTop::Update(std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView, AEDeviceQueue* commandQueue,
 	AECommandPool* commandPool)
 {
 	//rebuild needed to update tranform matrix

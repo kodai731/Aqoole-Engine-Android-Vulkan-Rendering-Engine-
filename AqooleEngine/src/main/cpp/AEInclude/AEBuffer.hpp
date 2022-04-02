@@ -88,7 +88,7 @@ namespace AEBuffer
         AELogicalDevice* device, AEDeviceQueue* queue,
         AECommandPool* commandPool);
 
-#ifndef __ANDROID__
+#ifdef __RAY_TRACING__
     VkDeviceAddress GetBufferDeviceAddress(AELogicalDevice const* device, VkBuffer buffer);
 #endif
 };
@@ -147,7 +147,7 @@ class AEBufferAS : public AEBufferUtilOnGPU
 {
     private:
     public:
-    AEBufferAS(AELogicalDevice const* device, VkDeviceSize bufferSize,
+    AEBufferAS(AELogicalDevice* device, VkDeviceSize bufferSize,
         VkBufferUsageFlagBits usage);
     ~AEBufferAS();
 };
@@ -159,10 +159,10 @@ class AEBufferSBT : public AEBufferUtilOnGPU
     //functions
     PFN_vkGetRayTracingShaderGroupHandlesKHR pfnGetRayTracingShaderGroupHandlesKHR;
     public:
-    AEBufferSBT(AELogicalDevice const* device, VkBufferUsageFlagBits usage, AEPipelineRaytracing* pipeline,
-        uint32_t binding, AEDeviceQueueBase* commandQueue, AECommandPool* commandPool);
-    AEBufferSBT(AELogicalDevice const* device, VkBufferUsageFlagBits usage, AEPipelineRaytracing* pipeline,
-        uint32_t firstGroup, uint32_t groupCount, AEDeviceQueueBase* commandQueue, AECommandPool* commandPool);
+    AEBufferSBT(AELogicalDevice* device, VkBufferUsageFlagBits usage, AEPipelineRaytracing* pipeline,
+        uint32_t binding, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
+    AEBufferSBT(AELogicalDevice* device, VkBufferUsageFlagBits usage, AEPipelineRaytracing* pipeline,
+        uint32_t firstGroup, uint32_t groupCount, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
     ~AEBufferSBT();
     uint32_t GetGroupCount()const{return mGroupCount;}
 };

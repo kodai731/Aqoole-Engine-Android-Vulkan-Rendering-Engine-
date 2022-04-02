@@ -16,9 +16,7 @@
 #include "AEDevice.hpp"
 #include "AEImage.hpp"
 #include "descriptorSet.hpp"
-#ifndef __ANDROID__
 #include "AEUBO.hpp"
-#endif
 //=====================================================================
 //AE render pass
 //=====================================================================
@@ -555,7 +553,13 @@ AEPipelineRaytracing::AEPipelineRaytracing(AELogicalDevice const* device, std::v
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR prop{};
 	prop.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
 	prop2.pNext = &prop;
+#ifndef __ANDROID__
 	vkGetPhysicalDeviceProperties2(*mDevice->GetPhysicalDevice(), &prop2);
+#else
+	PFN_vkGetPhysicalDeviceProperties2 pfnvkGetPhysicalDeviceProperties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2>
+	(vkGetDeviceProcAddr(*mDevice->GetDevice(), "vkGetPhysicalDeviceProperties2"));
+	pfnvkGetPhysicalDeviceProperties2(*mDevice->GetPhysicalDevice(), &prop2);
+#endif
 	std::fstream ofs("rayTracingPipelineProp.txt", std::ios::out | std::ios::trunc);
 	ofs << "max recursive depth = " << prop.maxRayRecursionDepth << std::endl;
 	ofs.close();

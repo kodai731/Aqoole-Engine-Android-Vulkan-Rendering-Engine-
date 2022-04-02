@@ -37,7 +37,8 @@ include_directories(${VK_INCLUDE_DIR} ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGU
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Werror       \
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 \
                      -Wno-unused-variable -DUSE_DEBUG_EXTENTIONS \
-                     -DVK_USE_PLATFORM_ANDROID_KHR")
+                     -DVK_USE_PLATFORM_ANDROID_KHR \
+                     -D__RAY_TRACING__")
 
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 target_link_libraries(vulkanNativeActivity AqooleEngine app-glue log android)
