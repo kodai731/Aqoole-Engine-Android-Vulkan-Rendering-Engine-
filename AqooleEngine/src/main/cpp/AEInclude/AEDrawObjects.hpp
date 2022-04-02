@@ -273,7 +273,7 @@ class AESphere : public AEDrawObjectBase3D
     ~AESphere();
 };
 
-#ifdef __RAY_TRACING__
+#ifdef __RAY_TRACING__PC
 class AEWaterSurface : public AEDrawObjectBase3D
 {
     protected:

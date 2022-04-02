@@ -450,7 +450,7 @@ AEBufferUniform::~AEBufferUniform()
 /*
 constructor
 */
-AEBufferAS::AEBufferAS(AELogicalDevice const* device, VkDeviceSize bufferSize,
+AEBufferAS::AEBufferAS(AELogicalDevice* device, VkDeviceSize bufferSize,
     VkBufferUsageFlagBits usage)
     : AEBufferUtilOnGPU(device, bufferSize, usage)
 {
@@ -474,8 +474,8 @@ AEBufferAS::~AEBufferAS()
 /*
 constructor
 */
-AEBufferSBT::AEBufferSBT(AELogicalDevice const* device, VkBufferUsageFlagBits usage, AEPipelineRaytracing* pipeline,
-    uint32_t binding, AEDeviceQueueBase* commandQueue, AECommandPool* commandPool)
+AEBufferSBT::AEBufferSBT(AELogicalDevice* device, VkBufferUsageFlagBits usage, AEPipelineRaytracing* pipeline,
+    uint32_t binding, AEDeviceQueue* commandQueue, AECommandPool* commandPool)
     : AEBufferUtilOnGPU(device, 0, usage)
 {
     // PFN_vkGetPhysicalDeviceProperties2KHR pfnGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>
@@ -507,8 +507,8 @@ AEBufferSBT::AEBufferSBT(AELogicalDevice const* device, VkBufferUsageFlagBits us
 constructor
 gathering one buffer
 */
-AEBufferSBT::AEBufferSBT(AELogicalDevice const* device, VkBufferUsageFlagBits usage, AEPipelineRaytracing* pipeline,
-    uint32_t firstGroup, uint32_t groupCount, AEDeviceQueueBase* commandQueue, AECommandPool* commandPool)
+AEBufferSBT::AEBufferSBT(AELogicalDevice* device, VkBufferUsageFlagBits usage, AEPipelineRaytracing* pipeline,
+    uint32_t firstGroup, uint32_t groupCount, AEDeviceQueue* commandQueue, AECommandPool* commandPool)
     : AEBufferUtilOnGPU(device, 0, usage)
 {
     mGroupCount = groupCount;
@@ -545,5 +545,4 @@ destructor
 */
 AEBufferSBT::~AEBufferSBT()
 {}
-
 #endif

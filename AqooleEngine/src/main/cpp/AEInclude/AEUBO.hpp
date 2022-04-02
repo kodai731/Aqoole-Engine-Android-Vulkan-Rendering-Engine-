@@ -367,7 +367,7 @@ struct ConstantsRT
 {
 	glm::vec4 clearColor;
 	glm::vec3 lightPosition;
-	float loghtIntensity;
+	float lightIntensity;
 	int lightType;
 };
 

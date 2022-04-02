@@ -148,10 +148,7 @@ AEDescriptorPool* gDescriptorPool;
 AEDescriptorSet* gDescriptorSet;
 glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
 MyImgui* gImgui;
-std::unique_ptr<AERayTracingASBottom> asls;
-std::unique_ptr<AERayTracingASTop> astop;
-
-
+AECommandBuffer* gImguiCommandBuffer;
 double lastTime;
 double startTime;
 
@@ -288,7 +285,7 @@ bool MapMemoryTypeToIndex(uint32_t typeBits, VkFlags requirements_mask,
 // Create our vertex buffer
 bool CreateBuffers(void) {
   // -----------------------------------------------
-  // Create draw objects and its vertex buffer and index buffer
+  // Create the triangle vertex buffer
   size_t vertexSize = gCubes.size() * gCubes[0]->GetVertexSize() * sizeof(Vertex3D);
   gVertexBuffer = new AEBufferUtilOnGPU(gDevice, vertexSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
   gVertexBuffer->CreateBuffer();
@@ -316,10 +313,6 @@ bool CreateBuffers(void) {
     indexOffset += oneIndexSize;
     indexOffsetNumber += gCubes[0]->GetVertexSize();
   }
-  //prepare ray tracing objects
-  BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)vertexSize, (uint32_t)indexSize, *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
-  std::vector<BLASGeometryInfo> geometries = {cubesInfo};
-  asls = std::make_unique<AERayTracingASBottom>(gDevice, geometries, &modelview, gQueue, gCommandPool);
   return true;
 }
 

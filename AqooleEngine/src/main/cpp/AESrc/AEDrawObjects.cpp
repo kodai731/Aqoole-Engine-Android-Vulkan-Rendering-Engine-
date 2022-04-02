@@ -1200,7 +1200,7 @@ void AESphere::CalcVertex(Vertex3D& v, float r, float theta, float phi)
     v.pos.z = r * st * cp;
 }
 
-#ifdef __RAY_TRACING__
+#ifdef __RAY_TRACING__PC
 //=====================================================================
 //AE water surface
 //=====================================================================
