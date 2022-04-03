@@ -14,4 +14,4 @@ sample
 
 ray tracing sample
 ----------------------
-<img src="./sample_ray_tracing.png" height="400px">
+<img src="./sample_ray_tracing.jpg" height="400px">
