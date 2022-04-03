@@ -541,6 +541,7 @@ void AEGraphicsPipeline::CreateColorBlending(VkPipelineColorBlendAttachmentState
 /*
 constructor
 */
+#ifndef __ANDROID__
 AEPipelineRaytracing::AEPipelineRaytracing(AELogicalDevice const* device, std::vector<const char*> &shaderPaths,
 	std::vector<std::unique_ptr<AEDescriptorSetLayout>> const* layouts)
 	: AEPipeline(device)
@@ -595,6 +596,66 @@ AEPipelineRaytracing::AEPipelineRaytracing(AELogicalDevice const* device, std::v
 	for(auto shaderModule : shaderModules)
 		vkDestroyShaderModule(*mDevice->GetDevice(), shaderModule, nullptr);
 }
+#else
+AEPipelineRaytracing::AEPipelineRaytracing(AELogicalDevice const* device, std::vector<const char*> &shaderPaths,
+										   std::vector<std::unique_ptr<AEDescriptorSetLayout>> const* layouts, android_app* app)
+		: AEPipeline(device) {
+	PFN_vkCreateRayTracingPipelinesKHR pfnCreateRayTracingPipelinesKHR = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>
+	(vkGetDeviceProcAddr(*mDevice->GetDevice(), "vkCreateRayTracingPipelinesKHR"));
+//	//get properties
+//	VkPhysicalDeviceProperties2 prop2{};
+//	prop2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+//	VkPhysicalDeviceRayTracingPipelinePropertiesKHR prop{};
+//	prop.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+//	prop2.pNext = &prop;
+//#ifndef __ANDROID__
+//	vkGetPhysicalDeviceProperties2(*mDevice->GetPhysicalDevice(), &prop2);
+//#else
+//	PFN_vkGetPhysicalDeviceProperties2 pfnvkGetPhysicalDeviceProperties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2>
+//	(vkGetDeviceProcAddr(*mDevice->GetDevice(), "vkGetPhysicalDeviceProperties2"));
+//	pfnvkGetPhysicalDeviceProperties2(*mDevice->GetPhysicalDevice(), &prop2);
+//#endif
+//	std::fstream ofs("rayTracingPipelineProp.txt", std::ios::out | std::ios::trunc);
+//	ofs << "max recursive depth = " << prop.maxRayRecursionDepth << std::endl;
+//	ofs.close();
+	//push constants
+	VkPushConstantRange pushConstant{};
+	pushConstant.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR |
+							  VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	pushConstant.offset = 0;
+	pushConstant.size = sizeof(ConstantsRT);
+	std::vector<VkPushConstantRange> pushConstants = {pushConstant};
+	CreatePipelineLayout(layouts, &pushConstants);
+	//save
+	mFlags = pushConstant.stageFlags;
+	mConstantsSize = pushConstant.size;
+	//set up shader stage creare info
+	uint32_t shaderCount = shaderPaths.size();
+	std::vector<VkShaderModule> shaderModules;
+	std::vector<VkPipelineShaderStageCreateInfo> shaderStageCreateInfo(shaderCount);
+	for (uint32_t i = 0; i < shaderPaths.size(); i++)
+		CreateShaderStageRayTracing(&shaderStageCreateInfo[i], shaderPaths[i], shaderModules,
+									mShaderGroup, app);
+	//create pipeline
+	VkRayTracingPipelineCreateInfoKHR createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
+	createInfo.stageCount = shaderCount;
+	createInfo.pStages = shaderStageCreateInfo.data();
+	createInfo.groupCount = static_cast<uint32_t>(mShaderGroup.size());
+	createInfo.pGroups = mShaderGroup.data();
+	createInfo.maxPipelineRayRecursionDepth = 1u;
+	createInfo.layout = mPipelineLayout;
+	auto ret = pfnCreateRayTracingPipelinesKHR(*mDevice->GetDevice(), VK_NULL_HANDLE,
+											   VK_NULL_HANDLE, 1, &createInfo, nullptr, &mPipeline);
+	if (ret != VK_SUCCESS)
+		throw std::runtime_error(
+				std::string("failed to create ray tracing pipeline error code = ") +
+				std::to_string(ret).c_str());
+	//delete
+	for (auto shaderModule : shaderModules)
+		vkDestroyShaderModule(*mDevice->GetDevice(), shaderModule, nullptr);
+}
+#endif
 
 /*
 destructor
@@ -607,16 +668,17 @@ AEPipelineRaytracing::~AEPipelineRaytracing()
 /*
 create shader stage and raygen groups
 */
+#ifndef __ANDROID__
 void AEPipelineRaytracing::CreateShaderStageRayTracing(VkPipelineShaderStageCreateInfo *stageInfo, const char* shaderPath,
     std::vector<VkShaderModule> &shaderModules, std::vector<VkRayTracingShaderGroupCreateInfoKHR> &raygenGroups)
 {
 	//shader module
+    VkShaderModule localModule;
 	auto shaderCode = ReadFile(shaderPath);
 	VkShaderModuleCreateInfo moduleInfo = {};
 	moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	moduleInfo.codeSize = shaderCode.size();
 	moduleInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
-	VkShaderModule localModule;
 	if (vkCreateShaderModule(*mDevice->GetDevice(), &moduleInfo, nullptr, &localModule) != VK_SUCCESS)
 		throw std::runtime_error("failed in create shader module");
 	shaderModules.push_back(localModule);
@@ -655,5 +717,62 @@ void AEPipelineRaytracing::CreateShaderStageRayTracing(VkPipelineShaderStageCrea
 	}
 	raygenGroups.push_back(raygenGroup);
 }
+#else
+void AEPipelineRaytracing::CreateShaderStageRayTracing(VkPipelineShaderStageCreateInfo *stageInfo, const char* shaderPath,
+													   std::vector<VkShaderModule> &shaderModules,
+													   std::vector<VkRayTracingShaderGroupCreateInfoKHR> &raygenGroups, android_app* app)
+{
+	//shader module
+	VkShaderModule localModule;
+	AAsset* file = AAssetManager_open(app->activity->assetManager,
+									  shaderPath, AASSET_MODE_BUFFER);
+	size_t fileLength = AAsset_getLength(file);
+	char* fileContent = new char[fileLength];
+	AAsset_read(file, fileContent, fileLength);
+	AAsset_close(file);
+	VkShaderModuleCreateInfo moduleInfo = {};
+	moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	moduleInfo.codeSize = fileLength;
+	moduleInfo.pCode = reinterpret_cast<const uint32_t*>(fileContent);
+	if (vkCreateShaderModule(*mDevice->GetDevice(), &moduleInfo, nullptr, &localModule) != VK_SUCCESS)
+		throw std::runtime_error("failed in create shader module");
+	shaderModules.push_back(localModule);
+	//fill shader stage create info
+	*stageInfo = {};
+	stageInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	if(std::regex_search(shaderPath, std::regex("vert", std::regex_constants::icase)))
+		stageInfo->stage = VK_SHADER_STAGE_VERTEX_BIT;
+	else if (std::regex_search(shaderPath, std::regex("frag", std::regex_constants::icase)))
+		stageInfo->stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	else if (std::regex_search(shaderPath, std::regex("rgen", std::regex_constants::icase)))
+		stageInfo->stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	else if (std::regex_search(shaderPath, std::regex("rmiss", std::regex_constants::icase)))
+		stageInfo->stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+	else if (std::regex_search(shaderPath, std::regex("rchit", std::regex_constants::icase)))
+		stageInfo->stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	stageInfo->module = shaderModules[shaderModules.size() - 1];
+	stageInfo->pName = "main";
+	//raygen groups
+	VkRayTracingShaderGroupCreateInfoKHR raygenGroup{};
+	raygenGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+	raygenGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+	raygenGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+	if (std::regex_search(shaderPath, std::regex("rgen", std::regex_constants::icase)) ||
+		std::regex_search(shaderPath, std::regex("rmiss", std::regex_constants::icase)))
+	{
+		raygenGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+		raygenGroup.generalShader = static_cast<uint32_t>(shaderModules.size()) - 1;
+		raygenGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+	}
+	else if (std::regex_search(shaderPath, std::regex("rchit", std::regex_constants::icase)))
+	{
+		raygenGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+		raygenGroup.generalShader = VK_SHADER_UNUSED_KHR;
+		raygenGroup.closestHitShader = static_cast<uint32_t>(shaderModules.size()) - 1;
+	}
+	raygenGroups.push_back(raygenGroup);
+    delete[] fileContent;
+}
 
+#endif
 #endif

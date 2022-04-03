@@ -22,6 +22,7 @@
 #include <vulkan/vulkan.hpp>
 #else
 #include <vulkan_wrapper.h>
+#include <android_native_app_glue.h>
 #endif
 
 /*
@@ -123,11 +124,22 @@ class AEPipelineRaytracing : public AEPipeline
     private:
     std::vector<VkRayTracingShaderGroupCreateInfoKHR> mShaderGroup;
     //functions
+#ifndef __ANDROID__
     void CreateShaderStageRayTracing(VkPipelineShaderStageCreateInfo *stageInfo, const char* shaderPath,
         std::vector<VkShaderModule> &shaderModules, std::vector<VkRayTracingShaderGroupCreateInfoKHR> &raygenGroups);
-    public:
+#else
+    void CreateShaderStageRayTracing(VkPipelineShaderStageCreateInfo *stageInfo, const char* shaderPath,
+                                     std::vector<VkShaderModule> &shaderModules,
+                                     std::vector<VkRayTracingShaderGroupCreateInfoKHR> &raygenGroups, android_app* app);
+#endif
+public:
+#ifndef __ANDROID__
     AEPipelineRaytracing(AELogicalDevice const* device, std::vector<const char*> &shaderPaths,
         std::vector<std::unique_ptr<AEDescriptorSetLayout>> const* layouts);
+#else
+    AEPipelineRaytracing(AELogicalDevice const* device, std::vector<const char*> &shaderPaths,
+                         std::vector<std::unique_ptr<AEDescriptorSetLayout>> const* layouts, android_app* app);
+#endif
     ~AEPipelineRaytracing();
     //getter
     std::vector<VkRayTracingShaderGroupCreateInfoKHR>& GetShaderGroup(){return mShaderGroup;}

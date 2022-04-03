@@ -159,7 +159,6 @@ std::vector<std::string> const& validationLayer)
 		createInfo.ppEnabledLayerNames = nullptr;
 	if (vkCreateInstance(&createInfo, nullptr, &mInstance) != VK_SUCCESS)
 		throw std::runtime_error("failed to create instance");
-	return;
 }
 
 void AEInstance::CreateInstance(VkApplicationInfo* appInfo, std::vector<std::string> const& extensionNames, bool enableValidationLayer,
@@ -696,7 +695,13 @@ void AELogicalDevice::GetRayTracingPipelineProperties(VkPhysicalDeviceRayTracing
 	VkPhysicalDeviceProperties2 physicalProp{};
 	physicalProp.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 	physicalProp.pNext = &prop;
+#ifndef __ANDROID__
 	pfnGetPhysicalDeviceProperties2KHR(*GetPhysicalDevice(), &physicalProp);
+#else
+    PFN_vkGetPhysicalDeviceProperties2 pfnGetPhysicalDeviceProperties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2>
+    (vkGetInstanceProcAddr(*mPhysicalDevice->GetInstance()->GetInstance(), "vkGetPhysicalDeviceProperties2"));
+    pfnGetPhysicalDeviceProperties2(*GetPhysicalDevice(), &physicalProp);
+#endif
 }
 
 //=====================================================================
@@ -812,6 +817,7 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, uint32_t one
 	buildGeometryInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
 	//build size
 	mSizeInfo = {};
+	mSizeInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
 	//get build size
 	pfnGetAccelerationStructureBuildSizesKHR(*mDevice->GetDevice(), VkAccelerationStructureBuildTypeKHR::VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
 		&buildGeometryInfo, primitiveCounts.data(), &mSizeInfo);
@@ -922,6 +928,7 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, std::vector<
 	buildGeometryInfo.geometryCount = geometries.size();
 	//build size
 	mSizeInfo = {};
+	mSizeInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
 	//get build size
 	pfnGetAccelerationStructureBuildSizesKHR(*mDevice->GetDevice(), VkAccelerationStructureBuildTypeKHR::VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
 		&buildGeometryInfo, primitiveCounts.data(), &mSizeInfo);
