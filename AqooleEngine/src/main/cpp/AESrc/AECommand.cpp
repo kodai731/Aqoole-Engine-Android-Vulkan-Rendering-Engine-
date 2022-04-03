@@ -238,7 +238,8 @@ void AECommand::EndSingleTimeCommands(AECommandBuffer *commandBuffer, AEDeviceQu
     vkQueueWaitIdle(queue->GetQueue(0));
 }
 
-#ifdef __RAY_TRACING_
+#ifdef __RAY_TRACING__
+#ifndef __ANDROID__
 /*
 for ray trace
 */
@@ -299,5 +300,65 @@ void AECommand::CommandTraceRays(AECommandBuffer* commandBuffer, AELogicalDevice
 		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, storageImage->GetImage());
 	}
 }
+#else
+void AECommand::CommandTraceRays(AECommandBuffer* commandBuffer, AELogicalDevice const* device, const uint32_t width, const uint32_t height,
+	std::vector<AEBufferSBT*>& bindingTables, AEPipelineRaytracing* pipeline, AEDescriptorSet* descriptorSet, void* pushConstants,
+	VkImage* swapchainImage, AEStorageImage* storageImage, AEDeviceQueue* commandQueue, AECommandPool* commandPool)
+{
+	//do before this funstion starts
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR prop{};
+	device->GetRayTracingPipelineProperties(prop);
+	uint32_t handleSizeAligned = AECommand::GetAlignedAddress(prop.shaderGroupHandleSize, prop.shaderGroupHandleAlignment);
+	//set up SBTs (shader binding table)
+	VkStridedDeviceAddressRegionKHR raygenSBT{};
+	raygenSBT.deviceAddress = AEBuffer::GetBufferDeviceAddress(device, *bindingTables[0]->GetBuffer());
+	raygenSBT.stride = handleSizeAligned;
+	raygenSBT.size = handleSizeAligned * bindingTables[0]->GetGroupCount();
+	VkStridedDeviceAddressRegionKHR rayMissSBT{};
+	rayMissSBT.deviceAddress = AEBuffer::GetBufferDeviceAddress(device, *bindingTables[1]->GetBuffer());
+	rayMissSBT.stride = handleSizeAligned;
+	rayMissSBT.size = handleSizeAligned * bindingTables[1]->GetGroupCount();
+	// VkStridedDeviceAddressRegionKHR shadowMissSBT{};
+	// shadowMissSBT.deviceAddress = AEBuffer::GetBufferDeviceAddress(device, *bindingTables[2]->GetBuffer());
+	// shadowMissSBT.stride = handleSizeAligned;
+	// shadowMissSBT.size = handleSizeAligned;
+	// std::vector<VkStridedDeviceAddressRegionKHR> missSBTs = {rayMissSBT, shadowMissSBT};
+	VkStridedDeviceAddressRegionKHR clHitSBT{};
+	clHitSBT.deviceAddress = AEBuffer::GetBufferDeviceAddress(device, *bindingTables[2]->GetBuffer());
+	clHitSBT.stride = handleSizeAligned;
+	clHitSBT.size = handleSizeAligned * bindingTables[2]->GetGroupCount();
+	uint32_t strideSize = sizeof(VkStridedDeviceAddressRegionKHR::stride) * clHitSBT.stride;
+	VkStridedDeviceAddressRegionKHR callable{};
+	//bind pipeline
+	vkCmdBindPipeline(*commandBuffer->GetCommandBuffer(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline->GetPipeline());
+	vkCmdBindDescriptorSets(*commandBuffer->GetCommandBuffer(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline->GetPipelineLayout(), 0, 1,
+		descriptorSet->GetDescriptorSet(), 0, 0);
+	//push constants
+	vkCmdPushConstants(*commandBuffer->GetCommandBuffer(), *pipeline->GetPipelineLayout(), pipeline->GetShaderStageFlags(), 0, pipeline->GetConstantsSize(), pushConstants);
+	//command
+   	PFN_vkCmdTraceRaysKHR pfnCmdTraceRaysKHR = reinterpret_cast<PFN_vkCmdTraceRaysKHR>
+		(vkGetDeviceProcAddr(*device->GetDevice(), "vkCmdTraceRaysKHR"));
+	pfnCmdTraceRaysKHR(*commandBuffer->GetCommandBuffer(), &raygenSBT, &rayMissSBT, &clHitSBT, &callable, width, height, 1);
+	if(swapchainImage != nullptr)
+	{
+		//copy image swapchain <-> storage image
+		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, swapchainImage);
+		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, storageImage->GetImage());
+		//copy command
+		VkImageCopy copy_region{};
+			copy_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+			copy_region.srcOffset      = {0, 0, 0};
+			copy_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+			copy_region.dstOffset      = {0, 0, 0};
+			copy_region.extent         = {width, height, 1};
+		vkCmdCopyImage(*commandBuffer->GetCommandBuffer(), *storageImage->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			*swapchainImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
+		//layout back
+		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, swapchainImage);
+		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, storageImage->GetImage());
+	}
+}
+
+#endif
 
 #endif

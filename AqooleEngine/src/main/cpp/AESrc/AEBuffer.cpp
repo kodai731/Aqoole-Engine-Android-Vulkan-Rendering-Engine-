@@ -280,18 +280,15 @@ void AEBuffer::CopyData(AELogicalDevice const* device, VkDeviceMemory bufferMemo
     vkMapMemory(*localDevice, bufferMemory, 0, dataSize, 0, &tmpBuffer);
     memcpy(tmpBuffer, data, dataSize);
     vkUnmapMemory(*localDevice, bufferMemory);
-    return;
 }
 
-void AEBuffer::CopyDataOffsets(AELogicalDevice const* device, VkDeviceMemory bufferMemory,
+void AEBuffer::CopyDataOffsets(AELogicalDevice* device, VkDeviceMemory bufferMemory,
     VkDeviceSize offsets, VkDeviceSize dataSize, void *data)
 {
-    VkDevice const* localDevice = device->GetDevice();
     void *tmpBuffer;
-    vkMapMemory(*localDevice, bufferMemory, offsets, dataSize, 0, &tmpBuffer);
+    vkMapMemory(*device->GetDevice(), bufferMemory, offsets, dataSize, 0, &tmpBuffer);
     memcpy(tmpBuffer, data, dataSize);
-    vkUnmapMemory(*localDevice, bufferMemory);
-    return;
+    vkUnmapMemory(*device->GetDevice(), bufferMemory);
 }
 
 void AEBuffer::CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize bufferSize,
@@ -478,6 +475,7 @@ AEBufferSBT::AEBufferSBT(AELogicalDevice* device, VkBufferUsageFlagBits usage, A
     uint32_t binding, AEDeviceQueue* commandQueue, AECommandPool* commandPool)
     : AEBufferUtilOnGPU(device, 0, usage)
 {
+    mGroupCount = 1;
     // PFN_vkGetPhysicalDeviceProperties2KHR pfnGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>
 	// 	(vkGetInstanceProcAddr(, "vkGetPhysicalDeviceProperties2KHR"));
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR prop{};

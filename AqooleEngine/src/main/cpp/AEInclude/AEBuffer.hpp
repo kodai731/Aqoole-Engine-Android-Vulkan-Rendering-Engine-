@@ -82,7 +82,7 @@ namespace AEBuffer
         VkMemoryPropertyFlags properties);
     void CopyData(AELogicalDevice const* device, VkDeviceMemory bufferMemory,
         VkDeviceSize bufferSize, void *data);
-    void CopyDataOffsets(AELogicalDevice const* device, VkDeviceMemory bufferMemory,
+    void CopyDataOffsets(AELogicalDevice* device, VkDeviceMemory bufferMemory,
         VkDeviceSize offsets, VkDeviceSize bufferSize, void *data);
     void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize bufferSize,
         AELogicalDevice* device, AEDeviceQueue* queue,

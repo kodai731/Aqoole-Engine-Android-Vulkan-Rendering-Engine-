@@ -88,9 +88,15 @@ namespace AECommand
     //get size by aligned
     inline uint32_t GetAlignedAddress(uint32_t value, uint32_t alignedSize){return (value + alignedSize - 1) & ~(alignedSize - 1);}
     //trace rays
+#ifndef __ANDROID__
     void CommandTraceRays(AECommandBuffer* commandBuffer, AELogicalDevice const* device, AEWindow* window,
 	    std::vector<AEBufferSBT*>& bindingTables, AEPipelineRaytracing* pipeline, AEDescriptorSet* descriptorSet, void* pushConstants,
-	    VkImage* swapchainImage, AEStorageImage* storageImage, AEDeviceQueueBase* commandQueue, AECommandPool* commandPool);
+	    VkImage* swapchainImage, AEStorageImage* storageImage, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
+#else
+	void CommandTraceRays(AECommandBuffer* commandBuffer, AELogicalDevice const* device, const uint32_t width, const uint32_t height,
+						  std::vector<AEBufferSBT*>& bindingTables, AEPipelineRaytracing* pipeline, AEDescriptorSet* descriptorSet, void* pushConstants,
+						  VkImage* swapchainImage, AEStorageImage* storageImage, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
+#endif
 };
 
 
