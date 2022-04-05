@@ -224,6 +224,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   // **********************************************************
   // Create the Vulkan instance
   gInstance = new AEInstance(appInfo, instance_extension_s, true, layers_s);
+  gInstance->SetupDebugMessage();
   device.instance_ = *gInstance->GetInstance();
   gSurface = new AESurface(platformWindow, gInstance);
   device.surface_ = *gSurface->GetSurface();
@@ -454,7 +455,7 @@ bool InitVulkan(android_app* app) {
       offsetX = -1.0f;
       for(uint32_t k = 0; k < 2; k++)
       {
-        AECube* cube = new AECube(cubeLength, glm::vec3(offsetX, offsetY, offsetZ), glm::vec3(1.0f, 0.0f, 0.0f));
+        AECube* cube = new AECube(cubeLength, glm::vec3(offsetX, offsetY, offsetZ), glm::vec3(0.0f, 0.0f, 1.0f));
         gCubes.push_back(cube);
         offsetX += nextPosition;
       }
@@ -489,6 +490,18 @@ bool InitVulkan(android_app* app) {
   //create image
   gStorageImage = std::make_unique<AEStorageImage>(gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,
                                                    gCommandPool, gQueue);
+  //change image layout
+  AECommandBuffer singletime(gDevice, gCommandPool);
+  AECommand::BeginCommand(&singletime);
+  AEImage::TransitionImageLayout(gDevice, &singletime, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, gStorageImage->GetImage());
+  VkSubmitInfo submitInfo =
+          {
+          .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+          .commandBufferCount = 1,
+          .pCommandBuffers = singletime.GetCommandBuffer()
+          };
+  vkQueueSubmit(gQueue->GetQueue(0), 1, &submitInfo, VK_NULL_HANDLE);
+  AECommand::EndCommand(&singletime);
   //uniform buffer
   uboRT.viewInverse = glm::inverse(modelview.view);
   uboRT.projInverse = glm::inverse(modelview.proj);
@@ -668,10 +681,10 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   uboRT.projInverse = glm::inverse(modelview.proj);
   uboRT.modelViewProj = modelview.translate * modelview.rotate * modelview.scale;
   uboRT.normalMatrix = modelViewInverse;
-  //gUboRTBuffer->CopyData(&gUboRTBuffer, sizeof(UBORT));
-  //update AS
-  //asls->Update(&modelview, gQueue, gCommandPool);
-  //astop->Update({asls.get()}, &modelview, gQueue, gCommandPool);
+  gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
+//  //update AS
+  asls->Update(&modelview, gQueue, gCommandPool);
+  astop->Update({asls.get()}, &modelview, gQueue, gCommandPool);
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,

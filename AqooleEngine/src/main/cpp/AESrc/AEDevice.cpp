@@ -387,7 +387,10 @@ VKAPI_ATTR VkBool32 VKAPI_CALL AEInstance::debugCallbackMessages
 	std::string s(pMessage);
 	std::string f("%u /n");
 	s = s + f;
-	__android_log_print(ANDROID_LOG_ERROR, "AE debug messages", s.c_str(), 10);
+	if(s.find("bufferDeviceAddress") != std::string::npos)
+		;
+	else
+		__android_log_print(ANDROID_LOG_DEBUG, "AE validation messages", s.c_str(), 10);
 #endif
 #ifndef __ANDROID__
 	throw std::runtime_error(pMessage);
@@ -743,7 +746,7 @@ get buffer device address
 VkDeviceAddress AERayTracingASBase::GetBufferDeviceAddress(VkBuffer buffer)
 {
 	//address info
-	VkBufferDeviceAddressInfo addressInfo = {};
+	VkBufferDeviceAddressInfoKHR addressInfo = {};
 	addressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
 	addressInfo.buffer = buffer;
 	//get device address
@@ -944,7 +947,7 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, std::vector<
 	if(pfnCreateAccelerationStructureKHR(*mDevice->GetDevice(), &createInfo, nullptr, &mAS) != VK_SUCCESS)
 		throw std::runtime_error("failed to create acceleration structure");
 	//scratch buffer
-	AEBufferAS scratchBuffer(mDevice, mSizeInfo.buildScratchSize, (VkBufferUsageFlagBits)0);
+	AEBufferAS scratchBuffer(mDevice, mSizeInfo.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	scratchBuffer.CreateBuffer();
 	VkDeviceOrHostAddressConstKHR scratchBufferDeviceAddress{};
 	scratchBufferDeviceAddress.deviceAddress = GetBufferDeviceAddress(*scratchBuffer.GetBuffer());
@@ -1025,12 +1028,13 @@ void AERayTracingASBottom::Update(ModelView const* m, AEDeviceQueue* queue, AECo
 	SetTransformMatrix(m->translate * m->rotate * m->scale);
 	mTransFormBuffer->CopyData((void*)&mTransformMatrix, 0, sizeof(VkTransformMatrixKHR), queue, commandPool);
 	//scratch buffer
-	AEBufferAS scratchBuffer(mDevice, mSizeInfo.buildScratchSize, (VkBufferUsageFlagBits)0);
+	AEBufferAS scratchBuffer(mDevice, mSizeInfo.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	scratchBuffer.CreateBuffer();
 	//modify buildGeometryInfo for update
 	mBuildCommandGeometryInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
 	mBuildCommandGeometryInfo.srcAccelerationStructure = mAS;
-	mBuildCommandGeometryInfo.scratchData.deviceAddress = AEBuffer::GetBufferDeviceAddress(mDevice, *scratchBuffer.GetBuffer());
+//	mBuildCommandGeometryInfo.scratchData.deviceAddress = AEBuffer::GetBufferDeviceAddress(mDevice, *scratchBuffer.GetBuffer());
+	mBuildCommandGeometryInfo.scratchData.deviceAddress = GetBufferDeviceAddress(*scratchBuffer.GetBuffer());
 	//range info
 	std::vector<VkAccelerationStructureBuildRangeInfoKHR*> buildRangeInfos = {mRangeInfos.data()};
 	//command
@@ -1127,7 +1131,7 @@ AERayTracingASTop::AERayTracingASTop(AELogicalDevice* device, std::vector<AERayT
 	createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 	pfnCreateAccelerationStructureKHR(*mDevice->GetDevice(), &createInfo, nullptr, &mAS);
 	//actual build prepare
-	AEBufferAS scratchBuffer(mDevice, mSizeInfo.buildScratchSize, (VkBufferUsageFlagBits)0);
+	AEBufferAS scratchBuffer(mDevice, mSizeInfo.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	scratchBuffer.CreateBuffer();
 	VkDeviceOrHostAddressConstKHR scratchDataDeviceAddress{};
 	scratchDataDeviceAddress.deviceAddress = GetBufferDeviceAddress(*scratchBuffer.GetBuffer());
@@ -1187,7 +1191,7 @@ void AERayTracingASTop::Update(std::vector<AERayTracingASBottom*> bottoms, Model
 	// mGeometry.geometry.instances.data = instanceDeviceAddress;
 	//build command geometry
 	VkDeviceOrHostAddressConstKHR scratchDataDeviceAddress{};
-	AEBufferAS scratchBuffer(mDevice, mSizeInfo.updateScratchSize, (VkBufferUsageFlagBits)0);
+	AEBufferAS scratchBuffer(mDevice, mSizeInfo.updateScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	scratchBuffer.CreateBuffer();
 	scratchDataDeviceAddress.deviceAddress = GetBufferDeviceAddress(*scratchBuffer.GetBuffer());
 	scratchDataDeviceAddress.hostAddress = malloc(mSizeInfo.updateScratchSize);

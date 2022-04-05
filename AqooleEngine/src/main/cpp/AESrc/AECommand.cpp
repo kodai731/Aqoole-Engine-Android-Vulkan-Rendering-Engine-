@@ -343,7 +343,7 @@ void AECommand::CommandTraceRays(AECommandBuffer* commandBuffer, AELogicalDevice
 	{
 		//copy image swapchain <-> storage image
 		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, swapchainImage);
-		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, storageImage->GetImage());
+		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, storageImage->GetImage());
 		//copy command
 		VkImageCopy copy_region{};
 			copy_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -355,7 +355,7 @@ void AECommand::CommandTraceRays(AECommandBuffer* commandBuffer, AELogicalDevice
 			*swapchainImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
 		//layout back
 		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, swapchainImage);
-		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, storageImage->GetImage());
+		AEImage::TransitionImageLayout(device, commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, storageImage->GetImage());
 	}
 }
 

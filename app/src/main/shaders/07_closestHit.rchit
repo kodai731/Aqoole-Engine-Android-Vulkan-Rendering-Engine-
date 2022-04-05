@@ -288,7 +288,6 @@ vec3 ColorBlendALL(vec3 surfaceColor, float reflectanceOrigin, inout bool[NODE] 
 
 void main()
 {
-  /*
   //obj Id
   //uint objId = scnDesc.i[gl_InstanceCustomIndexEXT].objId;
   uint objId = gl_InstanceCustomIndexEXT;
@@ -318,10 +317,9 @@ void main()
     waterAlpha = alpha;
   }
   vec3 color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;                         //object coordinates
-  color *= lightIntensity;
+  //color *= lightIntensity;
   //pld = vec4(attenuation * (color + dotNL), 1.0);
-  */
-  pld = vec4(0.0, 0.0, 1.0, 1.0);
+  pld = vec4(color, 1.0);
   //hitValue = vec3(dotNL) + ((v0.color + v1.color + v2.color) / 3.0);
   //hitValue = dotNL * attenuation * ((v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z));
   //hitValue = vec3(0.2);
