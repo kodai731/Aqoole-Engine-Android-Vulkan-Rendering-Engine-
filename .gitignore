@@ -87,3 +87,4 @@ lint/tmp/
 #my settings
 app/build/
 app/.cxx/
+./java_pid10864.hprof
