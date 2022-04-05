@@ -126,8 +126,8 @@ AESwapchainImageView* gSwapchainImageView;
 std::vector<AEDepthImage*> gDepthImages;
 std::vector<AECommandBuffer*> gCommandBuffers;
 //AEDepthImage* gDepthImage;
-AEBufferAS* gVertexBuffer;
-AEBufferAS* gIndexBuffer;
+AEBufferUtilOnGPU* gVertexBuffer;
+AEBufferUtilOnGPU* gIndexBuffer;
 AECommandPool* gCommandPool;
 ModelView modelview = {};
 /*
@@ -143,25 +143,12 @@ glm::vec3 cameraDirection = glm::normalize(cameraPos - gLookAtPoint);
 glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(1.0f, 0.0f, 0.0f)));
 //glm::vec3 cameraUp = glm::vec3(0.0f, -1.0f, 0.0f);
 AEBufferUniform* gModelViewBuffer;
-std::unique_ptr<AEDescriptorSetLayout> gDescriptorSetLayout;
-std::vector<std::unique_ptr<AEDescriptorSetLayout>> gLayouts;
+AEDescriptorSetLayout* gDescriptorSetLayout;
 AEDescriptorPool* gDescriptorPool;
 AEDescriptorSet* gDescriptorSet;
 glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
 MyImgui* gImgui;
-std::unique_ptr<AERayTracingASBottom> asls;
-std::unique_ptr<AERayTracingASTop> astop;
-std::unique_ptr<AEPipelineRaytracing> gPipelineRT;
-std::unique_ptr<AEStorageImage> gStorageImage;
-UBORT uboRT;
-std::unique_ptr<AEBufferUniform> gUboRTBuffer;
-std::vector<AEBufferSBT*> gSbts;
-std::unique_ptr<AEBufferSBT> raygenSBT;
-std::unique_ptr<AEBufferSBT> missSBT;
-std::unique_ptr<AEBufferSBT> chitSBT;
-std::unique_ptr<AECube> gCube;
-
-
+AECommandBuffer* gImguiCommandBuffer;
 double lastTime;
 double startTime;
 
@@ -176,6 +163,8 @@ bool isPositionInitialized = false;
 void ResetCamera();
 void PrintVector2(glm::vec2* vectors, uint32_t size);
 static double GetTime();
+VkPipeline imguiPipeline;
+void CreateImguiPipeline();
 void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions);
 /*
  * setImageLayout():
@@ -204,7 +193,6 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   instance_extension_s.push_back(std::string("VK_KHR_surface"));
   instance_extension_s.push_back(std::string("VK_KHR_android_surface"));
   instance_extension_s.push_back((std::string("VK_EXT_debug_report")));
-  instance_extension_s.push_back("VK_KHR_get_physical_device_properties2");
 
   layers.push_back("VK_LAYER_KHRONOS_validation");
   layers_s.push_back(std::string("VK_LAYER_KHRONOS_validation"));
@@ -214,15 +202,11 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   device_extensions.push_back("VK_KHR_acceleration_structure");
   device_extensions.push_back("VK_KHR_ray_query");
   device_extensions.push_back("VK_KHR_ray_tracing_pipeline");
-  device_extensions.push_back("VK_KHR_shader_float_controls");
   device_extensions.push_back("VK_KHR_spirv_1_4");
-  device_extensions.push_back("VK_EXT_descriptor_indexing");
-  device_extensions.push_back("VK_KHR_deferred_host_operations");
 
   // **********************************************************
   // Create the Vulkan instance
   gInstance = new AEInstance(appInfo, instance_extension_s, true, layers_s);
-  gInstance->SetupDebugMessage();
   device.instance_ = *gInstance->GetInstance();
   gSurface = new AESurface(platformWindow, gInstance);
   device.surface_ = *gSurface->GetSurface();
@@ -246,7 +230,7 @@ void CreateSwapChain(void) {
   //   - It contains the minimal and max length of the chain, we will need it
   //   - It's necessary to query the supported surface format (R8G8B8A8 for
   //   instance ...)
-  gSwapchain = new AESwapchain(gDevice, gSurface, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+  gSwapchain = new AESwapchain(gDevice, gSurface);
   swapchain.swapchain_ = *gSwapchain->GetSwapchain();
   swapchain.displayFormat_ = gSwapchain->GetFormat();
   swapchain.displaySize_ = gSwapchain->GetExtents()[0];
@@ -301,9 +285,9 @@ bool MapMemoryTypeToIndex(uint32_t typeBits, VkFlags requirements_mask,
 // Create our vertex buffer
 bool CreateBuffers(void) {
   // -----------------------------------------------
-  // Create draw objects and its vertex buffer and index buffer
+  // Create the triangle vertex buffer
   size_t vertexSize = gCubes.size() * gCubes[0]->GetVertexSize() * sizeof(Vertex3D);
-  gVertexBuffer = new AEBufferAS(gDevice, vertexSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gVertexBuffer = new AEBufferUtilOnGPU(gDevice, vertexSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
   gVertexBuffer->CreateBuffer();
   size_t vertexOffset = 0;
   size_t oneVertexSize = sizeof(Vertex3D) * gCubes[0]->GetVertexSize();
@@ -314,7 +298,7 @@ bool CreateBuffers(void) {
     vertexOffset += oneVertexSize;
   }
   size_t indexSize = gCubes.size() * gCubes[0]->GetIndexSize() * sizeof(uint32_t);
-  gIndexBuffer = new AEBufferAS(gDevice, indexSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gIndexBuffer = new AEBufferUtilOnGPU(gDevice, indexSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
   gIndexBuffer->CreateBuffer();
   size_t indexOffset = 0;
   uint32_t indexOffsetNumber = 0;
@@ -329,19 +313,6 @@ bool CreateBuffers(void) {
     indexOffset += oneIndexSize;
     indexOffsetNumber += gCubes[0]->GetVertexSize();
   }
-  //prepare ray tracing objects
-//  gCube = std::make_unique<AECube>(2.0f, glm::vec3(-1.0f, 0.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-//  gVertexBuffer = new AEBufferAS(gDevice, sizeof(Vertex3D) * gCube->GetVertexSize(), (VkBufferUsageFlagBits)0);
-//  gVertexBuffer->CreateBuffer();
-//  gVertexBuffer->CopyData((void*)gCube->GetVertexAddress().data(), 0, sizeof(Vertex3D) * gCube->GetVertexSize(), gQueue, gCommandPool);
-//  gIndexBuffer = new AEBufferAS(gDevice, sizeof(uint32_t) * gCube->GetIndexSize(), (VkBufferUsageFlagBits)0);
-//  gIndexBuffer->CreateBuffer();
-//  gIndexBuffer->CopyData((void*)gCube->GetIndexAddress().data(), 0, sizeof(uint32_t) * gCube->GetIndexSize(), gQueue, gCommandPool);
-  BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(), *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
-  std::vector<BLASGeometryInfo> geometries = {cubesInfo};
-  asls = std::make_unique<AERayTracingASBottom>(gDevice, geometries, &modelview, gQueue, gCommandPool);
-  std::vector<AERayTracingASBottom*> bottoms= {asls.get()};
-  astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
   return true;
 }
 
@@ -380,22 +351,215 @@ VkResult loadShaderFromFile(const char* filePath, VkShaderModule* shaderOut,
 }
 
 // Create Graphics Pipeline
-VkResult CreateGraphicsPipeline() {
-  assert(androidAppCtx);
-  //set = 0 for main pipeline
-  gDescriptorSetLayout = std::make_unique<AEDescriptorSetLayout>(gDevice);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
-                                                    VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
+VkResult CreateGraphicsPipeline(void) {
+  memset(&gfxPipeline, 0, sizeof(gfxPipeline));
+  //descriptor set layout
+  gDescriptorSetLayout = new AEDescriptorSetLayout(gDevice);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1,
+                                                      nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
-  gLayouts.push_back(std::move(gDescriptorSetLayout));
-  std::vector<const char*>paths =
-          {"shaders/07_raygenRgen.spv", "shaders/07_rayRmiss.spv", "shaders/07_rayRchit.spv"};
-  gPipelineRT = std::make_unique<AEPipelineRaytracing>(gDevice, paths, &gLayouts, androidAppCtx);
-    return VK_SUCCESS;
+  //descriptor pool
+  std::vector<VkDescriptorPoolSize> poolSize =
+          {
+                  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10}
+          };
+  gDescriptorPool = new AEDescriptorPool(gDevice, poolSize.size(), poolSize.data());
+  std::vector<VkDescriptorSetLayout> layouts = {*gDescriptorSetLayout->GetDescriptorSetLayout()};
+  // Create pipeline layout
+  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .pNext = nullptr,
+      .setLayoutCount = (uint32_t)layouts.size(),
+      .pSetLayouts = layouts.data(),
+      .pushConstantRangeCount = 0,
+      .pPushConstantRanges = nullptr,
+  };
+  CALL_VK(vkCreatePipelineLayout(device.device_, &pipelineLayoutCreateInfo,
+                                 nullptr, &gfxPipeline.layout_));
+
+  VkShaderModule vertexShader, fragmentShader;
+  loadShaderFromFile("shaders/tri.vert.spv", &vertexShader, VERTEX_SHADER);
+  loadShaderFromFile("shaders/tri.frag.spv", &fragmentShader, FRAGMENT_SHADER);
+
+  // Specify vertex and fragment shader stages
+  VkPipelineShaderStageCreateInfo shaderStages[2]{
+      {
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+          .pNext = nullptr,
+          .flags = 0,
+          .stage = VK_SHADER_STAGE_VERTEX_BIT,
+          .module = vertexShader,
+          .pName = "main",
+          .pSpecializationInfo = nullptr,
+      },
+      {
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+          .pNext = nullptr,
+          .flags = 0,
+          .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+          .module = fragmentShader,
+          .pName = "main",
+          .pSpecializationInfo = nullptr,
+      }};
+
+  VkViewport viewports{
+      .x = 0,
+      .y = 0,
+      .width = (float)swapchain.displaySize_.width,
+      .height = (float)swapchain.displaySize_.height,
+      .minDepth = 0.0f,
+      .maxDepth = 1.0f,
+  };
+
+  VkRect2D scissor = {
+      .offset { .x = 0, .y = 0,},
+      .extent = swapchain.displaySize_,
+  };
+  // Specify viewport info
+  VkPipelineViewportStateCreateInfo viewportInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .viewportCount = 1,
+      .pViewports = &viewports,
+      .scissorCount = 1,
+      .pScissors = &scissor,
+  };
+
+  // Specify multisample info
+  VkSampleMask sampleMask = ~0u;
+  VkPipelineMultisampleStateCreateInfo multisampleInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+      .sampleShadingEnable = VK_FALSE,
+      .minSampleShading = 0,
+      .pSampleMask = &sampleMask,
+      .alphaToCoverageEnable = VK_FALSE,
+      .alphaToOneEnable = VK_FALSE,
+  };
+
+  // Specify color blend state
+  VkPipelineColorBlendAttachmentState attachmentStates{
+      .blendEnable = VK_FALSE,
+      .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+  };
+  VkPipelineColorBlendStateCreateInfo colorBlendInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .logicOpEnable = VK_FALSE,
+      .logicOp = VK_LOGIC_OP_COPY,
+      .attachmentCount = 1,
+      .pAttachments = &attachmentStates,
+  };
+
+  // Specify rasterizer info
+  VkPipelineRasterizationStateCreateInfo rasterInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .depthClampEnable = VK_FALSE,
+      .rasterizerDiscardEnable = VK_FALSE,
+      .polygonMode = VK_POLYGON_MODE_FILL,
+      .cullMode = VK_CULL_MODE_NONE,
+      .frontFace = VK_FRONT_FACE_CLOCKWISE,
+      .depthBiasEnable = VK_FALSE,
+      .lineWidth = 1,
+  };
+
+  // Specify input assembler state
+  VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+      .primitiveRestartEnable = VK_FALSE,
+  };
+
+  // Specify vertex input state
+//  VkVertexInputBindingDescription vertex_input_bindings{
+//      .binding = 0,
+//      .stride = 3 * sizeof(float),
+//      .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+//  };
+  VkVertexInputBindingDescription vertex_input_bindings = Vertex3D::getBindingDescription();
+
+//  VkVertexInputAttributeDescription vertex_input_attributes[1]{{
+//      .location = 0,
+//      .binding = 0,
+//      .format = VK_FORMAT_R32G32B32_SFLOAT,
+//      .offset = 0,
+//  }};
+  auto vertex_input_attributes = Vertex3D::getAttributeDescriptions();
+
+  VkPipelineVertexInputStateCreateInfo vertexInputInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .vertexBindingDescriptionCount = 1,
+      .pVertexBindingDescriptions = &vertex_input_bindings,
+      .vertexAttributeDescriptionCount = vertex_input_attributes.size(),
+      .pVertexAttributeDescriptions = vertex_input_attributes.data(),
+  };
+
+  // Create the pipeline cache
+  VkPipelineCacheCreateInfo pipelineCacheInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,  // reserved, must be 0
+      .initialDataSize = 0,
+      .pInitialData = nullptr,
+  };
+
+    //depth stencial state
+    VkPipelineDepthStencilStateCreateInfo depthStencilInfo
+            {
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+                    .depthTestEnable = VK_TRUE,
+                    .depthWriteEnable = VK_TRUE,
+                    .depthCompareOp = VK_COMPARE_OP_LESS,
+                    .depthBoundsTestEnable = VK_FALSE,
+                    .stencilTestEnable = VK_FALSE,
+                    .front = {},
+                    .back = {},
+                    .minDepthBounds = 0.0f,
+                    .maxDepthBounds = 1.0f,
+            };
+
+    CALL_VK(vkCreatePipelineCache(device.device_, &pipelineCacheInfo, nullptr,
+                                &gfxPipeline.cache_));
+
+  // Create the pipeline
+  VkGraphicsPipelineCreateInfo pipelineCreateInfo{
+      .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .stageCount = 2,
+      .pStages = shaderStages,
+      .pVertexInputState = &vertexInputInfo,
+      .pInputAssemblyState = &inputAssemblyInfo,
+      .pTessellationState = nullptr,
+      .pViewportState = &viewportInfo,
+      .pRasterizationState = &rasterInfo,
+      .pMultisampleState = &multisampleInfo,
+//      .pMultisampleState = nullptr,
+      .pDepthStencilState = &depthStencilInfo,
+      .pColorBlendState = &colorBlendInfo,
+      .pDynamicState = nullptr,
+      .layout = gfxPipeline.layout_,
+      .renderPass = render.renderPass_,
+      .subpass = 0,
+      .basePipelineHandle = VK_NULL_HANDLE,
+      .basePipelineIndex = 0,
+  };
+
+  VkResult pipelineResult = vkCreateGraphicsPipelines(
+      device.device_, gfxPipeline.cache_, 1, &pipelineCreateInfo, nullptr,
+      &gfxPipeline.pipeline_);
+
+  // We don't need the shaders anymore, we can release their memory
+  vkDestroyShaderModule(device.device_, vertexShader, nullptr);
+  vkDestroyShaderModule(device.device_, fragmentShader, nullptr);
+
+  return pipelineResult;
 }
 
 void DeleteGraphicsPipeline(void) {
@@ -440,20 +604,20 @@ bool InitVulkan(android_app* app) {
   // Create 2 frame buffers.
   CreateFrameBuffers(render.renderPass_);
   //create objects
-  float offsetX = -1.0f;
-  float offsetY = 1.0f;
+  float offsetX = -5.0f;
+  float offsetY = 5.0f;
   float offsetZ = 0.0f;
   float cubeLength = 1.0f;
   float nextPosition = cubeLength * 1.5f;
-  for(uint32_t i = 0; i < 2; i++)
+  for(uint32_t i = 0; i < 10; i++)
   {
-    offsetY = -1.0f;
-    for(uint32_t j = 0; j < 2; j++)
+    offsetY = 5.0f;
+    for(uint32_t j = 0; j < 10; j++)
     {
-      offsetX = -1.0f;
-      for(uint32_t k = 0; k < 2; k++)
+      offsetX = -5.0f;
+      for(uint32_t k = 0; k < 10; k++)
       {
-        AECube* cube = new AECube(cubeLength, glm::vec3(offsetX, offsetY, offsetZ), glm::vec3(0.0f, 0.0f, 1.0f));
+        AECube* cube = new AECube(cubeLength, glm::vec3(offsetX, offsetY, offsetZ), glm::vec3(1.0f, 0.0f, 0.0f));
         gCubes.push_back(cube);
         offsetX += nextPosition;
       }
@@ -461,76 +625,28 @@ bool InitVulkan(android_app* app) {
     }
     offsetZ += nextPosition;
   }
+  CreateBuffers();  // create vertex buffers
+
+  // Create graphics pipeline
+  CreateGraphicsPipeline();
+  //prepare matrix
   modelview.rotate = glm::mat4(1.0f);
   modelview.scale = glm::mat4(1.0f);
   modelview.translate = glm::mat4(1.0f);
   modelview.proj = glm::mat4(1.0f);
   AEMatrix::Perspective(modelview.proj, 90.0f,
-                        (float)gSwapchain->GetExtents()[0].width / (float)gSwapchain->GetExtents()[0].height,
-                        0.1f, 100.0f);
+                            (float)gSwapchain->GetExtents()[0].width / (float)gSwapchain->GetExtents()[0].height,
+                            0.1f, 100.0f);
   modelview.view = glm::mat4(1.0f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-  CreateBuffers();  // create vertex buffers
-    // Create graphics pipeline
-    CreateGraphicsPipeline();
-  //prepare matrix
-  //descriptor pool
-  std::vector<VkDescriptorPoolSize> poolSizeRT =
-          {
-                  {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 2},
-                  {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2},
-                  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
-                  {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10},
-                  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8},
-                  {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2}
-          };
-  gDescriptorPool = new AEDescriptorPool(gDevice, poolSizeRT.size(), poolSizeRT.data());
-  //create image
-  gStorageImage = std::make_unique<AEStorageImage>(gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gCommandPool, gQueue,
-                                                   VkImageUsageFlagBits (VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
-  //change image layout
-  AECommandBuffer singletime(gDevice, gCommandPool);
-  AECommand::BeginCommand(&singletime);
-  AEImage::TransitionImageLayout(gDevice, &singletime, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, gStorageImage->GetImage());
-  VkSubmitInfo submitInfo =
-          {
-          .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-          .commandBufferCount = 1,
-          .pCommandBuffers = singletime.GetCommandBuffer()
-          };
-  AECommand::EndCommand(&singletime);
-  vkQueueSubmit(gQueue->GetQueue(0), 1, &submitInfo, VK_NULL_HANDLE);
   //uniform buffer
-  uboRT.viewInverse = glm::inverse(modelview.view);
-  uboRT.projInverse = glm::inverse(modelview.proj);
-  uboRT.modelViewProj = modelview.translate * modelview.rotate * modelview.scale;
-  uboRT.normalMatrix = glm::mat4(1.0f);
-  gUboRTBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(UBORT));
-  gUboRTBuffer->CreateBuffer();
-  gUboRTBuffer->CopyData((void*)&uboRT, sizeof(UBORT));
+  gModelViewBuffer = new AEBufferUniform(gDevice, sizeof(ModelView));
+  gModelViewBuffer->CreateBuffer();
+  gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
   //descriptor set
-  gDescriptorSet = new AEDescriptorSet(gDevice, gLayouts[0], gDescriptorPool);
-  gDescriptorSet->BindAccelerationStructure(0, astop.get());
-  gDescriptorSet->BindDescriptorImage(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, gStorageImage->GetImageView(),
-                                      nullptr);
-  gDescriptorSet->BindDescriptorBuffer(2, gUboRTBuffer->GetBuffer(), sizeof(UBORT), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(3, gVertexBuffer->GetBuffer(), sizeof(Vertex3D) * gCubes[0]->GetVertexSize() * gCubes.size(),
-                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(4, gIndexBuffer->GetBuffer(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size(),
-                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  //create binding table buffer
-  raygenSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 0, gQueue, gCommandPool);
-  missSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 1, gQueue, gCommandPool);
-  chitSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 2, gQueue, gCommandPool);
-  gSbts.push_back(raygenSBT.get());
-  gSbts.push_back(missSBT.get());
-  gSbts.push_back(chitSBT.get());
-  //push constants
-  ConstantsRT constantRT{};
-  constantRT.clearColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-  constantRT.lightPosition = glm::vec3(0.0f, -40.0f, 5.0f);
-  constantRT.lightType = 0;
-  constantRT.lightIntensity = 300.0f;
+  gDescriptorSet = new AEDescriptorSet(gDevice, gDescriptorSetLayout, gDescriptorPool);
+  gDescriptorSet->BindDescriptorBuffer(0, gModelViewBuffer->GetBuffer(), sizeof(ModelView),
+                                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   // -----------------------------------------------
   // Create a pool of command buffers to allocate command buffer from
   render.cmdBufferLen_ = swapchain.swapchainLength_;
@@ -551,18 +667,67 @@ bool InitVulkan(android_app* app) {
     render.cmdBuffer_[i] = *gCommandBuffers[i]->GetCommandBuffer();
   }
   //init imgui
+  CreateImguiPipeline();
   gImgui = new MyImgui(app->window, gInstance, gDevice, gSwapchain, gQueue, gQueue, gSurface, &gFrameBuffers,
                        &gDepthImages, gSwapchainImageView, gRenderPass);
   //register commands
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
-    AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
-//    AECommand::BeginRenderPass(bufferIndex, gCommandBuffers[bufferIndex], gFrameBuffers[bufferIndex]);
-    AECommand::CommandTraceRays(gCommandBuffers[bufferIndex], gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gSbts,
-                                gPipelineRT.get(), gDescriptorSet, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
-                                gQueue, gCommandPool);
-//    AECommand::EndRenderPass(gCommandBuffers[bufferIndex]);
-    AECommand::EndCommand(gCommandBuffers[bufferIndex]);
+    // We start by creating and declare the "beginning" our command buffer
+    VkCommandBufferBeginInfo cmdBufferBeginInfo{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .pInheritanceInfo = nullptr,
+    };
+    CALL_VK(vkBeginCommandBuffer(render.cmdBuffer_[bufferIndex],
+                                 &cmdBufferBeginInfo));
+    // transition the display image to color attachment layout
+    setImageLayout(render.cmdBuffer_[bufferIndex],
+                   swapchain.displayImages_[bufferIndex],
+                   VK_IMAGE_ASPECT_COLOR_BIT,
+                   VK_IMAGE_LAYOUT_UNDEFINED,
+                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    setImageLayout(render.cmdBuffer_[bufferIndex],
+                   *gDepthImages[bufferIndex]->GetImage(),
+                   VK_IMAGE_ASPECT_DEPTH_BIT,
+                   VK_IMAGE_LAYOUT_UNDEFINED,
+                   VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                   VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+    // Now we start a renderpass. Any draw command has to be recorded in a
+    // renderpass
+    VkClearValue clearVals[2]{ {.color { .float32 {0.0f, 0.34f, 0.90f, 1.0f}}},{.depthStencil{.depth = 1.0f}}};
+//    VkClearValue clearVals{ .color { .float32 {0.0f, 0.34f, 0.90f, 1.0f}}};
+    VkRenderPassBeginInfo renderPassBeginInfo{
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .pNext = nullptr,
+        .renderPass = render.renderPass_,
+        .framebuffer = swapchain.framebuffers_[bufferIndex],
+        .renderArea = {.offset { .x = 0, .y = 0,},
+                       .extent = swapchain.displaySize_},
+        .clearValueCount = 2,
+        .pClearValues = clearVals};
+    vkCmdBeginRenderPass(render.cmdBuffer_[bufferIndex], &renderPassBeginInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+      // Bind what is necessary to the command buffer
+    vkCmdBindPipeline(render.cmdBuffer_[bufferIndex],
+                      VK_PIPELINE_BIND_POINT_GRAPHICS, gfxPipeline.pipeline_);
+    VkDeviceSize offset = 0;
+//    vkCmdBindVertexBuffers(render.cmdBuffer_[bufferIndex], 0, 1,
+//                           &buffers.vertexBuf_, &offset);
+    vkCmdBindVertexBuffers(render.cmdBuffer_[bufferIndex], 0, 1,
+                           gVertexBuffer->GetBuffer(), &offset);
+    vkCmdBindIndexBuffer(render.cmdBuffer_[bufferIndex], *gIndexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindDescriptorSets(render.cmdBuffer_[bufferIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, gfxPipeline.layout_, 0, 1,
+                            gDescriptorSet->GetDescriptorSet(), 0, nullptr);
+    // Draw Triangle
+//    vkCmdDraw(render.cmdBuffer_[bufferIndex], 3, 1, 0, 0);
+    vkCmdDrawIndexed(render.cmdBuffer_[bufferIndex], gCubes.size() * gCubes[0]->GetIndexSize(), 1, 0, 0, 0);
+    vkCmdEndRenderPass(render.cmdBuffer_[bufferIndex]);
+    CALL_VK(vkEndCommandBuffer(render.cmdBuffer_[bufferIndex]));
   }
 
   // We need to create a fence to be able, in the main loop, to wait for our
@@ -618,7 +783,7 @@ void DeleteVulkan(void) {
   delete gRenderPass;
   gFrameBuffers.clear();
   //DeleteSwapChain();
-  gDescriptorSetLayout.reset();
+  delete gDescriptorSetLayout;
   delete gDescriptorSet;
   delete gDescriptorPool;
   delete gSwapchainImageView;
@@ -671,18 +836,9 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
       lastPositions[1] = touchPositions[1];
   }
   LookByGravity(currentFrame, isTouched, isFocused, gravityData, lastGravityData);
-  //cameraPos += glm::vec3(0.0f, 0.0f, 0.1f);
+  cameraPos += glm::vec3(0.0f, 0.0f, 0.1f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-  glm::mat4 modelViewInverse = glm::inverse(modelview.translate * modelview.rotate * modelview.scale);
-  modelViewInverse = glm::transpose(modelViewInverse);
-  uboRT.viewInverse = glm::inverse(modelview.view);
-  uboRT.projInverse = glm::inverse(modelview.proj);
-  uboRT.modelViewProj = modelview.translate * modelview.rotate * modelview.scale;
-  uboRT.normalMatrix = modelViewInverse;
-  gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
-  //update AS
-  asls->Update(&modelview, gQueue, gCommandPool);
-  astop->Update({asls.get()}, &modelview, gQueue, gCommandPool);
+  gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
@@ -692,13 +848,13 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   RecordImguiCommand(nextIndex, touchPositions);
     VkPipelineStageFlags waitStageMask =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  VkCommandBuffer cmdBuffers[1] = {*gCommandBuffers[nextIndex]->GetCommandBuffer()/*, gImgui->GetCommandBuffer()->GetCommandBuffer()*/};
+  VkCommandBuffer cmdBuffers[2] = {render.cmdBuffer_[nextIndex], *gImgui->GetCommandBuffer()->GetCommandBuffer()};
   VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                               .pNext = nullptr,
                               .waitSemaphoreCount = 1,
                               .pWaitSemaphores = &render.semaphore_,
                               .pWaitDstStageMask = &waitStageMask,
-                              .commandBufferCount = 1,
+                              .commandBufferCount = 2,
                               .pCommandBuffers = cmdBuffers,
                               .signalSemaphoreCount = 1,
                               .pSignalSemaphores = &render.presentSemaphore_,};
@@ -835,7 +991,7 @@ void Zoom(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* to
       cameraPos -= (0.01f * abs(dd)) * cameraDirection;
     }
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-//    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
+    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
   }
 }
 
@@ -882,7 +1038,7 @@ void Look(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* to
     cameraDirection = rotate * cameraDirection;
     cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(1.0f, 0.0f, 0.0f)));
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-//    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
+    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
 
 }
 
@@ -917,7 +1073,7 @@ void LookByGravity(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm:
     cameraDirection = (rotateX * rotateY * rotateZ) * cameraDirection;
     cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(1.0f, 0.0f, 0.0f)));
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-//    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
+    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
 }
 
 void ResetCamera()
@@ -926,7 +1082,7 @@ void ResetCamera()
   cameraDirection = glm::normalize(cameraPos - gLookAtPoint);
   cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(1.0f, 0.0f, 0.0f)));
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-//  gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
+  gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
 }
 
 double GetTime()
@@ -934,6 +1090,190 @@ double GetTime()
   timespec res;
   clock_gettime(CLOCK_REALTIME, &res);
   return 1000.0 * res.tv_sec + res.tv_nsec / 1e6;
+}
+
+void CreateImguiPipeline() {
+    VkShaderModule vertexShader, fragmentShader;
+    loadShaderFromFile("shaders/tri.vert.spv", &vertexShader, VERTEX_SHADER);
+    loadShaderFromFile("shaders/tri.frag.spv", &fragmentShader, FRAGMENT_SHADER);
+
+    // Specify vertex and fragment shader stages
+    VkPipelineShaderStageCreateInfo shaderStages[2]{
+            {
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                    .pNext = nullptr,
+                    .flags = 0,
+                    .stage = VK_SHADER_STAGE_VERTEX_BIT,
+                    .module = vertexShader,
+                    .pName = "main",
+                    .pSpecializationInfo = nullptr,
+            },
+            {
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                    .pNext = nullptr,
+                    .flags = 0,
+                    .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .module = fragmentShader,
+                    .pName = "main",
+                    .pSpecializationInfo = nullptr,
+            }};
+
+    VkViewport viewports{
+            .x = 0,
+            .y = 0,
+            .width = (float) 150.0f,
+            .height = (float) 200.0f,
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f,
+    };
+
+    VkRect2D scissor = {
+            .offset {.x = 0, .y = 0,},
+            .extent = {.width = 150, .height = 200},
+    };
+    // Specify viewport info
+    VkPipelineViewportStateCreateInfo viewportInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .viewportCount = 1,
+            .pViewports = &viewports,
+            .scissorCount = 1,
+            .pScissors = &scissor,
+    };
+
+    // Specify multisample info
+    VkSampleMask sampleMask = ~0u;
+    VkPipelineMultisampleStateCreateInfo multisampleInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+            .sampleShadingEnable = VK_FALSE,
+            .minSampleShading = 0,
+            .pSampleMask = &sampleMask,
+            .alphaToCoverageEnable = VK_FALSE,
+            .alphaToOneEnable = VK_FALSE,
+    };
+
+    // Specify color blend state
+    VkPipelineColorBlendAttachmentState attachmentStates{
+            .blendEnable = VK_FALSE,
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+    };
+    VkPipelineColorBlendStateCreateInfo colorBlendInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .logicOpEnable = VK_FALSE,
+            .logicOp = VK_LOGIC_OP_COPY,
+            .attachmentCount = 1,
+            .pAttachments = &attachmentStates,
+    };
+
+    // Specify rasterizer info
+    VkPipelineRasterizationStateCreateInfo rasterInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .depthClampEnable = VK_FALSE,
+            .rasterizerDiscardEnable = VK_FALSE,
+            .polygonMode = VK_POLYGON_MODE_FILL,
+            .cullMode = VK_CULL_MODE_NONE,
+            .frontFace = VK_FRONT_FACE_CLOCKWISE,
+            .depthBiasEnable = VK_FALSE,
+            .lineWidth = 1,
+    };
+
+    // Specify input assembler state
+    VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .primitiveRestartEnable = VK_FALSE,
+    };
+
+    // Specify vertex input state
+//  VkVertexInputBindingDescription vertex_input_bindings{
+//      .binding = 0,
+//      .stride = 3 * sizeof(float),
+//      .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+//  };
+    VkVertexInputBindingDescription vertex_input_bindings = Vertex3D::getBindingDescription();
+
+//  VkVertexInputAttributeDescription vertex_input_attributes[1]{{
+//      .location = 0,
+//      .binding = 0,
+//      .format = VK_FORMAT_R32G32B32_SFLOAT,
+//      .offset = 0,
+//  }};
+    auto vertex_input_attributes = Vertex3D::getAttributeDescriptions();
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .vertexBindingDescriptionCount = 1,
+            .pVertexBindingDescriptions = &vertex_input_bindings,
+            .vertexAttributeDescriptionCount = vertex_input_attributes.size(),
+            .pVertexAttributeDescriptions = vertex_input_attributes.data(),
+    };
+
+    // Create the pipeline cache
+    VkPipelineCacheCreateInfo pipelineCacheInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,  // reserved, must be 0
+            .initialDataSize = 0,
+            .pInitialData = nullptr,
+    };
+
+    //depth stencial state
+    VkPipelineDepthStencilStateCreateInfo depthStencilInfo
+            {
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+                    .depthTestEnable = VK_TRUE,
+                    .depthWriteEnable = VK_TRUE,
+                    .depthCompareOp = VK_COMPARE_OP_LESS,
+                    .depthBoundsTestEnable = VK_FALSE,
+                    .stencilTestEnable = VK_FALSE,
+                    .front = {},
+                    .back = {},
+                    .minDepthBounds = 0.0f,
+                    .maxDepthBounds = 1.0f,
+            };
+
+    CALL_VK(vkCreatePipelineCache(device.device_, &pipelineCacheInfo, nullptr,
+                                  &gfxPipeline.cache_));
+
+    // Create the pipeline
+    VkGraphicsPipelineCreateInfo pipelineCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .stageCount = 2,
+            .pStages = shaderStages,
+            .pVertexInputState = &vertexInputInfo,
+            .pInputAssemblyState = &inputAssemblyInfo,
+            .pTessellationState = nullptr,
+            .pViewportState = &viewportInfo,
+            .pRasterizationState = &rasterInfo,
+            .pMultisampleState = &multisampleInfo,
+//      .pMultisampleState = nullptr,
+            .pDepthStencilState = &depthStencilInfo,
+            .pColorBlendState = &colorBlendInfo,
+            .pDynamicState = nullptr,
+            .layout = gfxPipeline.layout_,
+            .renderPass = render.renderPass_,
+            .subpass = 0,
+            .basePipelineHandle = VK_NULL_HANDLE,
+            .basePipelineIndex = 0,
+    };
+
+    VkResult pipelineResult = vkCreateGraphicsPipelines(
+            device.device_, gfxPipeline.cache_, 1, &pipelineCreateInfo, nullptr,
+            &imguiPipeline);
+
+    // We don't need the shaders anymore, we can release their memory
+    vkDestroyShaderModule(device.device_, vertexShader, nullptr);
+    vkDestroyShaderModule(device.device_, fragmentShader, nullptr);
 }
 
 void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions)
