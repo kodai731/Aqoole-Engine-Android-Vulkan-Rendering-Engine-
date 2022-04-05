@@ -132,7 +132,7 @@ class AESwapchain
     VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
     VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
     public:
-    AESwapchain(AELogicalDevice* device, AESurface *surface);
+    AESwapchain(AELogicalDevice* device, AESurface *surface, VkImageUsageFlagBits additionalUsage = (VkImageUsageFlagBits)0);
     AESwapchain(AELogicalDevice* device, AESurface *surface, float width, float height);
     ~AESwapchain();
     //iterator

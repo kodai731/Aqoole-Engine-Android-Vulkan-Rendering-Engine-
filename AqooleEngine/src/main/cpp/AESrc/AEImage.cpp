@@ -432,13 +432,13 @@ AEDepthImage::~AEDepthImage()
 /*
 constructor
 */
-AEStorageImage::AEStorageImage(AELogicalDevice* device, const int width, const int height, AECommandPool* commandPool, AEDeviceQueue* queue)
+AEStorageImage::AEStorageImage(AELogicalDevice* device, const int width, const int height, AECommandPool* commandPool, AEDeviceQueue* queue, VkImageUsageFlagBits additionalUsage)
     : AEImageBase(device, commandPool, queue)
 {
     mWidth = width;
     mHeight = height;
     AEImage::CreateImage2D(mDevice, mWidth, mHeight, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT, (VkSharingMode)0, VK_SAMPLE_COUNT_1_BIT, &mImage);
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT | additionalUsage, (VkSharingMode)0, VK_SAMPLE_COUNT_1_BIT, &mImage);
     AEImage::BindImageMemory(mDevice, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &mImage, &mImageMemory);
     AEImage::CreateImageView2D(mDevice, &mImage, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, &mImageView, 1);
     AECommandBuffer commandBuffer(mDevice, commandPool);

@@ -107,7 +107,7 @@ AESurface::~AESurface()
 /*
 constructor
  */
-AESwapchain::AESwapchain(AELogicalDevice* device, AESurface *surface)
+AESwapchain::AESwapchain(AELogicalDevice* device, AESurface *surface, VkImageUsageFlagBits additionalUsage)
 {
 	mDevice = device;
 	mSurface = surface;
@@ -132,7 +132,7 @@ AESwapchain::AESwapchain(AELogicalDevice* device, AESurface *surface)
 	createInfo.imageColorSpace = surfaceformat.colorSpace;
 	createInfo.imageExtent = extent;
 	createInfo.imageArrayLayers = 1;
-	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | additionalUsage;
 	//
 	// QueueFamilyIndice indices = FindQueueFamilies(mPhysicalDevices[0]);
 	// uint32_t queueFamilyIndices[] = { (uint32_t)indices.graphicsFamily, (uint32_t)indices.presentFamily };

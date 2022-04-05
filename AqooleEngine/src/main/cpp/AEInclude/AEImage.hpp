@@ -123,7 +123,7 @@ class AEStorageImage : public AEImageBase
     int mHeight;
     public:
     AEStorageImage(AELogicalDevice* device, const int width, const int height,
-        AECommandPool* commandPool, AEDeviceQueue* queue);
+        AECommandPool* commandPool, AEDeviceQueue* queue, VkImageUsageFlagBits additionalUsage = (VkImageUsageFlagBits)0);
     ~AEStorageImage();
 };
 

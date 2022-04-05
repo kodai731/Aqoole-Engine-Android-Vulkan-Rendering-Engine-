@@ -176,8 +176,6 @@ bool isPositionInitialized = false;
 void ResetCamera();
 void PrintVector2(glm::vec2* vectors, uint32_t size);
 static double GetTime();
-VkPipeline imguiPipeline;
-void CreateImguiPipeline();
 void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions);
 /*
  * setImageLayout():
@@ -248,7 +246,7 @@ void CreateSwapChain(void) {
   //   - It contains the minimal and max length of the chain, we will need it
   //   - It's necessary to query the supported surface format (R8G8B8A8 for
   //   instance ...)
-  gSwapchain = new AESwapchain(gDevice, gSurface);
+  gSwapchain = new AESwapchain(gDevice, gSurface, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
   swapchain.swapchain_ = *gSwapchain->GetSwapchain();
   swapchain.displayFormat_ = gSwapchain->GetFormat();
   swapchain.displaySize_ = gSwapchain->GetExtents()[0];
@@ -305,7 +303,7 @@ bool CreateBuffers(void) {
   // -----------------------------------------------
   // Create draw objects and its vertex buffer and index buffer
   size_t vertexSize = gCubes.size() * gCubes[0]->GetVertexSize() * sizeof(Vertex3D);
-  gVertexBuffer = new AEBufferAS(gDevice, vertexSize, (VkBufferUsageFlagBits)0);
+  gVertexBuffer = new AEBufferAS(gDevice, vertexSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gVertexBuffer->CreateBuffer();
   size_t vertexOffset = 0;
   size_t oneVertexSize = sizeof(Vertex3D) * gCubes[0]->GetVertexSize();
@@ -316,7 +314,7 @@ bool CreateBuffers(void) {
     vertexOffset += oneVertexSize;
   }
   size_t indexSize = gCubes.size() * gCubes[0]->GetIndexSize() * sizeof(uint32_t);
-  gIndexBuffer = new AEBufferAS(gDevice, indexSize, (VkBufferUsageFlagBits)0);
+  gIndexBuffer = new AEBufferAS(gDevice, indexSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gIndexBuffer->CreateBuffer();
   size_t indexOffset = 0;
   uint32_t indexOffsetNumber = 0;
@@ -489,7 +487,8 @@ bool InitVulkan(android_app* app) {
   gDescriptorPool = new AEDescriptorPool(gDevice, poolSizeRT.size(), poolSizeRT.data());
   //create image
   gStorageImage = std::make_unique<AEStorageImage>(gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,
-                                                   gCommandPool, gQueue);
+                                                   gCommandPool, gQueue,
+                                                   VkImageUsageFlagBits (VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
   //change image layout
   AECommandBuffer singletime(gDevice, gCommandPool);
   AECommand::BeginCommand(&singletime);
@@ -500,8 +499,8 @@ bool InitVulkan(android_app* app) {
           .commandBufferCount = 1,
           .pCommandBuffers = singletime.GetCommandBuffer()
           };
-  vkQueueSubmit(gQueue->GetQueue(0), 1, &submitInfo, VK_NULL_HANDLE);
   AECommand::EndCommand(&singletime);
+  vkQueueSubmit(gQueue->GetQueue(0), 1, &submitInfo, VK_NULL_HANDLE);
   //uniform buffer
   uboRT.viewInverse = glm::inverse(modelview.view);
   uboRT.projInverse = glm::inverse(modelview.proj);
@@ -936,190 +935,6 @@ double GetTime()
   timespec res;
   clock_gettime(CLOCK_REALTIME, &res);
   return 1000.0 * res.tv_sec + res.tv_nsec / 1e6;
-}
-
-void CreateImguiPipeline() {
-    VkShaderModule vertexShader, fragmentShader;
-    loadShaderFromFile("shaders/tri.vert.spv", &vertexShader, VERTEX_SHADER);
-    loadShaderFromFile("shaders/tri.frag.spv", &fragmentShader, FRAGMENT_SHADER);
-
-    // Specify vertex and fragment shader stages
-    VkPipelineShaderStageCreateInfo shaderStages[2]{
-            {
-                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                    .pNext = nullptr,
-                    .flags = 0,
-                    .stage = VK_SHADER_STAGE_VERTEX_BIT,
-                    .module = vertexShader,
-                    .pName = "main",
-                    .pSpecializationInfo = nullptr,
-            },
-            {
-                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                    .pNext = nullptr,
-                    .flags = 0,
-                    .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-                    .module = fragmentShader,
-                    .pName = "main",
-                    .pSpecializationInfo = nullptr,
-            }};
-
-    VkViewport viewports{
-            .x = 0,
-            .y = 0,
-            .width = (float) 150.0f,
-            .height = (float) 200.0f,
-            .minDepth = 0.0f,
-            .maxDepth = 1.0f,
-    };
-
-    VkRect2D scissor = {
-            .offset {.x = 0, .y = 0,},
-            .extent = {.width = 150, .height = 200},
-    };
-    // Specify viewport info
-    VkPipelineViewportStateCreateInfo viewportInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-            .pNext = nullptr,
-            .viewportCount = 1,
-            .pViewports = &viewports,
-            .scissorCount = 1,
-            .pScissors = &scissor,
-    };
-
-    // Specify multisample info
-    VkSampleMask sampleMask = ~0u;
-    VkPipelineMultisampleStateCreateInfo multisampleInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-            .pNext = nullptr,
-            .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-            .sampleShadingEnable = VK_FALSE,
-            .minSampleShading = 0,
-            .pSampleMask = &sampleMask,
-            .alphaToCoverageEnable = VK_FALSE,
-            .alphaToOneEnable = VK_FALSE,
-    };
-
-    // Specify color blend state
-    VkPipelineColorBlendAttachmentState attachmentStates{
-            .blendEnable = VK_FALSE,
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-    };
-    VkPipelineColorBlendStateCreateInfo colorBlendInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0,
-            .logicOpEnable = VK_FALSE,
-            .logicOp = VK_LOGIC_OP_COPY,
-            .attachmentCount = 1,
-            .pAttachments = &attachmentStates,
-    };
-
-    // Specify rasterizer info
-    VkPipelineRasterizationStateCreateInfo rasterInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-            .pNext = nullptr,
-            .depthClampEnable = VK_FALSE,
-            .rasterizerDiscardEnable = VK_FALSE,
-            .polygonMode = VK_POLYGON_MODE_FILL,
-            .cullMode = VK_CULL_MODE_NONE,
-            .frontFace = VK_FRONT_FACE_CLOCKWISE,
-            .depthBiasEnable = VK_FALSE,
-            .lineWidth = 1,
-    };
-
-    // Specify input assembler state
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-            .pNext = nullptr,
-            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-            .primitiveRestartEnable = VK_FALSE,
-    };
-
-    // Specify vertex input state
-//  VkVertexInputBindingDescription vertex_input_bindings{
-//      .binding = 0,
-//      .stride = 3 * sizeof(float),
-//      .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-//  };
-    VkVertexInputBindingDescription vertex_input_bindings = Vertex3D::getBindingDescription();
-
-//  VkVertexInputAttributeDescription vertex_input_attributes[1]{{
-//      .location = 0,
-//      .binding = 0,
-//      .format = VK_FORMAT_R32G32B32_SFLOAT,
-//      .offset = 0,
-//  }};
-    auto vertex_input_attributes = Vertex3D::getAttributeDescriptions();
-
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-            .pNext = nullptr,
-            .vertexBindingDescriptionCount = 1,
-            .pVertexBindingDescriptions = &vertex_input_bindings,
-            .vertexAttributeDescriptionCount = vertex_input_attributes.size(),
-            .pVertexAttributeDescriptions = vertex_input_attributes.data(),
-    };
-
-    // Create the pipeline cache
-    VkPipelineCacheCreateInfo pipelineCacheInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0,  // reserved, must be 0
-            .initialDataSize = 0,
-            .pInitialData = nullptr,
-    };
-
-    //depth stencial state
-    VkPipelineDepthStencilStateCreateInfo depthStencilInfo
-            {
-                    .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-                    .depthTestEnable = VK_TRUE,
-                    .depthWriteEnable = VK_TRUE,
-                    .depthCompareOp = VK_COMPARE_OP_LESS,
-                    .depthBoundsTestEnable = VK_FALSE,
-                    .stencilTestEnable = VK_FALSE,
-                    .front = {},
-                    .back = {},
-                    .minDepthBounds = 0.0f,
-                    .maxDepthBounds = 1.0f,
-            };
-
-    CALL_VK(vkCreatePipelineCache(device.device_, &pipelineCacheInfo, nullptr,
-                                  &gfxPipeline.cache_));
-
-    // Create the pipeline
-    VkGraphicsPipelineCreateInfo pipelineCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0,
-            .stageCount = 2,
-            .pStages = shaderStages,
-            .pVertexInputState = &vertexInputInfo,
-            .pInputAssemblyState = &inputAssemblyInfo,
-            .pTessellationState = nullptr,
-            .pViewportState = &viewportInfo,
-            .pRasterizationState = &rasterInfo,
-            .pMultisampleState = &multisampleInfo,
-//      .pMultisampleState = nullptr,
-            .pDepthStencilState = &depthStencilInfo,
-            .pColorBlendState = &colorBlendInfo,
-            .pDynamicState = nullptr,
-            .layout = gfxPipeline.layout_,
-            .renderPass = render.renderPass_,
-            .subpass = 0,
-            .basePipelineHandle = VK_NULL_HANDLE,
-            .basePipelineIndex = 0,
-    };
-
-    VkResult pipelineResult = vkCreateGraphicsPipelines(
-            device.device_, gfxPipeline.cache_, 1, &pipelineCreateInfo, nullptr,
-            &imguiPipeline);
-
-    // We don't need the shaders anymore, we can release their memory
-    vkDestroyShaderModule(device.device_, vertexShader, nullptr);
-    vkDestroyShaderModule(device.device_, fragmentShader, nullptr);
 }
 
 void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions)

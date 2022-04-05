@@ -390,7 +390,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL AEInstance::debugCallbackMessages
 	if(s.find("bufferDeviceAddress") != std::string::npos)
 		;
 	else
-		__android_log_print(ANDROID_LOG_DEBUG, "AE validation messages", s.c_str(), 10);
+		__android_log_print(ANDROID_LOG_DEBUG, "AE validation messages", s.c_str(),"");
 #endif
 #ifndef __ANDROID__
 	throw std::runtime_error(pMessage);
@@ -464,7 +464,7 @@ void AEPhysicalDevices::CreatePhysicalDevices()
 	if(deviceCount == 0)
     {
 #ifdef __ANDROID__
-    __android_log_print(ANDROID_LOG_ERROR, "AE debug messages", "no physical device found %u /n", 10);
+    __android_log_print(ANDROID_LOG_ERROR, "AE debug messages", "no physical device found %u /n");
 #else
     throw std::runtime_error("no physical device found");
 #endif

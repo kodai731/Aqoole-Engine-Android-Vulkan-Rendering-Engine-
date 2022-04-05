@@ -62,7 +62,6 @@ void AECommand::BeginCommand(AECommandBuffer *commandBuffer)
 	beginInfo.pInheritanceInfo = nullptr;
 	if(vkBeginCommandBuffer(*commandBuffer->GetCommandBuffer(), &beginInfo) != VK_SUCCESS)
 		throw std::runtime_error("failed to begin command");
-	return;
 }
 
 void AECommand::BeginRenderPass(uint32_t index, AECommandBuffer *commandBuffer,
@@ -82,34 +81,29 @@ void AECommand::BeginRenderPass(uint32_t index, AECommandBuffer *commandBuffer,
 	beginInfo.clearValueCount = clearValues.size();
 	beginInfo.pClearValues = clearValues.data();
 	vkCmdBeginRenderPass(*commandBuffer->GetCommandBuffer(), &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-	return;
 }
 
 void AECommand::BindPipeline(AECommandBuffer *commandBuffer, VkPipelineBindPoint bindPoint,
 	AEPipeline *pipeline)
 {
 	vkCmdBindPipeline(*commandBuffer->GetCommandBuffer(), bindPoint, *pipeline->GetPipeline());
-	return;
 }
 
 void AECommand::CommandDraw(AECommandBuffer *commandBuffer, uint32_t verticesSize,
 	uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
 {
 	vkCmdDraw(*commandBuffer->GetCommandBuffer(), verticesSize, instanceCount, firstVertex, firstInstance);
-	return;
 }
 
 void AECommand::EndRenderPass(AECommandBuffer *commandBuffer)
 {
 	vkCmdEndRenderPass(*commandBuffer->GetCommandBuffer());
-	return;
 }
 
 void AECommand::EndCommand(AECommandBuffer *commandBuffer)
 {
 	if(vkEndCommandBuffer(*commandBuffer->GetCommandBuffer()) != VK_SUCCESS)
 		throw std::runtime_error("failed to end command buffer");
-	return;
 }
 
 #ifndef __ANDROID__
