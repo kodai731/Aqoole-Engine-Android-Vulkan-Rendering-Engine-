@@ -320,6 +320,11 @@ void AEDrawObjectBase::CalcNormal()
     // }
 }
 
+uint32_t AEDrawObjectBase::GetIndexBufferSize()
+{
+    return sizeof(uint32_t) * mIndices.size();
+}
+
 //=====================================================================
 //AE draw object base 3D
 //=====================================================================
@@ -414,6 +419,10 @@ void AEDrawObjectBase3D::CalcNormal()
     }
 }
 
+uint32_t AEDrawObjectBase3D::GetVertexBufferSize()
+{
+    return sizeof(Vertex3D) * mVertices.size();
+}
 
 //=====================================================================
 //AE draw object base texture

@@ -137,7 +137,7 @@ uniform
 glm::vec3 gLookAtPoint(0.0f, 0.01f, 0.0f);
 //ModelView modelView;
 //glm::vec3 cameraPos(0.0f, -1.0f, -1.0f);
-glm::vec3 cameraPos(0.0f, 0.0f, -10.0f);
+glm::vec3 cameraPos(0.0f, -5.0f, -10.0f);
 glm::vec3 cameraDirection = glm::normalize(cameraPos - gLookAtPoint);
 //glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(0.0f, 0.0f, -1.0f)));
 glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(1.0f, 0.0f, 0.0f)));
@@ -149,7 +149,8 @@ AEDescriptorPool* gDescriptorPool;
 AEDescriptorSet* gDescriptorSet;
 glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
 MyImgui* gImgui;
-std::unique_ptr<AERayTracingASBottom> asls;
+std::unique_ptr<AERayTracingASBottom> aslsCubes;
+std::unique_ptr<AERayTracingASBottom> aslsPlane;
 std::unique_ptr<AERayTracingASTop> astop;
 std::unique_ptr<AEPipelineRaytracing> gPipelineRT;
 std::unique_ptr<AEStorageImage> gStorageImage;
@@ -160,7 +161,9 @@ std::unique_ptr<AEBufferSBT> raygenSBT;
 std::unique_ptr<AEBufferSBT> missSBT;
 std::unique_ptr<AEBufferSBT> chitSBT;
 std::unique_ptr<AECube> gCube;
-
+std::unique_ptr<AEPlane> gXZPlane;
+std::unique_ptr<AEBufferAS> gvbPlane;
+std::unique_ptr<AEBufferAS> gibPlane;
 
 double lastTime;
 double startTime;
@@ -329,6 +332,13 @@ bool CreateBuffers(void) {
     indexOffset += oneIndexSize;
     indexOffsetNumber += gCubes[0]->GetVertexSize();
   }
+  //plane buffers
+  gvbPlane = std::make_unique<AEBufferAS>(gDevice, gXZPlane->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbPlane->CreateBuffer();
+  gvbPlane->CopyData((void*)gXZPlane->GetVertexAddress().data(), 0, gXZPlane->GetVertexBufferSize(), gQueue, gCommandPool);
+  gibPlane = std::make_unique<AEBufferAS>(gDevice, gXZPlane->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gibPlane->CreateBuffer();
+  gibPlane->CopyData((void*)gXZPlane->GetIndexAddress().data(), 0, gXZPlane->GetIndexBufferSize(), gQueue, gCommandPool);
   //prepare ray tracing objects
 //  gCube = std::make_unique<AECube>(2.0f, glm::vec3(-1.0f, 0.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 //  gVertexBuffer = new AEBufferAS(gDevice, sizeof(Vertex3D) * gCube->GetVertexSize(), (VkBufferUsageFlagBits)0);
@@ -338,45 +348,18 @@ bool CreateBuffers(void) {
 //  gIndexBuffer->CreateBuffer();
 //  gIndexBuffer->CopyData((void*)gCube->GetIndexAddress().data(), 0, sizeof(uint32_t) * gCube->GetIndexSize(), gQueue, gCommandPool);
   BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(), *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
-  std::vector<BLASGeometryInfo> geometries = {cubesInfo};
-  asls = std::make_unique<AERayTracingASBottom>(gDevice, geometries, &modelview, gQueue, gCommandPool);
-  std::vector<AERayTracingASBottom*> bottoms= {asls.get()};
+  BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(), *gvbPlane->GetBuffer(), *gibPlane->GetBuffer()};
+  std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
+  std::vector<BLASGeometryInfo> geometryPlane = {planeInfo};
+  aslsPlane = std::make_unique<AERayTracingASBottom>(gDevice, geometryPlane, &modelview, gQueue, gCommandPool);
+  aslsCubes = std::make_unique<AERayTracingASBottom>(gDevice, geometryCubes, &modelview, gQueue, gCommandPool);
+  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsCubes.get()};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
   return true;
 }
 
 void DeleteBuffers(void) {
   vkDestroyBuffer(device.device_, buffers.vertexBuf_, nullptr);
-}
-
-enum ShaderType { VERTEX_SHADER, FRAGMENT_SHADER };
-VkResult loadShaderFromFile(const char* filePath, VkShaderModule* shaderOut,
-                            ShaderType type) {
-  // Read the file
-  assert(androidAppCtx);
-  AAsset* file = AAssetManager_open(androidAppCtx->activity->assetManager,
-                                    filePath, AASSET_MODE_BUFFER);
-  size_t fileLength = AAsset_getLength(file);
-
-  char* fileContent = new char[fileLength];
-
-  AAsset_read(file, fileContent, fileLength);
-  AAsset_close(file);
-
-  VkShaderModuleCreateInfo shaderModuleCreateInfo{
-      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-      .pNext = nullptr,
-      .flags = 0,
-      .codeSize = fileLength,
-      .pCode = (const uint32_t*)fileContent,
-  };
-  VkResult result = vkCreateShaderModule(
-      device.device_, &shaderModuleCreateInfo, nullptr, shaderOut);
-  assert(result == VK_SUCCESS);
-
-  delete[] fileContent;
-
-  return result;
 }
 
 // Create Graphics Pipeline
@@ -440,6 +423,7 @@ bool InitVulkan(android_app* app) {
   // Create 2 frame buffers.
   CreateFrameBuffers(render.renderPass_);
   //create objects
+  //cubes
   float offsetX = -1.0f;
   float offsetY = 1.0f;
   float offsetZ = 0.0f;
@@ -461,6 +445,13 @@ bool InitVulkan(android_app* app) {
     }
     offsetZ += nextPosition;
   }
+  //plane
+  float left = -40.0f;
+  float right = 40.0f;
+  float top = 20.0f;
+  float bottom = -10.0f;
+  gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, 0.0f, top), glm::vec3(left, 0.0f, bottom),
+                                       glm::vec3(right, 0.0f, bottom), glm::vec3(right, 0.0f, top), glm::vec3(0.0f, 0.2f, 0.0f));
   modelview.rotate = glm::mat4(1.0f);
   modelview.scale = glm::mat4(1.0f);
   modelview.translate = glm::mat4(1.0f);
@@ -471,8 +462,8 @@ bool InitVulkan(android_app* app) {
   modelview.view = glm::mat4(1.0f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
   CreateBuffers();  // create vertex buffers
-    // Create graphics pipeline
-    CreateGraphicsPipeline();
+  // Create graphics pipeline
+  CreateGraphicsPipeline();
   //prepare matrix
   //descriptor pool
   std::vector<VkDescriptorPoolSize> poolSizeRT =
@@ -514,10 +505,18 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorImage(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, gStorageImage->GetImageView(),
                                       nullptr);
   gDescriptorSet->BindDescriptorBuffer(2, gUboRTBuffer->GetBuffer(), sizeof(UBORT), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(3, gVertexBuffer->GetBuffer(), sizeof(Vertex3D) * gCubes[0]->GetVertexSize() * gCubes.size(),
-                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(4, gIndexBuffer->GetBuffer(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size(),
-                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+//  gDescriptorSet->BindDescriptorBuffers(3, {gVertexBuffer->GetBuffer(), gvbPlane->GetBuffer()},
+//                                        {sizeof(Vertex3D) * gCubes[0]->GetVertexSize() * gCubes.size(), gXZPlane->GetVertexBufferSize()},
+//                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+//  gDescriptorSet->BindDescriptorBuffers(4, {gIndexBuffer->GetBuffer(), gibPlane->GetBuffer()},
+//                                        {sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size(), gXZPlane->GetIndexBufferSize()},
+//                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffers(3, {*gvbPlane->GetBuffer(),*gVertexBuffer->GetBuffer()},
+                                        {gXZPlane->GetVertexBufferSize(), sizeof(Vertex3D) * gCubes[0]->GetVertexSize() * gCubes.size()},
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffers(4, {*gibPlane->GetBuffer(), *gIndexBuffer->GetBuffer()},
+                                        {gXZPlane->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   //create binding table buffer
   raygenSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 0, gQueue, gCommandPool);
   missSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 1, gQueue, gCommandPool);
@@ -681,8 +680,9 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   uboRT.normalMatrix = modelViewInverse;
   gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
   //update AS
-  asls->Update(&modelview, gQueue, gCommandPool);
-  astop->Update({asls.get()}, &modelview, gQueue, gCommandPool);
+  aslsPlane->Update(&modelview, gQueue, gCommandPool);
+  aslsCubes->Update(&modelview, gQueue, gCommandPool);
+  astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,

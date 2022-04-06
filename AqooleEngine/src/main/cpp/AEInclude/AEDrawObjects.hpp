@@ -99,6 +99,7 @@ class AEDrawObjectBase
     public:
     AEDrawObjectBase();
     virtual ~AEDrawObjectBase();
+    uint32_t GetIndexBufferSize();
     //iterator
     uint32_t GetIndexSize()const{return mIndices.size();}
     std::vector<uint32_t>const& GetIndexAddress()const{return mIndices;}
@@ -120,6 +121,7 @@ class AEDrawObjectBase3D : public AEDrawObjectBase
     public:
     AEDrawObjectBase3D();
     virtual ~AEDrawObjectBase3D();
+    uint32_t GetVertexBufferSize();
     //iterator
     uint32_t GetVertexSize()const{return mVertices.size();}
     std::vector<Vertex3D>const& GetVertexAddress()const{return mVertices;}
