@@ -376,7 +376,7 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   std::vector<const char*>paths =
-          {"shaders/07_raygenRgen.spv", "shaders/07_rayRmiss.spv", "shaders/07_rayRchit.spv"};
+          {"shaders/07_raygenRgen.spv","shaders/07_rayRmiss.spv","shaders/07_shadowRmiss.spv","shaders/07_rayRchit.spv","shaders/07_colorBlendRchit.spv"};
   gPipelineRT = std::make_unique<AEPipelineRaytracing>(gDevice, paths, &gLayouts, androidAppCtx);
     return VK_SUCCESS;
 }
@@ -437,7 +437,7 @@ bool InitVulkan(android_app* app) {
       offsetX = -1.0f;
       for(uint32_t k = 0; k < 2; k++)
       {
-        AECube* cube = new AECube(cubeLength, glm::vec3(offsetX, offsetY, offsetZ), glm::vec3(0.0f, 0.0f, 1.0f));
+        AECube* cube = new AECube(cubeLength, glm::vec3(offsetX, offsetY, offsetZ), glm::vec3(0.1f, 0.1f, 0.1f));
         gCubes.push_back(cube);
         offsetX += nextPosition;
       }
@@ -505,12 +505,6 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorImage(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, gStorageImage->GetImageView(),
                                       nullptr);
   gDescriptorSet->BindDescriptorBuffer(2, gUboRTBuffer->GetBuffer(), sizeof(UBORT), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-//  gDescriptorSet->BindDescriptorBuffers(3, {gVertexBuffer->GetBuffer(), gvbPlane->GetBuffer()},
-//                                        {sizeof(Vertex3D) * gCubes[0]->GetVertexSize() * gCubes.size(), gXZPlane->GetVertexBufferSize()},
-//                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-//  gDescriptorSet->BindDescriptorBuffers(4, {gIndexBuffer->GetBuffer(), gibPlane->GetBuffer()},
-//                                        {sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size(), gXZPlane->GetIndexBufferSize()},
-//                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffers(3, {*gvbPlane->GetBuffer(),*gVertexBuffer->GetBuffer()},
                                         {gXZPlane->GetVertexBufferSize(), sizeof(Vertex3D) * gCubes[0]->GetVertexSize() * gCubes.size()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -519,8 +513,8 @@ bool InitVulkan(android_app* app) {
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   //create binding table buffer
   raygenSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 0, gQueue, gCommandPool);
-  missSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 1, gQueue, gCommandPool);
-  chitSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 2, gQueue, gCommandPool);
+  missSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 1, 2, gQueue, gCommandPool);
+  chitSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 3, 2, gQueue, gCommandPool);
   gSbts.push_back(raygenSBT.get());
   gSbts.push_back(missSBT.get());
   gSbts.push_back(chitSBT.get());

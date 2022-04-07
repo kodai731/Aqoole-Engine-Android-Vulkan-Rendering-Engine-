@@ -59,7 +59,8 @@ layout(push_constant) uniform Constants
   int lightType;
 }pushC;
 
-const uint NODE = 126;
+//const uint NODE = 126;
+const uint NODE = 30;
 //const uint NODE = 254;
 //const uint NODE = 2;
 
@@ -245,7 +246,7 @@ vec3 ColorBlendALL(vec3 surfaceColor, float reflectanceOrigin, inout bool[NODE] 
     uint refractIndex = 2 * i + 3;
     colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
   }
-  */
+
   for(uint i = 30; i < 62; i++)
   {
     uint reflectIndex = 2 * i + 2;
@@ -259,7 +260,7 @@ vec3 ColorBlendALL(vec3 surfaceColor, float reflectanceOrigin, inout bool[NODE] 
     uint refractIndex = 2 * i + 3;
     colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
   }
-
+  */
   for(uint i = 6; i < 14; i++)
   {
     uint reflectIndex = 2 * i + 2;
@@ -303,24 +304,48 @@ void main()
   vec3 normal = cross(v1.pos - v0.pos, v2.pos - v0.pos);
   normal = normalize(normal);
   vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;                         //object coordinates
-  //worldPos = vec3(cam.modelViewProj * vec4(worldPos, 1.0));
   float lightIntensity = pushC.lightIntensity;
   vec3 lDir = pushC.lightPosition - worldPos;
   float lightDistance = length(lDir);
   lightIntensity = lightIntensity / (lightDistance * lightDistance);
   vec3 L = normalize(lDir);
-  float attenuation = 1.0;
-  float alpha = 1.0;
-  if(objId == 1)
+  vec3 color;
+  if(objId == 0)
   {
-    alpha = 0.1;
-    waterAlpha = alpha;
+    //plane
+    color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;
   }
-  vec3 color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;                         //object coordinates
-  //color *= lightIntensity;
-  //pld = vec4(attenuation * (color + dotNL), 1.0);
+  else
+  {
+    //cube
+    float refractRatio = nAir / nGlass;
+    prdBlend.hit = false;
+    //prdBlend.color = pushC.clearColor.xyz;
+    prdBlend.color = vec3(1.0, 1.0, 1.0);
+    vec4 cameraPos = cam.viewInverse * vec4(0, 0, 0, 1);
+    vec3 direction = normalize(worldPos - cameraPos.xyz);
+    float reflectanceOrigin;
+    //depth = 0
+    traceReflectRefract(worldPos, direction, normal, refractRatio, reflectPos[0], reflectMiss[0], reflectNormal[0], reflectColor[0], isPlane[0],
+      reflectPos[1], reflectMiss[1], reflectNormal[1], reflectColor[1], isPlane[1], isAllReflect[1], reflectanceOrigin);
+    for(uint i = 0; i < (NODE / 2) - 1; i++)
+    {
+      vec3 incident;
+      if(i < 2)
+      {
+        incident = normalize(reflectPos[i] - worldPos);
+      }
+      else
+      {
+        uint lastIndex = (i - 2) / 2;
+        incident = normalize(reflectPos[i] - reflectPos[lastIndex]);
+      }
+      traceReflectRefract(reflectPos[i], incident, reflectNormal[i], refractRatio, reflectPos[2 * i + 2], reflectMiss[2 * i + 2],
+        reflectNormal[2 * i + 2], reflectColor[2 * i + 2], isPlane[2 * i + 2], reflectPos[2 * i + 3], reflectMiss[2 * i + 3], reflectNormal[2 * i + 3],
+        reflectColor[2 * i + 3], isPlane[2 * i + 3], isAllReflect[2 * i + 3], reflectance[i]);
+    }
+    //color = ColorBlend(reflection, color, false, reflectMiss[0], color0, reflectMiss[1], color1, isAllReflect[1]);
+    color = ColorBlendALL(waterColor, reflectanceOrigin, isPlane, reflectMiss, reflectColor, isAllReflect, reflectance);
+  }
   pld = vec4(color, 1.0);
-  //hitValue = vec3(dotNL) + ((v0.color + v1.color + v2.color) / 3.0);
-  //hitValue = dotNL * attenuation * ((v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z));
-  //hitValue = vec3(0.2);
 }
