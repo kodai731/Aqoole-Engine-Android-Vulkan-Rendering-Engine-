@@ -156,11 +156,12 @@ class AEDrawObjectBaseObjFile : public AEDrawObjectBase
 #ifndef __ANDROID__
     AEDrawObjectBaseObjFile(const char* filePath);
 #else
-    AEDrawObjectBaseObjFile(const char* filePath, android_app* app);
+    AEDrawObjectBaseObjFile(const char* filePath, android_app* app, bool isReverseY);
 #endif
     virtual ~AEDrawObjectBaseObjFile();
     //iterator
     uint32_t GetVertexSize(){return mVertices.size();}
+    uint32_t GetVertexBufferSize();
     std::vector<Vertex3DObj>const& GetVertexAddress()const{return mVertices;}
     uint32_t GetTextureCount(){return mTextureFiles.size();}
     std::string& GetTexturePath(uint32_t index){return mTextureFiles[index];}

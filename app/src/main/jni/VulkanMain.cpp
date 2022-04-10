@@ -151,6 +151,7 @@ glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
 MyImgui* gImgui;
 std::unique_ptr<AERayTracingASBottom> aslsCubes;
 std::unique_ptr<AERayTracingASBottom> aslsPlane;
+std::unique_ptr<AERayTracingASBottom> aslsWoman;
 std::unique_ptr<AERayTracingASTop> astop;
 std::unique_ptr<AEPipelineRaytracing> gPipelineRT;
 std::unique_ptr<AEStorageImage> gStorageImage;
@@ -164,6 +165,8 @@ std::unique_ptr<AEPlane> gXZPlane;
 std::unique_ptr<AEBufferAS> gvbPlane;
 std::unique_ptr<AEBufferAS> gibPlane;
 std::unique_ptr<AEDrawObjectBaseObjFile> gWoman;
+std::unique_ptr<AEBufferAS> gvbWoman;
+std::unique_ptr<AEBufferAS> gibWoman;
 
 double lastTime;
 double startTime;
@@ -339,6 +342,13 @@ bool CreateBuffers(void) {
   gibPlane = std::make_unique<AEBufferAS>(gDevice, gXZPlane->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gibPlane->CreateBuffer();
   gibPlane->CopyData((void*)gXZPlane->GetIndexAddress().data(), 0, gXZPlane->GetIndexBufferSize(), gQueue, gCommandPool);
+  //woman buffers
+  gvbWoman = std::make_unique<AEBufferAS>(gDevice, gWoman->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbWoman->CreateBuffer();
+  gvbWoman->CopyData((void*)gWoman->GetVertexAddress().data(), 0, gWoman->GetVertexBufferSize(), gQueue, gCommandPool);
+  gibWoman = std::make_unique<AEBufferAS>(gDevice, gWoman->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gibWoman->CreateBuffer();
+  gibWoman->CopyData((void*)gWoman->GetIndexAddress().data(), 0, gWoman->GetIndexBufferSize(), gQueue, gCommandPool);
   //prepare ray tracing objects
 //  gCube = std::make_unique<AECube>(2.0f, glm::vec3(-1.0f, 0.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 //  gVertexBuffer = new AEBufferAS(gDevice, sizeof(Vertex3D) * gCube->GetVertexSize(), (VkBufferUsageFlagBits)0);
@@ -349,11 +359,14 @@ bool CreateBuffers(void) {
 //  gIndexBuffer->CopyData((void*)gCube->GetIndexAddress().data(), 0, sizeof(uint32_t) * gCube->GetIndexSize(), gQueue, gCommandPool);
   BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(), *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
   BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(), *gvbPlane->GetBuffer(), *gibPlane->GetBuffer()};
+  BLASGeometryInfo womanInfo = {sizeof(Vertex3DObj), gWoman->GetVertexSize(), gWoman->GetIndexSize(), *gvbWoman->GetBuffer(), *gibWoman->GetBuffer()};
   std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
   std::vector<BLASGeometryInfo> geometryPlane = {planeInfo};
+  std::vector<BLASGeometryInfo> geometryWoman = {womanInfo};
   aslsPlane = std::make_unique<AERayTracingASBottom>(gDevice, geometryPlane, &modelview, gQueue, gCommandPool);
   aslsCubes = std::make_unique<AERayTracingASBottom>(gDevice, geometryCubes, &modelview, gQueue, gCommandPool);
-  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsCubes.get()};
+  aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman, &modelview, gQueue, gCommandPool);
+  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsCubes.get(), aslsWoman.get()};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
   return true;
 }
@@ -428,13 +441,13 @@ bool InitVulkan(android_app* app) {
   float offsetY = 1.0f;
   float offsetZ = 0.0f;
   float cubeLength = 1.0f;
-  float nextPosition = cubeLength * 1.5f;
+  float nextPosition = cubeLength * 1.5f + 5.0f;
   for(uint32_t i = 0; i < 2; i++)
   {
-    offsetY = -1.0f;
+    offsetY = -5.0f;
     for(uint32_t j = 0; j < 2; j++)
     {
-      offsetX = -1.0f;
+      offsetX = -5.0f;
       for(uint32_t k = 0; k < 2; k++)
       {
         AECube* cube = new AECube(cubeLength, glm::vec3(offsetX, offsetY, offsetZ), glm::vec3(0.1f, 0.1f, 0.1f));
@@ -453,7 +466,8 @@ bool InitVulkan(android_app* app) {
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, 0.0f, top), glm::vec3(left, 0.0f, bottom),
                                        glm::vec3(right, 0.0f, bottom), glm::vec3(right, 0.0f, top), glm::vec3(0.0f, 0.2f, 0.0f));
   //woman
-  gWoman = std::make_unique<AEDrawObjectBaseObjFile>("fuse-woman-1/source/woman.obj", app);
+  gWoman = std::make_unique<AEDrawObjectBaseObjFile>("fuse-woman-1/source/woman.obj", app, true);
+  gWoman->Scale(0.01f);
   modelview.rotate = glm::mat4(1.0f);
   modelview.scale = glm::mat4(1.0f);
   modelview.translate = glm::mat4(1.0f);
@@ -678,7 +692,8 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   //update AS
   aslsPlane->Update(&modelview, gQueue, gCommandPool);
   aslsCubes->Update(&modelview, gQueue, gCommandPool);
-  astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
+  //aslsWoman->Update(&modelview, gQueue, gCommandPool);
+  //astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,

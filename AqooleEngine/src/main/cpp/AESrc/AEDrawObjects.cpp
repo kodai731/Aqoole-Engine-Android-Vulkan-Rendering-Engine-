@@ -543,9 +543,12 @@ AEDrawObjectBaseObjFile::AEDrawObjectBaseObjFile(const char* filePath)
     CalcTangent();
 }
 #else
-AEDrawObjectBaseObjFile::AEDrawObjectBaseObjFile(const char* filePath, android_app* app)
+AEDrawObjectBaseObjFile::AEDrawObjectBaseObjFile(const char* filePath, android_app* app, bool isReverseY)
         : AEDrawObjectBase()
 {
+    float signY = 1.0f;
+    if(isReverseY)
+        signY = -1.0f;
     AAsset* file = AAssetManager_open(app->activity->assetManager,
                                       filePath, AASSET_MODE_BUFFER);
     size_t fileLength = AAsset_getLength(file);
@@ -571,7 +574,7 @@ AEDrawObjectBaseObjFile::AEDrawObjectBaseObjFile(const char* filePath, android_a
         lastPos = pos + 1;
         AEDrawObject::Split(fields, oneLine, ' ');
         if(fields[0] == "v")
-            localVertices.push_back(glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3])));
+            localVertices.push_back(glm::vec3(std::stof(fields[1]), std::stof(fields[2]) * signY, std::stof(fields[3])));
         else if(fields[0] == "vt")
             localTexCoords.push_back(glm::vec2(std::stof(fields[1]), 1.0f - std::stof(fields[2])));
         else if(fields[0] == "vn")
@@ -737,6 +740,8 @@ void AEDrawObjectBaseObjFile::CalcTangent()
     tangents.reset();
     bitangents.reset();
 }
+
+uint32_t AEDrawObjectBaseObjFile::GetVertexBufferSize(){return sizeof(Vertex3DObj) * mVertices.size();}
 
 #ifndef __ANDROID__
 //=====================================================================
