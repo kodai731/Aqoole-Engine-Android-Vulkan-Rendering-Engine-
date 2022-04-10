@@ -463,6 +463,7 @@ void AEDrawObjectBaseTexture::AddVertex(glm::vec3 const& v, glm::vec3 const& col
 /*
 constructor
 */
+#ifndef __ANDROID__
 AEDrawObjectBaseObjFile::AEDrawObjectBaseObjFile(const char* filePath)
     : AEDrawObjectBase()
 {
@@ -541,6 +542,99 @@ AEDrawObjectBaseObjFile::AEDrawObjectBaseObjFile(const char* filePath)
     //calc tangent
     CalcTangent();
 }
+#else
+AEDrawObjectBaseObjFile::AEDrawObjectBaseObjFile(const char* filePath, android_app* app)
+        : AEDrawObjectBase()
+{
+    AAsset* file = AAssetManager_open(app->activity->assetManager,
+                                      filePath, AASSET_MODE_BUFFER);
+    size_t fileLength = AAsset_getLength(file);
+    char* fileContent = new char[fileLength];
+    AAsset_read(file, fileContent, fileLength);
+    std::string objData(fileContent);
+    AAsset_close(file);
+    std::string oneLine;
+    std::vector<std::string> fields;
+    std::vector<std::string> lineFields;
+    Vertex3DObj tmpV;
+    std::vector<glm::vec3> localVertices;
+    std::vector<glm::vec2> localTexCoords;
+    std::vector<glm::vec3> localNormals;
+    int indices[4];
+    int totalF = 0;
+    uint32_t offset = 0;
+    std::string::size_type pos = 0;
+    std::string::size_type lastPos = 0;
+    while((pos = objData.find('\n', lastPos)) != std::string::npos)
+    {
+        oneLine = objData.substr(lastPos, pos - lastPos);
+        lastPos = pos + 1;
+        AEDrawObject::Split(fields, oneLine, ' ');
+        if(fields[0] == "v")
+            localVertices.push_back(glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3])));
+        else if(fields[0] == "vt")
+            localTexCoords.push_back(glm::vec2(std::stof(fields[1]), 1.0f - std::stof(fields[2])));
+        else if(fields[0] == "vn")
+            localNormals.push_back(glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3])));
+        else if(fields[0] == "f")
+        {
+            uint32_t fieldsSize = fields.size();
+            for(int i = 1; i < fieldsSize; i++)
+            {
+                AEDrawObject::Split(lineFields, fields[i], '/');
+                tmpV.pos = localVertices[std::stoi(lineFields[0]) - 1];
+                tmpV.texcoord = localTexCoords[std::stof(lineFields[1]) - 1];
+                tmpV.normal = localNormals[std::stof(lineFields[2]) - 1];
+                //calc vertex tangent
+                // float xn2 = tmpV.normal.x * tmpV.normal.x;
+                // float zn2 = tmpV.normal.z * tmpV.normal.z;
+                // float xn2zn2 = xn2 + zn2;
+                // float xt = sqrt(zn2 / xn2zn2);
+                // float zt = sqrt(xn2 / xn2zn2);
+                // glm::vec3 tangent;
+                // if(glm::dot(tmpV.normal, glm::vec3(0, 1.0f, 0)) != 1.0)
+                //     tangent = glm::cross(tmpV.normal, glm::vec3(0.0f, 1.0f, 0.0f));
+                // else
+                //     tangent = glm::cross(tmpV.normal, glm::vec3(0.0f, -1.0f, 0.0f));
+                // tmpV.vertexTangent = glm::vec4(tangent, -1.0f);
+                mVertices.push_back(tmpV);
+                indices[i - 1] = totalF;
+                totalF++;
+            }
+            if(fieldsSize == 5)
+            {
+                AddIndex(indices[0], indices[1], indices[2], indices[3]);
+                offset += 6;
+            }
+            else if(fieldsSize == 4)
+            {
+                AddIndex(indices[0], indices[1], indices[2]);
+                offset += 3;
+            }
+            else
+                throw std::runtime_error("obj file is unknown");
+        }
+        else if(fields[0] == "usemtl")
+        {
+            mMaterials.push_back(fields[1]);
+            mOffsets.push_back(offset);
+        }
+        else if(fields[0] == "mtllib")
+        {
+            std::string str(filePath);
+            str = str.substr(0, str.find_last_of('/'));
+            mMatFileName = str + std::string("/") + fields[1];
+        }
+    }
+    //read material information
+    ReadMtlFile();
+    //calc tangent
+    CalcTangent();
+    //delete
+    delete[] fileContent;
+}
+#endif
+
 
 /*
 destructor

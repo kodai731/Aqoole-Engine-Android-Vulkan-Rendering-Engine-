@@ -122,7 +122,7 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
     n1 = nAir;
   }
   uint flags = gl_RayFlagsOpaqueEXT;
-  float tMin = 0.18;
+  float tMin = 0.01;
   float tMax = 20.0;
   //reflect
   InitPayLoad(pos, vec3(1.0, 1.0, 1.0));

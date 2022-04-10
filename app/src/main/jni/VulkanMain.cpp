@@ -160,10 +160,10 @@ std::vector<AEBufferSBT*> gSbts;
 std::unique_ptr<AEBufferSBT> raygenSBT;
 std::unique_ptr<AEBufferSBT> missSBT;
 std::unique_ptr<AEBufferSBT> chitSBT;
-std::unique_ptr<AECube> gCube;
 std::unique_ptr<AEPlane> gXZPlane;
 std::unique_ptr<AEBufferAS> gvbPlane;
 std::unique_ptr<AEBufferAS> gibPlane;
+std::unique_ptr<AEDrawObjectBaseObjFile> gWoman;
 
 double lastTime;
 double startTime;
@@ -452,6 +452,8 @@ bool InitVulkan(android_app* app) {
   float bottom = -10.0f;
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, 0.0f, top), glm::vec3(left, 0.0f, bottom),
                                        glm::vec3(right, 0.0f, bottom), glm::vec3(right, 0.0f, top), glm::vec3(0.0f, 0.2f, 0.0f));
+  //woman
+  gWoman = std::make_unique<AEDrawObjectBaseObjFile>("fuse-woman-1/source/woman.obj", app);
   modelview.rotate = glm::mat4(1.0f);
   modelview.scale = glm::mat4(1.0f);
   modelview.translate = glm::mat4(1.0f);

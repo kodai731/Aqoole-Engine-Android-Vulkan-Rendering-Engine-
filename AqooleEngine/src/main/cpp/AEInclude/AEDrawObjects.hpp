@@ -24,6 +24,7 @@
 #include <fstream>
 #include <random>
 #include <thread>
+#include <android_native_app_glue.h>
 #ifndef __ANDROID__
 #include <cstring>
 #include <limits>
@@ -152,7 +153,11 @@ class AEDrawObjectBaseObjFile : public AEDrawObjectBase
     void ReadMtlFile();
     void CalcTangent();
     public:
+#ifndef __ANDROID__
     AEDrawObjectBaseObjFile(const char* filePath);
+#else
+    AEDrawObjectBaseObjFile(const char* filePath, android_app* app);
+#endif
     virtual ~AEDrawObjectBaseObjFile();
     //iterator
     uint32_t GetVertexSize(){return mVertices.size();}
