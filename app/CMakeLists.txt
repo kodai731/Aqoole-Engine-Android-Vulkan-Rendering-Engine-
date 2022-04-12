@@ -23,10 +23,12 @@ set(VK_VAL_LAYER_SRC_DIR ${ANDROID_NDK}/sources/third_party/vulkan/src)
 set(AE_DIR ../AqooleEngine/src/main/cpp/AEInclude)
 set(GLM_DIR ${AE_DIR}/../glm)
 set(IMGUI_DIR ${AE_DIR}/imgui/imgui)
+set(STB_SRC_DIR ${SRC_DIR}/stb/stb/deprecated)
 add_library(vulkanNativeActivity SHARED
             ${SRC_DIR}/VulkanMain.cpp
             ${SRC_DIR}/AndroidMain.cpp
-            ${WRAPPER_DIR}/vulkan_wrapper.cpp)
+            ${WRAPPER_DIR}/vulkan_wrapper.cpp
+            ${STB_SRC_DIR}/stb_image.c)
 
 include_directories(${VK_INCLUDE_DIR} ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGUI_DIR})
 #include_directories(${VK_VAL_LAYER_SRC_DIR}/include ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGUI_DIR})

@@ -296,7 +296,7 @@ void AECommand::CommandTraceRays(AECommandBuffer* commandBuffer, AELogicalDevice
 }
 #else
 void AECommand::CommandTraceRays(AECommandBuffer* commandBuffer, AELogicalDevice const* device, const uint32_t width, const uint32_t height,
-	std::vector<AEBufferSBT*>& bindingTables, AEPipelineRaytracing* pipeline, AEDescriptorSet* descriptorSet, void* pushConstants,
+	std::vector<AEBufferSBT*>& bindingTables, AEPipelineRaytracing* pipeline, std::vector<AEDescriptorSet*>& descriptorSets, void* pushConstants,
 	VkImage* swapchainImage, AEStorageImage* storageImage, AEDeviceQueue* commandQueue, AECommandPool* commandPool)
 {
 	//do before this funstion starts
@@ -324,9 +324,12 @@ void AECommand::CommandTraceRays(AECommandBuffer* commandBuffer, AELogicalDevice
 	uint32_t strideSize = sizeof(VkStridedDeviceAddressRegionKHR::stride) * clHitSBT.stride;
 	VkStridedDeviceAddressRegionKHR callable{};
 	//bind pipeline
+	std::vector<VkDescriptorSet> localDescriptorSets;
+	for(auto d : descriptorSets)
+		localDescriptorSets.emplace_back(*d->GetDescriptorSet());
 	vkCmdBindPipeline(*commandBuffer->GetCommandBuffer(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline->GetPipeline());
-	vkCmdBindDescriptorSets(*commandBuffer->GetCommandBuffer(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline->GetPipelineLayout(), 0, 1,
-		descriptorSet->GetDescriptorSet(), 0, 0);
+	vkCmdBindDescriptorSets(*commandBuffer->GetCommandBuffer(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline->GetPipelineLayout(), 0,
+							localDescriptorSets.size(), localDescriptorSets.data(), 0, 0);
 	//push constants
 	vkCmdPushConstants(*commandBuffer->GetCommandBuffer(), *pipeline->GetPipelineLayout(), pipeline->GetShaderStageFlags(), 0, pipeline->GetConstantsSize(), pushConstants);
 	//command

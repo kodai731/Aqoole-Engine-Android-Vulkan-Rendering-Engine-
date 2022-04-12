@@ -167,6 +167,9 @@ std::unique_ptr<AEBufferAS> gibPlane;
 std::unique_ptr<AEDrawObjectBaseObjFile> gWoman;
 std::unique_ptr<AEBufferAS> gvbWoman;
 std::unique_ptr<AEBufferAS> gibWoman;
+std::vector<std::unique_ptr<AETextureImage>> gWomanTextures;
+std::vector<AEDescriptorSet*> gDescriptorSets;
+AEDescriptorSet* gWomanTextureSets;
 
 double lastTime;
 double startTime;
@@ -388,6 +391,15 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
+  //set = 1 for texture image
+  gDescriptorSetLayout = std::make_unique<AEDescriptorSetLayout>(gDevice);
+  for(uint32_t i = 0; i < gWoman->GetTextureCount(); i++)
+  {
+      gDescriptorSetLayout->AddDescriptorSetLayoutBinding(i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1,
+                                                          nullptr);
+  }
+  gDescriptorSetLayout->CreateDescriptorSetLayout();
+  gLayouts.push_back(std::move(gDescriptorSetLayout));
   std::vector<const char*>paths =
           {"shaders/07_raygenRgen.spv","shaders/07_rayRmiss.spv","shaders/07_shadowRmiss.spv","shaders/07_rayRchit.spv","shaders/07_colorBlendRchit.spv"};
   gPipelineRT = std::make_unique<AEPipelineRaytracing>(gDevice, paths, &gLayouts, androidAppCtx);
@@ -468,6 +480,13 @@ bool InitVulkan(android_app* app) {
   //woman
   gWoman = std::make_unique<AEDrawObjectBaseObjFile>("fuse-woman-1/source/woman.obj", app, true);
   gWoman->Scale(0.01f);
+  //woman texture
+  for(uint32_t i = 0; i < gWoman->GetTextureCount(); i++)
+  {
+      std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, gWoman->GetTexturePath(i).c_str(), gCommandPool, gQueue, app));
+      texture->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
+      gWomanTextures.push_back(std::move(texture));
+  }
   modelview.rotate = glm::mat4(1.0f);
   modelview.scale = glm::mat4(1.0f);
   modelview.translate = glm::mat4(1.0f);
@@ -488,8 +507,8 @@ bool InitVulkan(android_app* app) {
                   {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2},
                   {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
                   {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10},
-                  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8},
-                  {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2}
+                  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 20},
+                  {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 20}
           };
   gDescriptorPool = new AEDescriptorPool(gDevice, poolSizeRT.size(), poolSizeRT.data());
   //create image
@@ -527,6 +546,13 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorBuffers(4, {*gibPlane->GetBuffer(), *gIndexBuffer->GetBuffer()},
                                         {gXZPlane->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSets.push_back(gDescriptorSet);
+  //woman texture images
+  gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
+  for(uint32_t i = 0; i < gWoman->GetTextureCount(); i++)
+    gWomanTextureSets->BindDescriptorImage(i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, gWomanTextures[i]->GetImageView(),
+                                           gWomanTextures[i]->GetSampler());
+  gDescriptorSets.push_back(gWomanTextureSets);
   //create binding table buffer
   raygenSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 0, gQueue, gCommandPool);
   missSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 1, 2, gQueue, gCommandPool);
@@ -568,7 +594,7 @@ bool InitVulkan(android_app* app) {
     AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
 //    AECommand::BeginRenderPass(bufferIndex, gCommandBuffers[bufferIndex], gFrameBuffers[bufferIndex]);
     AECommand::CommandTraceRays(gCommandBuffers[bufferIndex], gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gSbts,
-                                gPipelineRT.get(), gDescriptorSet, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
+                                gPipelineRT.get(), gDescriptorSets, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
                                 gQueue, gCommandPool);
 //    AECommand::EndRenderPass(gCommandBuffers[bufferIndex]);
     AECommand::EndCommand(gCommandBuffers[bufferIndex]);

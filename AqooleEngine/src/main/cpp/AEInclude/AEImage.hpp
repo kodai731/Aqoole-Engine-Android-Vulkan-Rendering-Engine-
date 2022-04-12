@@ -13,19 +13,16 @@
 //        limitations under the License.
 #ifndef _AE_IMAGE
 #define _AE_IMAGE
-
+#ifndef STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#endif
+#define STBI_NO_SIMD
 #ifndef __ANDROID__
 #include <vulkan/vulkan.hpp>
 #include <memory>
-// #ifndef STB_IMAGE_IMPLEMENTATION
-// #define STB_IMAGE_IMPLEMENTATION
-// #endif
-// #define STBI_MALLOC
-// #define STBI_REALLOC
-// #define STBI_FREE
-#include "stb_image.h"
 #else
 #include <vulkan_wrapper.h>
+#include <android_native_app_glue.h>
 #include <memory>
 #include <vector>
 #endif
@@ -96,16 +93,19 @@ class AEImageBase
     void ImageClear(AECommandBuffer* commandBuffer);
 };
 
-#ifndef __ANDROID__
 class AETextureImage : public AEImageBase
 {
     private:
     public:
-    AETextureImage(AELogicalDevice const* device, const char* imagePath,
-        AECommandPool const* commandPool, AEDeviceQueue *queue);
+#ifndef __ANDROID__
+    AETextureImage(AELogicalDevice* device, const char* imagePath,
+        AECommandPool* commandPool, AEDeviceQueue *queue);
+#else
+    AETextureImage(AELogicalDevice* device, const char* imagePath,
+                   AECommandPool* commandPool, AEDeviceQueue *queue, android_app* app);
+#endif
     ~AETextureImage();
 };
-#endif
 
 class AEDepthImage : public AEImageBase
 {

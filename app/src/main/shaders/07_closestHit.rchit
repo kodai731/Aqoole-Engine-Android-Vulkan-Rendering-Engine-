@@ -51,6 +51,8 @@ layout(binding = 2, set = 0) uniform CameraProperties
 layout(binding = 3, set = 0, scalar) buffer Vertices {Vertex3D v[];} vertices[];
 layout(binding = 4, set = 0) buffer Indices {uint i[];} indices[];
 
+layout(binding = 0, set = 1) uniform sampler2D texSampler;
+
 layout(push_constant) uniform Constants
 {
   vec4 clearColor;
@@ -315,7 +317,7 @@ void main()
     //plane
     color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;
   }
-  else
+  else if(objId == 1)
   {
     //cube
     float refractRatio = nAir / nGlass;
@@ -346,6 +348,11 @@ void main()
     }
     //color = ColorBlend(reflection, color, false, reflectMiss[0], color0, reflectMiss[1], color1, isAllReflect[1]);
     color = ColorBlendALL(waterColor, reflectanceOrigin, isPlane, reflectMiss, reflectColor, isAllReflect, reflectance);
+  }
+  else
+  {
+    //woman
+    color = texture(texSampler, vec2(attribs.x, attribs.y)).xyz;
   }
   pld = vec4(color, 1.0);
 }

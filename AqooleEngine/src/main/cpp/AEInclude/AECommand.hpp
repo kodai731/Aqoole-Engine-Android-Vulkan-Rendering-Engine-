@@ -94,8 +94,8 @@ namespace AECommand
 	    VkImage* swapchainImage, AEStorageImage* storageImage, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
 #else
 	void CommandTraceRays(AECommandBuffer* commandBuffer, AELogicalDevice const* device, const uint32_t width, const uint32_t height,
-						  std::vector<AEBufferSBT*>& bindingTables, AEPipelineRaytracing* pipeline, AEDescriptorSet* descriptorSet, void* pushConstants,
-						  VkImage* swapchainImage, AEStorageImage* storageImage, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
+						  std::vector<AEBufferSBT*>& bindingTables, AEPipelineRaytracing* pipeline, std::vector<AEDescriptorSet*>& descriptorSet,
+						  void* pushConstants, VkImage* swapchainImage, AEStorageImage* storageImage, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
 #endif
 };
 

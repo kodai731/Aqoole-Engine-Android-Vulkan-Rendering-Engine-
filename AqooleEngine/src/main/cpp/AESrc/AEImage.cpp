@@ -16,6 +16,10 @@
 #include "AEWindow.hpp"
 #include "AECommand.hpp"
 #include "AEBuffer.hpp"
+//#define STBI_MALLOC
+//#define STBI_REALLOC
+//#define STBI_FREE free
+#include "stb_image.h"
 
 /*
 find supported format
@@ -336,15 +340,15 @@ void AEImageBase::ImageClear(AECommandBuffer* commandBuffer)
     vkCmdClearColorImage(*commandBuffer->GetCommandBuffer(), mImage, VK_IMAGE_LAYOUT_GENERAL, &clearColor, 1, &range);
 }
 
-#ifndef __ANDROID__
 //=====================================================================
 //AE texture
 //=====================================================================
 /*
 constructor
 */
-AETextureImage::AETextureImage(AELogicalDevice const* device, const char* imagePath,
-    AECommandPool const* commandPool, AEDeviceQueue *queue)
+#ifndef __ANDROID__
+AETextureImage::AETextureImage(AELogicalDevice* device, const char* imagePath,
+    AECommandPool* commandPool, AEDeviceQueue *queue)
     : AEImageBase(device, commandPool, queue)
 {
     int texWidth, texHeight, texChannels;
@@ -387,6 +391,59 @@ AETextureImage::AETextureImage(AELogicalDevice const* device, const char* imageP
     vkFreeMemory(*mDevice->GetDevice(), stagingBufferMemory, nullptr);
     vkDestroyBuffer(*mDevice->GetDevice(), stagingBuffer, nullptr);
 }
+#else
+AETextureImage::AETextureImage(AELogicalDevice* device, const char* imagePath,
+                               AECommandPool* commandPool, AEDeviceQueue *queue, android_app* app)
+        : AEImageBase(device, commandPool, queue)
+{
+    AAsset* file = AAssetManager_open(app->activity->assetManager,
+                                      imagePath, AASSET_MODE_BUFFER);
+    size_t fileLength = AAsset_getLength(file);
+    auto fileContent = new unsigned char[fileLength];
+    AAsset_read(file, fileContent, fileLength);
+    AAsset_close(file);
+    int texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load_from_memory(fileContent, (int)fileLength, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+    if (!pixels)
+        throw std::runtime_error("failed to load texture image!");
+    //copy data to tmp buffer
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    AEBuffer::CreateBuffer(mDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
+                           stagingBufferMemory);
+    AEBuffer::CopyData(mDevice, stagingBufferMemory, imageSize, (void*)pixels);
+    stbi_image_free(pixels);
+    //create image
+    AEImage::CreateImage2D(mDevice, (uint32_t)texWidth, (uint32_t)texHeight, VK_FORMAT_R8G8B8A8_UNORM,
+                           VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                                                               VK_IMAGE_USAGE_SAMPLED_BIT, VK_SHARING_MODE_EXCLUSIVE, VK_SAMPLE_COUNT_1_BIT, &mImage);
+    //bind image to memory
+    AEImage::BindImageMemory(mDevice, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                             &mImage, &mImageMemory);
+    //command buffer create
+    AECommandBuffer singleTimeCommandBuffer(mDevice, commandPool);
+    //begin single time command
+    AECommand::BeginSingleTimeCommands(&singleTimeCommandBuffer);
+    AEImage::TransitionImageLayout(mDevice, &singleTimeCommandBuffer, VK_IMAGE_LAYOUT_UNDEFINED,
+                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &mImage);
+    //copy buffer to image memory
+    AEImage::CopyBufferToImage(mDevice, &singleTimeCommandBuffer, (uint32_t)texWidth, (uint32_t)texHeight,
+                               &mImage, &stagingBuffer);
+    AEImage::TransitionImageLayout(mDevice, &singleTimeCommandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &mImage);
+    //end command
+    AECommand::EndSingleTimeCommands(&singleTimeCommandBuffer, queue);
+    //create image view
+    AEImage::CreateImageView2D(mDevice, &mImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT,
+                               &mImageView, 1);
+    //clean buffer
+    vkFreeMemory(*mDevice->GetDevice(), stagingBufferMemory, nullptr);
+    vkDestroyBuffer(*mDevice->GetDevice(), stagingBuffer, nullptr);
+    delete[] fileContent;
+}
+#endif
 
 /*
 destructor
@@ -395,7 +452,6 @@ AETextureImage::~AETextureImage()
 {
 
 }
-#endif
 
 //=====================================================================
 //AE depth image

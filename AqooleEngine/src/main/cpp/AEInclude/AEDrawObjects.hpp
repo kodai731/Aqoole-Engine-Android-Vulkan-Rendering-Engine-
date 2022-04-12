@@ -150,7 +150,11 @@ class AEDrawObjectBaseObjFile : public AEDrawObjectBase
     std::vector<std::string> mTextureFiles;
     //functions
     void AddVertex(glm::vec3 const& normal, glm::vec2 const& texCoord, Vertex3DTexture &reuse);
+#ifndef __ANDROID__
     void ReadMtlFile();
+#else
+    void ReadMtlFile(android_app* app);
+#endif
     void CalcTangent();
     public:
 #ifndef __ANDROID__

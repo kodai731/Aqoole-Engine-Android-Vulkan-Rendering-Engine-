@@ -164,7 +164,6 @@ void AEPipeline::AddShaderModule(const char* shaderPath)
     //
     mShaderModules.push_back(shaderModule);
     mShaderPaths.push_back(shaderPath);
-    return;
 }
 
 /*
@@ -200,8 +199,7 @@ void AEPipeline::CreatePipelineLayout(std::vector<std::unique_ptr<AEDescriptorSe
 		pipelineLayoutInfo.pPushConstantRanges = pushConstants->data();
 	}
 	if (vkCreatePipelineLayout(*mDevice->GetDevice(), &pipelineLayoutInfo, nullptr, &mPipelineLayout) != VK_SUCCESS)
-		std::runtime_error("failed to create pipeline layout");
-	return;
+		throw std::runtime_error("failed to create pipeline layout");
 }
 
 #ifdef __RAY_TRACING__

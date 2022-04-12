@@ -630,7 +630,7 @@ AEDrawObjectBaseObjFile::AEDrawObjectBaseObjFile(const char* filePath, android_a
         }
     }
     //read material information
-    ReadMtlFile();
+    ReadMtlFile(app);
     //calc tangent
     CalcTangent();
     //delete
@@ -662,6 +662,7 @@ void AEDrawObjectBaseObjFile::Scale(float multiple)
 /*
 read material file
 */
+#ifndef __ANDROID__
 void AEDrawObjectBaseObjFile::ReadMtlFile()
 {
     std::ifstream mtlData(mMatFileName.c_str(), std::ios::in);
@@ -685,9 +686,44 @@ void AEDrawObjectBaseObjFile::ReadMtlFile()
         else if(fields[0] == "map_Kd")
             mTextureFiles[nowIndex] = base + fields[1];
     }
-
 }
-
+#else
+void AEDrawObjectBaseObjFile::ReadMtlFile(android_app* app)
+{
+    AAsset* file = AAssetManager_open(app->activity->assetManager,
+                                      mMatFileName.c_str(), AASSET_MODE_BUFFER);
+    size_t fileLength = AAsset_getLength(file);
+    char* fileContent = new char[fileLength];
+    AAsset_read(file, fileContent, fileLength);
+    std::string mtlData(fileContent);
+    AAsset_close(file);
+    std::string oneLine;
+    std::vector<std::string> fields;
+    uint32_t nowIndex = 0;
+    uint32_t size = mMaterials.size();
+    mTextureFiles.resize(size);
+    std::string base = mMatFileName.substr(0, mMatFileName.find_last_of('/')) + std::string("/");
+    std::string::size_type pos = 0;
+    std::string::size_type lastPos = 0;
+    while((pos = mtlData.find('\n', lastPos)) != std::string::npos)
+    {
+        oneLine = mtlData.substr(lastPos, pos - lastPos);
+        lastPos = pos + 1;
+        if(oneLine == "")
+            continue;
+        AEDrawObject::Split(fields, oneLine, ' ');
+        if(fields[0] == "newmtl")
+        {
+            for(uint32_t i = 0; i < size; i++)
+                if(mMaterials[i] == fields[1])
+                    nowIndex = i;
+        }
+        else if(fields[0] == "map_Kd")
+            mTextureFiles[nowIndex] = base + fields[1];
+    }
+    delete[] fileContent;
+}
+#endif
 /*
 calc tangent
 */
