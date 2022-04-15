@@ -47,6 +47,7 @@ layout(binding = 2, set = 0) uniform CameraProperties
 } cam;
 layout(binding = 3, set = 0, scalar) buffer Vertices {Vertex3D v[];} vertices[];
 layout(binding = 4, set = 0) buffer Indices {uint i[];} indices[];
+layout(binding = 0, set = 1) uniform sampler2D texSampler;
 
 
 layout(push_constant) uniform Constants

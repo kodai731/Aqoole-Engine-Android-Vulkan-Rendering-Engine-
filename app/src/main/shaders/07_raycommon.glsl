@@ -11,6 +11,14 @@ struct Vertex3D
     vec3 normal;
 };
 
+struct Vertex3DObj
+{
+  vec3 pos;
+  vec3 normal;
+  vec2 texcoord;
+  vec4 vertexTangent;
+};
+
 struct PayroadBlend
 {
   vec3 pos;
@@ -67,7 +75,7 @@ float ReflectanceP(vec3 incident, vec3 normal, float fromN, float toN)
   float n0ct = fromN * ct;
   float I = (n0ct - n1ci) / (n0ct + n1ci);
   return I * I;
-};
+}
 
 float ReflectanceS(vec3 incident, vec3 normal, float fromN, float toN)
 {
@@ -80,7 +88,7 @@ float ReflectanceS(vec3 incident, vec3 normal, float fromN, float toN)
   float n1ct = toN * ct;
   float I = (n0ci - n1ct) / (n0ci + n1ct);
   return I * I;
-};
+}
 
 struct PayloadVecFloat
 {

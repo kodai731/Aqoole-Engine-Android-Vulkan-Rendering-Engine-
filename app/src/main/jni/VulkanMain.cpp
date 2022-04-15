@@ -389,6 +389,8 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
@@ -506,7 +508,7 @@ bool InitVulkan(android_app* app) {
                   {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 2},
                   {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2},
                   {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
-                  {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10},
+                  {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 20},
                   {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 20},
                   {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 20}
           };
@@ -546,6 +548,8 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorBuffers(4, {*gibPlane->GetBuffer(), *gIndexBuffer->GetBuffer()},
                                         {gXZPlane->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(), gWoman->GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(6, gibWoman->GetBuffer(), gWoman->GetIndexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);

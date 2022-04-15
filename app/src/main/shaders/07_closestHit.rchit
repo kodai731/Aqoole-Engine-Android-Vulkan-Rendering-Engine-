@@ -50,6 +50,8 @@ layout(binding = 2, set = 0) uniform CameraProperties
 } cam;
 layout(binding = 3, set = 0, scalar) buffer Vertices {Vertex3D v[];} vertices[];
 layout(binding = 4, set = 0) buffer Indices {uint i[];} indices[];
+layout(binding = 5, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} verticesobj[];
+layout(binding = 6, set = 0) buffer Indicesobj {uint iobj[];} indicesobj[];
 
 layout(binding = 0, set = 1) uniform sampler2D texSampler;
 
@@ -294,32 +296,30 @@ void main()
   //obj Id
   //uint objId = scnDesc.i[gl_InstanceCustomIndexEXT].objId;
   uint objId = gl_InstanceCustomIndexEXT;
-  ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
-                    indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 1],   //
-                    indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 2]);  //
-  Vertex3D v0 = vertices[nonuniformEXT(objId)].v[ind.x];
-  Vertex3D v1 = vertices[nonuniformEXT(objId)].v[ind.y];
-  Vertex3D v2 = vertices[nonuniformEXT(objId)].v[ind.z];
   const vec3 barycentricCoords = vec3(1.0f - attribs.x - attribs.y, attribs.x, attribs.y);
-  //vec3 normal = normalize(v0.normal * barycentricCoords.x + v1.normal * barycentricCoords.y + v2.normal * barycentricCoords.z);       //object coordinates
-  //normal = normalize(vec3(cam.normalMatrix * vec4(normal, 1.0)));
-  vec3 normal = cross(v1.pos - v0.pos, v2.pos - v0.pos);
-  normal = normalize(normal);
-  vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;                         //object coordinates
-  float lightIntensity = pushC.lightIntensity;
-  vec3 lDir = pushC.lightPosition - worldPos;
-  float lightDistance = length(lDir);
-  lightIntensity = lightIntensity / (lightDistance * lightDistance);
-  vec3 L = normalize(lDir);
   vec3 color;
   if(objId == 0)
   {
     //plane
+    ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
+                      indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 1],   //
+                      indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 2]);  //
+    Vertex3D v0 = vertices[nonuniformEXT(objId)].v[ind.x];
+    Vertex3D v1 = vertices[nonuniformEXT(objId)].v[ind.y];
+    Vertex3D v2 = vertices[nonuniformEXT(objId)].v[ind.z];
+    vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
     color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;
   }
   else if(objId == 1)
   {
     //cube
+    ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
+                      indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 1],   //
+                      indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 2]);  //
+    Vertex3D v0 = vertices[nonuniformEXT(objId)].v[ind.x];
+    Vertex3D v1 = vertices[nonuniformEXT(objId)].v[ind.y];
+    Vertex3D v2 = vertices[nonuniformEXT(objId)].v[ind.z];
+    vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
     float refractRatio = nAir / nGlass;
     prdBlend.hit = false;
     //prdBlend.color = pushC.clearColor.xyz;
@@ -327,6 +327,7 @@ void main()
     vec4 cameraPos = cam.viewInverse * vec4(0, 0, 0, 1);
     vec3 direction = normalize(worldPos - cameraPos.xyz);
     float reflectanceOrigin;
+    vec3 normal = normalize(cross(v1.pos - v0.pos, v2.pos - v0.pos));
     //depth = 0
     traceReflectRefract(worldPos, direction, normal, refractRatio, reflectPos[0], reflectMiss[0], reflectNormal[0], reflectColor[0], isPlane[0],
       reflectPos[1], reflectMiss[1], reflectNormal[1], reflectColor[1], isPlane[1], isAllReflect[1], reflectanceOrigin);
@@ -352,7 +353,13 @@ void main()
   else
   {
     //woman
-    color = texture(texSampler, vec2(attribs.x, attribs.y)).xyz;
+    ivec3 ind = ivec3(indicesobj[nonuniformEXT(objId)].iobj[3 * gl_PrimitiveID + 0],   //
+                      indicesobj[nonuniformEXT(objId)].iobj[3 * gl_PrimitiveID + 1],   //
+                      indicesobj[nonuniformEXT(objId)].iobj[3 * gl_PrimitiveID + 2]);  //
+    Vertex3DObj v0 = verticesobj[nonuniformEXT(objId)].vobj[ind.x];
+    Vertex3DObj v1 = verticesobj[nonuniformEXT(objId)].vobj[ind.y];
+    Vertex3DObj v2 = verticesobj[nonuniformEXT(objId)].vobj[ind.z];
+    color = texture(texSampler, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
   }
   pld = vec4(color, 1.0);
 }
