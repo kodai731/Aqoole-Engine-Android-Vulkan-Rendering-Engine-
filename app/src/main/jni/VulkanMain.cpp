@@ -137,10 +137,10 @@ uniform
 glm::vec3 gLookAtPoint(0.0f, 0.01f, 0.0f);
 //ModelView modelView;
 //glm::vec3 cameraPos(0.0f, -1.0f, -1.0f);
-glm::vec3 cameraPos(0.0f, -5.0f, -10.0f);
+glm::vec3 cameraPos(0.0f, -5.0f, 10.0f);
 glm::vec3 cameraDirection = glm::normalize(cameraPos - gLookAtPoint);
 //glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(0.0f, 0.0f, -1.0f)));
-glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(1.0f, 0.0f, 0.0f)));
+glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(-1.0f, 0.0f, 0.0f)));
 //glm::vec3 cameraUp = glm::vec3(0.0f, -1.0f, 0.0f);
 AEBufferUniform* gModelViewBuffer;
 std::unique_ptr<AEDescriptorSetLayout> gDescriptorSetLayout;
@@ -170,6 +170,7 @@ std::unique_ptr<AEBufferAS> gibWoman;
 std::vector<std::unique_ptr<AETextureImage>> gWomanTextures;
 std::vector<AEDescriptorSet*> gDescriptorSets;
 AEDescriptorSet* gWomanTextureSets;
+std::unique_ptr<AEBufferAS> gWomanOffset;
 
 double lastTime;
 double startTime;
@@ -346,12 +347,20 @@ bool CreateBuffers(void) {
   gibPlane->CreateBuffer();
   gibPlane->CopyData((void*)gXZPlane->GetIndexAddress().data(), 0, gXZPlane->GetIndexBufferSize(), gQueue, gCommandPool);
   //woman buffers
-  gvbWoman = std::make_unique<AEBufferAS>(gDevice, gWoman->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbWoman = std::make_unique<AEBufferAS>(gDevice, gWoman->GetVertexBufferSize(),
+                                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gvbWoman->CreateBuffer();
-  gvbWoman->CopyData((void*)gWoman->GetVertexAddress().data(), 0, gWoman->GetVertexBufferSize(), gQueue, gCommandPool);
-  gibWoman = std::make_unique<AEBufferAS>(gDevice, gWoman->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbWoman->CopyData((void *) gWoman->GetVertexAddress().data(), 0,
+                     gWoman->GetVertexBufferSize(), gQueue, gCommandPool);
+  gibWoman = std::make_unique<AEBufferAS>(gDevice, gWoman->GetIndexBufferSize(),
+                                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gibWoman->CreateBuffer();
-  gibWoman->CopyData((void*)gWoman->GetIndexAddress().data(), 0, gWoman->GetIndexBufferSize(), gQueue, gCommandPool);
+  gibWoman->CopyData((void *) gWoman->GetIndexAddress().data(), 0, gWoman->GetIndexBufferSize(),
+                     gQueue, gCommandPool);
+  //offset
+  gWomanOffset = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * gWoman->GetTextureCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gWomanOffset->CreateBuffer();
+  gWomanOffset->CopyData((void*)gWoman->GetOffsetAll().data(), 0, sizeof(uint32_t) * gWoman->GetTextureCount(), gQueue, gCommandPool);
   //prepare ray tracing objects
 //  gCube = std::make_unique<AECube>(2.0f, glm::vec3(-1.0f, 0.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 //  gVertexBuffer = new AEBufferAS(gDevice, sizeof(Vertex3D) * gCube->GetVertexSize(), (VkBufferUsageFlagBits)0);
@@ -363,6 +372,11 @@ bool CreateBuffers(void) {
   BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(), *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
   BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(), *gvbPlane->GetBuffer(), *gibPlane->GetBuffer()};
   BLASGeometryInfo womanInfo = {sizeof(Vertex3DObj), gWoman->GetVertexSize(), gWoman->GetIndexSize(), *gvbWoman->GetBuffer(), *gibWoman->GetBuffer()};
+  std::vector<BLASGeometryInfo> womanInfos;
+  for(uint32_t i = 0; i < gWoman->GetTextureCount(); i++)
+  {
+    BLASGeometryInfo womanInfo = {sizeof(Vertex3DObj), gWoman->GetVertexSize(), gWoman->GetIndexSize(), *gvbWoman->GetBuffer(), *gibWoman->GetBuffer()};
+  }
   std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
   std::vector<BLASGeometryInfo> geometryPlane = {planeInfo};
   std::vector<BLASGeometryInfo> geometryWoman = {womanInfo};
@@ -391,6 +405,7 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
@@ -550,6 +565,8 @@ bool InitVulkan(android_app* app) {
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(), gWoman->GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(6, gibWoman->GetBuffer(), gWoman->GetIndexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(7, gWomanOffset->GetBuffer(), sizeof(uint32_t) * gWoman->GetTextureCount(),
+                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
@@ -722,8 +739,8 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   //update AS
   aslsPlane->Update(&modelview, gQueue, gCommandPool);
   aslsCubes->Update(&modelview, gQueue, gCommandPool);
-  //aslsWoman->Update(&modelview, gQueue, gCommandPool);
-  //astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
+  aslsWoman->Update(&modelview, gQueue, gCommandPool);
+//  astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
@@ -952,11 +969,11 @@ void LookByGravity(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm:
     glm::mat3 rotateY(1.0f);
     glm::mat3 rotateZ(1.0f);
     *gravityData *= 0.15f;
-    AEMatrix::Rodrigues(rotateX, cos(gravityData->x), sin(gravityData->x), glm::vec3(1.0f, 0.0f, 0.0f));
+    AEMatrix::Rodrigues(rotateX, cos(gravityData->x), sin(gravityData->x), glm::vec3(-1.0f, 0.0f, 0.0f));
     AEMatrix::Rodrigues(rotateY, cos(gravityData->y), sin(gravityData->y), glm::vec3(0.0f, -1.0f, 0.0f));
     AEMatrix::Rodrigues(rotateZ, cos(gravityData->z), sin(gravityData->z), glm::vec3(0.0f, 0.0f, -1.0f));
     cameraDirection = (rotateX * rotateY * rotateZ) * cameraDirection;
-    cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(1.0f, 0.0f, 0.0f)));
+    cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(-1.0f, 0.0f, 0.0f)));
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
 //    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
 }

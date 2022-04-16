@@ -170,6 +170,7 @@ class AEDrawObjectBaseObjFile : public AEDrawObjectBase
     uint32_t GetTextureCount(){return mTextureFiles.size();}
     std::string& GetTexturePath(uint32_t index){return mTextureFiles[index];}
     uint32_t GetOffset(uint32_t index){return mOffsets[index];}
+    std::vector<uint32_t>const& GetOffsetAll(){return mOffsets;}
     //scale
     void Scale(float multiple);
 };

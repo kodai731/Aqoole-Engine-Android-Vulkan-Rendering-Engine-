@@ -52,8 +52,12 @@ layout(binding = 3, set = 0, scalar) buffer Vertices {Vertex3D v[];} vertices[];
 layout(binding = 4, set = 0) buffer Indices {uint i[];} indices[];
 layout(binding = 5, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} verticesobj[];
 layout(binding = 6, set = 0) buffer Indicesobj {uint iobj[];} indicesobj[];
+layout(binding = 7, set = 0) buffer IndicesOffset {uint ioff[];} indicesoff[];
 
-layout(binding = 0, set = 1) uniform sampler2D texSampler;
+layout(binding = 0, set = 1) uniform sampler2D texSampler0;
+layout(binding = 1, set = 1) uniform sampler2D texSampler1;
+layout(binding = 2, set = 1) uniform sampler2D texSampler2;
+layout(binding = 3, set = 1) uniform sampler2D texSampler3;
 
 layout(push_constant) uniform Constants
 {
@@ -64,7 +68,7 @@ layout(push_constant) uniform Constants
 }pushC;
 
 //const uint NODE = 126;
-const uint NODE = 30;
+const uint NODE = 14;
 //const uint NODE = 254;
 //const uint NODE = 2;
 
@@ -264,14 +268,14 @@ vec3 ColorBlendALL(vec3 surfaceColor, float reflectanceOrigin, inout bool[NODE] 
     uint refractIndex = 2 * i + 3;
     colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
   }
-  */
+
   for(uint i = 6; i < 14; i++)
   {
     uint reflectIndex = 2 * i + 2;
     uint refractIndex = 2 * i + 3;
     colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
   }
-
+*/
   for(uint i = 2; i < 6; i++)
   {
     uint reflectIndex = 2 * i + 2;
@@ -359,7 +363,23 @@ void main()
     Vertex3DObj v0 = verticesobj[nonuniformEXT(objId)].vobj[ind.x];
     Vertex3DObj v1 = verticesobj[nonuniformEXT(objId)].vobj[ind.y];
     Vertex3DObj v2 = verticesobj[nonuniformEXT(objId)].vobj[ind.z];
-    color = texture(texSampler, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
+    //color = texture(texSampler, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
+    //color = texture(texSampler, vec2(0.1, 0.1)).xyz;
+    uint offset = 3 * gl_PrimitiveID;
+    if(offset < 44106)
+      color = texture(texSampler0, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
+      //color = texture(texSampler, vec2(0.1, 0.1)).xyz;
+      //color = vec3(0.0, 1.0, 0.0);
+    else if(44106 <= offset && offset < 58974)
+      color = texture(texSampler1, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
+      //color = vec3(1.0, 0.0, 0.0);
+    else if(58974 <= offset && offset < 69990)
+      color = texture(texSampler2, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
+      //color = vec3(0.0, 0.0, 1.0);
+    else
+      color = texture(texSampler3, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
+      //color = vec3(1.0, 1.0, 1.0);
+    color *= 4.0;
   }
   pld = vec4(color, 1.0);
 }
