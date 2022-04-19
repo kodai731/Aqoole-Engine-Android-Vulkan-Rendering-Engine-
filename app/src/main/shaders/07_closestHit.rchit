@@ -357,29 +357,21 @@ void main()
   else
   {
     //woman
-    ivec3 ind = ivec3(indicesobj[nonuniformEXT(objId)].iobj[3 * gl_PrimitiveID + 0],   //
-                      indicesobj[nonuniformEXT(objId)].iobj[3 * gl_PrimitiveID + 1],   //
-                      indicesobj[nonuniformEXT(objId)].iobj[3 * gl_PrimitiveID + 2]);  //
-    Vertex3DObj v0 = verticesobj[nonuniformEXT(objId)].vobj[ind.x];
-    Vertex3DObj v1 = verticesobj[nonuniformEXT(objId)].vobj[ind.y];
-    Vertex3DObj v2 = verticesobj[nonuniformEXT(objId)].vobj[ind.z];
-    //color = texture(texSampler, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
-    //color = texture(texSampler, vec2(0.1, 0.1)).xyz;
+    ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
+                      indicesobj[0].iobj[3 * gl_PrimitiveID + 1],   //
+                      indicesobj[0].iobj[3 * gl_PrimitiveID + 2]);  //
+    Vertex3DObj v0 = verticesobj[0].vobj[ind.x];
+    Vertex3DObj v1 = verticesobj[0].vobj[ind.y];
+    Vertex3DObj v2 = verticesobj[0].vobj[ind.z];
     uint offset = 3 * gl_PrimitiveID;
     if(offset < 44106)
       color = texture(texSampler0, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
-      //color = texture(texSampler, vec2(0.1, 0.1)).xyz;
-      //color = vec3(0.0, 1.0, 0.0);
     else if(44106 <= offset && offset < 58974)
       color = texture(texSampler1, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
-      //color = vec3(1.0, 0.0, 0.0);
     else if(58974 <= offset && offset < 69990)
       color = texture(texSampler2, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
-      //color = vec3(0.0, 0.0, 1.0);
     else
       color = texture(texSampler3, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
-      //color = vec3(1.0, 1.0, 1.0);
-    color *= 4.0;
   }
   pld = vec4(color, 1.0);
 }

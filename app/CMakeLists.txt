@@ -28,7 +28,8 @@ add_library(vulkanNativeActivity SHARED
             ${SRC_DIR}/VulkanMain.cpp
             ${SRC_DIR}/AndroidMain.cpp
             ${WRAPPER_DIR}/vulkan_wrapper.cpp
-            ${STB_SRC_DIR}/stb_image.c)
+#            ${STB_SRC_DIR}/stb_image.c
+        )
 
 include_directories(${VK_INCLUDE_DIR} ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGUI_DIR})
 #include_directories(${VK_VAL_LAYER_SRC_DIR}/include ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGUI_DIR})

@@ -16,10 +16,9 @@
 #include "AEWindow.hpp"
 #include "AECommand.hpp"
 #include "AEBuffer.hpp"
-//#define STBI_MALLOC
-//#define STBI_REALLOC
-//#define STBI_FREE free
+#ifndef __ANDROID__
 #include "stb_image.h"
+#endif
 
 /*
 find supported format
@@ -397,26 +396,35 @@ AETextureImage::AETextureImage(AELogicalDevice* device, const char* imagePath,
         : AEImageBase(device, commandPool, queue)
 {
     AAsset* file = AAssetManager_open(app->activity->assetManager,
-                                      imagePath, AASSET_MODE_BUFFER);
-    size_t fileLength = AAsset_getLength(file);
-    auto fileContent = new unsigned char[fileLength];
-    AAsset_read(file, fileContent, fileLength);
+                                      imagePath, AASSET_MODE_STREAMING);
+    AImageDecoder *decoder;
+    if(AImageDecoder_createFromAAsset(file, &decoder) != ANDROID_IMAGE_DECODER_SUCCESS)
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole error", "error in decode image %d", 0);
+    const AImageDecoderHeaderInfo* info = AImageDecoder_getHeaderInfo(decoder);
+    int32_t width = AImageDecoderHeaderInfo_getWidth(info);
+    int32_t height = AImageDecoderHeaderInfo_getHeight(info);
+    AndroidBitmapFormat format =
+            (AndroidBitmapFormat) AImageDecoderHeaderInfo_getAndroidBitmapFormat(info);
+    size_t stride = AImageDecoder_getMinimumStride(decoder);  // Image decoder does not use padding by default
+    size_t size = height * stride;
+    void* pixels = malloc(size);
+    if(AImageDecoder_decodeImage(decoder, pixels, stride, size) != ANDROID_IMAGE_DECODER_SUCCESS)
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole error", "error in decode image %d", 0);
+    AImageDecoder_delete(decoder);
     AAsset_close(file);
-    int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load_from_memory(fileContent, (int)fileLength, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-    if (!pixels)
-        throw std::runtime_error("failed to load texture image!");
     //copy data to tmp buffer
+    VkDeviceSize imageSize = size;
+    int texWidth = width;
+    int texHeight = height;
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
     AEBuffer::CreateBuffer(mDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
                            stagingBufferMemory);
     AEBuffer::CopyData(mDevice, stagingBufferMemory, imageSize, (void*)pixels);
-    stbi_image_free(pixels);
+    //stbi_image_free(pixels);
     //create image
-    AEImage::CreateImage2D(mDevice, (uint32_t)texWidth, (uint32_t)texHeight, VK_FORMAT_R8G8B8A8_UNORM,
+    AEImage::CreateImage2D(mDevice, (uint32_t)texWidth, (uint32_t)texHeight, VK_FORMAT_B8G8R8A8_UNORM,
                            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                                                                                VK_IMAGE_USAGE_SAMPLED_BIT, VK_SHARING_MODE_EXCLUSIVE, VK_SAMPLE_COUNT_1_BIT, &mImage);
     //bind image to memory
@@ -436,12 +444,12 @@ AETextureImage::AETextureImage(AELogicalDevice* device, const char* imagePath,
     //end command
     AECommand::EndSingleTimeCommands(&singleTimeCommandBuffer, queue);
     //create image view
-    AEImage::CreateImageView2D(mDevice, &mImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT,
+    AEImage::CreateImageView2D(mDevice, &mImage, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT,
                                &mImageView, 1);
     //clean buffer
     vkFreeMemory(*mDevice->GetDevice(), stagingBufferMemory, nullptr);
     vkDestroyBuffer(*mDevice->GetDevice(), stagingBuffer, nullptr);
-    delete[] fileContent;
+    free(pixels);
 }
 #endif
 

@@ -13,16 +13,17 @@
 //        limitations under the License.
 #ifndef _AE_IMAGE
 #define _AE_IMAGE
+#ifndef __ANDROID__
 #ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #endif
-#define STBI_NO_SIMD
-#ifndef __ANDROID__
 #include <vulkan/vulkan.hpp>
 #include <memory>
 #else
 #include <vulkan_wrapper.h>
 #include <android_native_app_glue.h>
+#include <android/imagedecoder.h>
+#include <android/bitmap.h>
 #include <memory>
 #include <vector>
 #endif
