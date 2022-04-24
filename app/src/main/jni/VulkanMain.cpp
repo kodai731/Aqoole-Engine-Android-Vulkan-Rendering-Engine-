@@ -137,10 +137,12 @@ uniform
 glm::vec3 gLookAtPoint(0.0f, 0.01f, 0.0f);
 //ModelView modelView;
 //glm::vec3 cameraPos(0.0f, -1.0f, -1.0f);
-glm::vec3 cameraPos(0.0f, -5.0f, 10.0f);
+const glm::vec3 firstCameraPos(0.0f, -5.0f, 10.0f);
+glm::vec3 cameraPos = firstCameraPos;
 glm::vec3 cameraDirection = glm::normalize(cameraPos - gLookAtPoint);
 //glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(0.0f, 0.0f, -1.0f)));
-glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(-1.0f, 0.0f, 0.0f)));
+const glm::vec3 firstCameraBasis(-1.0f, 0.0f, 0.0f);
+glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, firstCameraBasis));
 //glm::vec3 cameraUp = glm::vec3(0.0f, -1.0f, 0.0f);
 AEBufferUniform* gModelViewBuffer;
 std::unique_ptr<AEDescriptorSetLayout> gDescriptorSetLayout;
@@ -186,7 +188,8 @@ bool isPositionInitialized = false;
 void ResetCamera();
 void PrintVector2(glm::vec2* vectors, uint32_t size);
 static double GetTime();
-void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions);
+void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTouched);
+bool isTouchButton(glm::vec2* touchPos, ImVec2 buttonPos, ImVec2 buttonRegion);
 /*
  * setImageLayout():
  *    Helper function to transition color buffer layout
@@ -473,7 +476,7 @@ bool InitVulkan(android_app* app) {
   float nextPosition = cubeLength * 1.5f + 5.0f;
   for(uint32_t i = 0; i < 2; i++)
   {
-    offsetY = -5.0f;
+    offsetY = -1.0f;
     for(uint32_t j = 0; j < 2; j++)
     {
       offsetX = -5.0f;
@@ -747,16 +750,16 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
                                 UINT64_MAX, render.semaphore_, VK_NULL_HANDLE,
                                 &nextIndex));
   CALL_VK(vkResetFences(device.device_, 1, &render.fence_));
-  RecordImguiCommand(nextIndex, touchPositions);
+  RecordImguiCommand(nextIndex, touchPositions, isTouched);
     VkPipelineStageFlags waitStageMask =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  VkCommandBuffer cmdBuffers[1] = {*gCommandBuffers[nextIndex]->GetCommandBuffer()/*, gImgui->GetCommandBuffer()->GetCommandBuffer()*/};
+  VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};
   VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                               .pNext = nullptr,
                               .waitSemaphoreCount = 1,
                               .pWaitSemaphores = &render.semaphore_,
                               .pWaitDstStageMask = &waitStageMask,
-                              .commandBufferCount = 1,
+                              .commandBufferCount = 2,
                               .pCommandBuffers = cmdBuffers,
                               .signalSemaphoreCount = 1,
                               .pSignalSemaphores = &render.presentSemaphore_,};
@@ -994,7 +997,7 @@ double GetTime()
   return 1000.0 * res.tv_sec + res.tv_nsec / 1e6;
 }
 
-void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions)
+void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTouched)
 {
   VkCommandBuffer* cb = gImgui->GetCommandBuffer()->GetCommandBuffer();
   VkCommandBufferBeginInfo cmdBufferBeginInfo{
@@ -1011,31 +1014,30 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions)
           .renderPass = render.renderPass_,
           .framebuffer = swapchain.framebuffers_[imageNum],
           .renderArea = {.offset { .x = 0, .y = 0,},
-                  .extent = {.width = 150, .height = 200}},
+                  .extent = {.width = 0, .height = 0}},
           .clearValueCount = 2,
           .pClearValues = clearVals};
   vkCmdBeginRenderPass(*cb, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+  auto io = ImGui::GetIO();
   ImGui_ImplAndroid_NewFrame();
   ImGui_ImplVulkan_NewFrame();
   ImGui::NewFrame();
-  static float f = 0.0f;
-  static int counter = 0;
   ImGui::SetNextWindowPos(ImVec2(100, 500), ImGuiCond_FirstUseEver);
-  ImGui::SetItemAllowOverlap();
-  ImGui::SetCursorPos(ImVec2(touchPositions[0].x, touchPositions[0].y));
+//  ImGui::SetItemAllowOverlap();
   ImGui::Begin("Parameters");                          // Create a window called "Hello, world!" and append into it.
   //ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
   // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
   // ImGui::ColorEdit3("clear color", (float*)&imguiClearColor); // Edit 3 floats representing a color
-  if (ImGui::Button("reset time", ImVec2(350.0f, 100.0f)))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-  {
+  ImGui::Button("reset time", ImVec2(350.0f, 100.0f));  // Buttons return true when clicked (most widgets return true when edited/activated)
+  auto region = ImGui::GetContentRegionAvail();
+  if(isTouchButton(touchPositions, ImVec2(100, 500), ImVec2(350.0f, 100.0f))){
 //      startTime = lastTime;
 //      *passedTime = 0.0f;
-    cameraPos = glm::vec3(0.0f, 0.0f, -10.0f);
+    cameraPos = firstCameraPos;
     cameraDirection = glm::normalize(cameraPos - gLookAtPoint);
-    cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(1.0f, 0.0f, 0.0f)));
+    cameraUp = glm::normalize(glm::cross(cameraDirection, firstCameraBasis));
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
+    gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
   }
   if (ImGui::Button("pause"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
   {
@@ -1051,4 +1053,12 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions)
   ImGui_ImplVulkan_RenderDrawData(drawData, *cb);
   vkCmdEndRenderPass(*cb);
   vkEndCommandBuffer(*cb);
+}
+
+bool isTouchButton(glm::vec2* touchPos, ImVec2 buttonPos, ImVec2 buttonRegion)
+{
+  if(buttonPos.x < touchPos[0].x && touchPos[0].x < buttonPos.x + buttonRegion.x)
+    if(buttonPos.y < touchPos[0].y && touchPos[0].y < buttonPos.y + buttonRegion.y)
+      return true;
+  return false;
 }

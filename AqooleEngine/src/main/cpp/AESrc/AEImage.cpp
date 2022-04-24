@@ -422,7 +422,6 @@ AETextureImage::AETextureImage(AELogicalDevice* device, const char* imagePath,
                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
                            stagingBufferMemory);
     AEBuffer::CopyData(mDevice, stagingBufferMemory, imageSize, (void*)pixels);
-    //stbi_image_free(pixels);
     //create image
     AEImage::CreateImage2D(mDevice, (uint32_t)texWidth, (uint32_t)texHeight, VK_FORMAT_B8G8R8A8_UNORM,
                            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_USAGE_TRANSFER_DST_BIT |

@@ -506,6 +506,7 @@ MyImgui::MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalD
 	//ImGui_ImplGlfw_InitForAE(mWindow->GetWindowNC(), true);
 	//vulkan init
 	ImGui::StyleColorsDark();
+	ImGui::GetStyle().TouchExtraPadding = ImVec2(4.0f, 4.0f);
 	ImGui_ImplVulkan_InitInfo init_info = {};
 	init_info.Instance = *instance->GetInstance();
 	init_info.PhysicalDevice = *mDevice->GetPhysicalDevice();
@@ -524,6 +525,9 @@ MyImgui::MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalD
 	ImGui_ImplVulkan_Init(&init_info, *mRenderPass->GetRenderPass());
 	//android init
 	ImGui_ImplAndroid_Init(platformWindow);
+	auto imguiIo = ImGui::GetIO();
+	imguiIo.WantCaptureMouse = true;
+	imguiIo.WantSetMousePos = true;
 	//upload fonts
 	mCommandPool = std::make_unique<AECommandPool>(mDevice, mQueue);
 	mCommandBuffer = std::make_unique<AECommandBuffer>(mDevice, mCommandPool.get());
@@ -575,6 +579,8 @@ MyImgui::~MyImgui()
 	mSurface.reset();
 	mWindow.reset();
 #endif
+	ImGui_ImplAndroid_Shutdown();
+	ImGui_ImplVulkan_Shutdown();
 }
 
 /*
