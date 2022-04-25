@@ -525,9 +525,6 @@ MyImgui::MyImgui(ANativeWindow* platformWindow, AEInstance* instance, AELogicalD
 	ImGui_ImplVulkan_Init(&init_info, *mRenderPass->GetRenderPass());
 	//android init
 	ImGui_ImplAndroid_Init(platformWindow);
-	auto imguiIo = ImGui::GetIO();
-	imguiIo.WantCaptureMouse = true;
-	imguiIo.WantSetMousePos = true;
 	//upload fonts
 	mCommandPool = std::make_unique<AECommandPool>(mDevice, mQueue);
 	mCommandBuffer = std::make_unique<AECommandBuffer>(mDevice, mCommandPool.get());

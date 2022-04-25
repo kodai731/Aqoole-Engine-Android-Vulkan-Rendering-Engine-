@@ -173,6 +173,8 @@ std::vector<std::unique_ptr<AETextureImage>> gWomanTextures;
 std::vector<AEDescriptorSet*> gDescriptorSets;
 AEDescriptorSet* gWomanTextureSets;
 std::unique_ptr<AEBufferAS> gWomanOffset;
+std::string fuse1ObjPath("fuse-woman-1/source/woman.obj");
+std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
 
 double lastTime;
 double startTime;
@@ -498,7 +500,7 @@ bool InitVulkan(android_app* app) {
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, 0.0f, top), glm::vec3(left, 0.0f, bottom),
                                        glm::vec3(right, 0.0f, bottom), glm::vec3(right, 0.0f, top), glm::vec3(0.0f, 0.2f, 0.0f));
   //woman
-  gWoman = std::make_unique<AEDrawObjectBaseObjFile>("fuse-woman-1/source/woman.obj", app, true);
+  gWoman = std::make_unique<AEDrawObjectBaseObjFile>(fuse1ObjPath.c_str(), app, true);
   gWoman->Scale(0.01f);
   //woman texture
   for(uint32_t i = 0; i < gWoman->GetTextureCount(); i++)
@@ -702,7 +704,8 @@ void DeleteVulkan(void) {
 // Draw one frame
 bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* touchPositions,
                      glm::vec3* gravityData, glm::vec3* lastGravityData) {
-  if(!isTouched & !isPositionInitialized)
+    LookByGravity(currentFrame, isTouched, isFocused, gravityData, lastGravityData);
+    if(!isTouched & !isPositionInitialized)
   {
     //initialization
 //    float index1Value = -100000.0f;
@@ -729,7 +732,6 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
       lastPositions[0] = touchPositions[0];
       lastPositions[1] = touchPositions[1];
   }
-  LookByGravity(currentFrame, isTouched, isFocused, gravityData, lastGravityData);
   //cameraPos += glm::vec3(0.0f, 0.0f, 0.1f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
   glm::mat4 modelViewInverse = glm::inverse(modelview.translate * modelview.rotate * modelview.scale);
