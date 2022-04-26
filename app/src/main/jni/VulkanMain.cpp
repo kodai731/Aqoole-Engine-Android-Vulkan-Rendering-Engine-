@@ -178,8 +178,10 @@ std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
 
 double lastTime;
 double startTime;
+double passedTime = 0.0;
 
 std::vector<AECube*> gCubes;
+bool isPaused = false;
 
 bool isContinuedTouch = false;
 void Zoom(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* touchPositions);
@@ -704,47 +706,48 @@ void DeleteVulkan(void) {
 // Draw one frame
 bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* touchPositions,
                      glm::vec3* gravityData, glm::vec3* lastGravityData) {
-    LookByGravity(currentFrame, isTouched, isFocused, gravityData, lastGravityData);
-    if(!isTouched & !isPositionInitialized)
+  if(!isPaused)
   {
-    //initialization
+    LookByGravity(currentFrame, isTouched, isFocused, gravityData, lastGravityData);
+    if (!isTouched & !isPositionInitialized) {
+      //initialization
 //    float index1Value = -100000.0f;
 //    lastPositions[0] = glm::vec2(-100.0f);
 //    lastPositions[1] = glm::vec2(index1Value);
 //    touchPositions[0] = glm::vec2(-0.1f);
 //    touchPositions[1] = glm::vec2(index1Value);
-    lastPositions[0] = touchPositions[0];
-    lastPositions[1] = touchPositions[1];
-    isPositionInitialized = true;
-  }
-  else if(isTouched)
-  {
+      lastPositions[0] = touchPositions[0];
+      lastPositions[1] = touchPositions[1];
+      isPositionInitialized = true;
+    } else if (isTouched) {
       uint32_t fingers = DetectFingers(currentFrame, isTouched, isFocused, touchPositions);
-      if(fingers == 1)
-          //Look(currentFrame, isTouched, isFocused, touchPositions);
+      if (fingers == 1)
+        //Look(currentFrame, isTouched, isFocused, touchPositions);
 //          ResetCamera();  //=> will reposition to imgui later
         ;
-      else if(fingers == 2)
-          Zoom(currentFrame, isTouched, isFocused, touchPositions);
+      else if (fingers == 2)
+        Zoom(currentFrame, isTouched, isFocused, touchPositions);
       isPositionInitialized = false;
 //      Look(currentFrame, isTouched, isFocused, touchPositions);
 //      Zoom(currentFrame, isTouched, isFocused, touchPositions);
       lastPositions[0] = touchPositions[0];
       lastPositions[1] = touchPositions[1];
+    }
+    //cameraPos += glm::vec3(0.0f, 0.0f, 0.1f);
+    AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
+    glm::mat4 modelViewInverse = glm::inverse(
+            modelview.translate * modelview.rotate * modelview.scale);
+    modelViewInverse = glm::transpose(modelViewInverse);
+    uboRT.viewInverse = glm::inverse(modelview.view);
+    uboRT.projInverse = glm::inverse(modelview.proj);
+    uboRT.modelViewProj = modelview.translate * modelview.rotate * modelview.scale;
+    uboRT.normalMatrix = modelViewInverse;
+    gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
+    //update AS
+    aslsPlane->Update(&modelview, gQueue, gCommandPool);
+    aslsCubes->Update(&modelview, gQueue, gCommandPool);
+    aslsWoman->Update(&modelview, gQueue, gCommandPool);
   }
-  //cameraPos += glm::vec3(0.0f, 0.0f, 0.1f);
-  AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-  glm::mat4 modelViewInverse = glm::inverse(modelview.translate * modelview.rotate * modelview.scale);
-  modelViewInverse = glm::transpose(modelViewInverse);
-  uboRT.viewInverse = glm::inverse(modelview.view);
-  uboRT.projInverse = glm::inverse(modelview.proj);
-  uboRT.modelViewProj = modelview.translate * modelview.rotate * modelview.scale;
-  uboRT.normalMatrix = modelViewInverse;
-  gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
-  //update AS
-  aslsPlane->Update(&modelview, gQueue, gCommandPool);
-  aslsCubes->Update(&modelview, gQueue, gCommandPool);
-  aslsWoman->Update(&modelview, gQueue, gCommandPool);
 //  astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
@@ -784,7 +787,8 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   };
   vkQueuePresentKHR(device.queue_, &presentInfo);
   double currentTime = GetTime();
-  //UpdateUI(app, 1000.0f / (float)(currentTime - lastTime));
+  if(!isPaused)
+    passedTime += currentTime - lastTime;
   lastTime = currentTime;
   return true;
 }
@@ -1024,15 +1028,16 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
   ImGui_ImplAndroid_NewFrame();
   ImGui_ImplVulkan_NewFrame();
   ImGui::NewFrame();
-  ImGui::SetNextWindowPos(ImVec2(100, 500), ImGuiCond_FirstUseEver);
+  ImVec2 resetCameraButtonPos(20, gSwapchain->GetExtents()[0].height - 150);
+  ImVec2 buttonSize(350, 100);
+  ImGui::SetNextWindowPos(resetCameraButtonPos, ImGuiCond_FirstUseEver);
 //  ImGui::SetItemAllowOverlap();
   ImGui::Begin("Parameters");                          // Create a window called "Hello, world!" and append into it.
   //ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
   // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
   // ImGui::ColorEdit3("clear color", (float*)&imguiClearColor); // Edit 3 floats representing a color
-  ImGui::Button("reset time", ImVec2(350.0f, 100.0f));  // Buttons return true when clicked (most widgets return true when edited/activated)
-  auto region = ImGui::GetContentRegionAvail();
-  if(isTouchButton(touchPositions, ImVec2(100, 500), ImVec2(350.0f, 100.0f))){
+  ImGui::Button("reset time", buttonSize);  // Buttons return true when clicked (most widgets return true when edited/activated)
+  if(isTouchButton(touchPositions, resetCameraButtonPos, ImVec2(350.0f, 100.0f))){
 //      startTime = lastTime;
 //      *passedTime = 0.0f;
     cameraPos = firstCameraPos;
@@ -1041,14 +1046,18 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
     gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
   }
-  if (ImGui::Button("pause"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-  {
-    //      paused = !paused;
-  }
-  ImGui::Text("time = %.3f", (lastTime - startTime) * 0.001);
+  ImGui::Text("time = %.3f", passedTime * 0.001);
   ImGui::SameLine();
-  //ImGui::Text("counter = %d", counter);
-  //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+  ImGui::End();
+  ImVec2 pauseButtonPos(380, gSwapchain->GetExtents()[0].height - 150);
+  ImGui::SetNextWindowPos(pauseButtonPos, ImGuiCond_FirstUseEver);
+  ImGui::Begin("button2");
+  ImGui::Button("pause", buttonSize);
+  if (isTouchButton(touchPositions, pauseButtonPos, buttonSize))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+  {
+      isPaused = !isPaused;
+  }
+  ImGui::SameLine();
   ImGui::End();
   ImGui::Render();
   ImDrawData* drawData = ImGui::GetDrawData();
