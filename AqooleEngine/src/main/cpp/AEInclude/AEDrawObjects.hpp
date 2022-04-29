@@ -25,6 +25,13 @@
 #include <random>
 #include <thread>
 #include <android_native_app_glue.h>
+#include <cstring>
+#include <limits>
+#include "boost/property_tree/ptree.hpp"
+#include "boost/property_tree/xml_parser.hpp"
+#include "boost/foreach.hpp"
+#include "boost/lexical_cast.hpp"
+
 #ifndef __ANDROID__
 #include <cstring>
 #include <limits>
@@ -175,7 +182,6 @@ class AEDrawObjectBaseObjFile : public AEDrawObjectBase
     void Scale(float multiple);
 };
 
-#ifndef __ANDROID__
 class AEDrawObjectBaseCollada : public AEDrawObjectBase
 {
     protected:
@@ -227,7 +233,6 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     //scale
     void Scale(float scale);
 };
-#endif
 
 /*
 3rd objects

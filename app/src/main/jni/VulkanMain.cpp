@@ -620,11 +620,9 @@ bool InitVulkan(android_app* app) {
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
     AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
-//    AECommand::BeginRenderPass(bufferIndex, gCommandBuffers[bufferIndex], gFrameBuffers[bufferIndex]);
     AECommand::CommandTraceRays(gCommandBuffers[bufferIndex], gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gSbts,
                                 gPipelineRT.get(), gDescriptorSets, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
                                 gQueue, gCommandPool);
-//    AECommand::EndRenderPass(gCommandBuffers[bufferIndex]);
     AECommand::EndCommand(gCommandBuffers[bufferIndex]);
   }
 

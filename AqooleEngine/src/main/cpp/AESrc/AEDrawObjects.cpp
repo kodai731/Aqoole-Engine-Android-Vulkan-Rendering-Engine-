@@ -779,7 +779,6 @@ void AEDrawObjectBaseObjFile::CalcTangent()
 
 uint32_t AEDrawObjectBaseObjFile::GetVertexBufferSize(){return sizeof(Vertex3DObj) * mVertices.size();}
 
-#ifndef __ANDROID__
 //=====================================================================
 //AE collada
 //=====================================================================
@@ -1133,7 +1132,6 @@ void AEDrawObjectBaseCollada::GetVertexWeights(std::vector<float> &vertexWeights
     for(uint32_t i = 0; i < fields.size(); i++)
         vertexWeights[i] = std::stof(fields[i]);
 }
-#endif
 
 //=====================================================================
 //AE cube
