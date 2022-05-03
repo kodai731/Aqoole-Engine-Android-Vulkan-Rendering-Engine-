@@ -37,14 +37,6 @@
 #include "boost/foreach.hpp"
 #include "boost/lexical_cast.hpp"
 
-#ifndef __ANDROID__
-#include <cstring>
-#include <limits>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
-#include <boost/foreach.hpp>
-#include <boost/lexical_cast.hpp>
-#endif
 
 /*
 prototypes
@@ -228,13 +220,18 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     void DebugRootNode();
     void GetVertexWeights(std::vector<float> &vertexWeights, std::string const& weightString);
     public:
-    AEDrawObjectBaseCollada(const char* filePath);
+    AEDrawObjectBaseCollada(const char* filePath, android_app* app);
     virtual ~AEDrawObjectBaseCollada();
     //iterator
     uint32_t GetVertexSize(){return mVertices.size();}
     std::vector<Vertex3DObj>& GetVertexAddress(){return mVertices;}
     uint32_t GetIndexSize(){return mIndices.size();}
     std::vector<uint32_t>& GetIndexAddress(){return mIndices;}
+    uint32_t GetVertexBufferSize();
+    uint32_t GetTextureCount(){return mTextureFiles.size();}
+    std::string& GetTexturePath(uint32_t index){return mTextureFiles[index];}
+    uint32_t GetOffset(uint32_t index){return mOffsets[index];}
+    std::vector<uint32_t>const& GetOffsetAll(){return mOffsets;}
     //scale
     void Scale(float scale);
 };

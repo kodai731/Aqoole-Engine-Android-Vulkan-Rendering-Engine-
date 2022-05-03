@@ -54,10 +54,13 @@ layout(binding = 5, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} ve
 layout(binding = 6, set = 0) buffer Indicesobj {uint iobj[];} indicesobj[];
 layout(binding = 7, set = 0) buffer IndicesOffset {uint ioff[];} indicesoff[];
 
+/*
 layout(binding = 0, set = 1) uniform sampler2D texSampler0;
 layout(binding = 1, set = 1) uniform sampler2D texSampler1;
 layout(binding = 2, set = 1) uniform sampler2D texSampler2;
 layout(binding = 3, set = 1) uniform sampler2D texSampler3;
+*/
+layout(binding = 0, set = 1) uniform sampler2D texSampler0;
 
 layout(push_constant) uniform Constants
 {
@@ -363,6 +366,7 @@ void main()
     Vertex3DObj v0 = verticesobj[0].vobj[ind.x];
     Vertex3DObj v1 = verticesobj[0].vobj[ind.y];
     Vertex3DObj v2 = verticesobj[0].vobj[ind.z];
+    /*
     uint offset = 3 * gl_PrimitiveID;
     if(offset < 44106)
       color = texture(texSampler0, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
@@ -372,6 +376,9 @@ void main()
       color = texture(texSampler2, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
     else
       color = texture(texSampler3, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
+      */
+    //color = texture(texSampler0, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
+    color = vec3(0.0, 0.0, 0.0);
   }
   pld = vec4(color, 1.0);
 }

@@ -785,14 +785,21 @@ uint32_t AEDrawObjectBaseObjFile::GetVertexBufferSize(){return sizeof(Vertex3DOb
 /*
 constructor
 */
-AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath)
+AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_app* app)
     : AEDrawObjectBase()
 {
     //using boost
     {
         using namespace boost::property_tree;
         ptree tree;
-        read_xml(filePath, tree);
+        AAsset* file = AAssetManager_open(app->activity->assetManager,
+                                          filePath, AASSET_MODE_BUFFER);
+        size_t fileLength = AAsset_getLength(file);
+        char* fileContent = new char[fileLength];
+        AAsset_read(file, fileContent, fileLength);
+        std::stringbuf strbuf(fileContent);
+        std::basic_istream stream(&strbuf);
+        read_xml(stream, tree);
         //one 3D obj
         Vertex3DObj one3DObj;
         glm::vec3 oneVec3; 
@@ -1067,17 +1074,24 @@ make vertices data
 */
 void AEDrawObjectBaseCollada::MakeVertices()
 {
-    uint32_t size = mPositionIndices.size();
+    uint32_t vertices = mPositions.size();
     Vertex3DObj oneVertex;
     oneVertex.texcoord = glm::vec2(0.5f, 0.5f);
-    for(uint32_t i = 0; i < size; i++)
+    for(uint32_t i = 0; i < vertices; i++)
     {
-        oneVertex.pos = mPositions[mPositionIndices[i]];
-        oneVertex.normal = mNormals[mNormalsIndices[i]];
+        oneVertex.pos = mPositions[i];
+        oneVertex.normal = mNormals[i];
         mVertices.push_back(oneVertex);
-        mIndices.push_back(i);
     }
+    uint32_t indices = mPositionIndices.size();
+    for(uint32_t i = 0; i < indices; i++)
+        mIndices.emplace_back(mPositionIndices[i]);
 }
+
+/*
+ *get vertex buffer size
+ */
+uint32_t AEDrawObjectBaseCollada::GetVertexBufferSize(){return sizeof(Vertex3DObj) * mVertices.size();}
 
 /*
 read skeleton node

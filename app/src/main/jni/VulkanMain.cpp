@@ -130,6 +130,7 @@ AEBufferAS* gVertexBuffer;
 AEBufferAS* gIndexBuffer;
 AECommandPool* gCommandPool;
 ModelView modelview = {};
+ModelView phoenixModelView = {};
 /*
 uniform
  */
@@ -175,6 +176,9 @@ AEDescriptorSet* gWomanTextureSets;
 std::unique_ptr<AEBufferAS> gWomanOffset;
 std::string fuse1ObjPath("fuse-woman-1/source/woman.obj");
 std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
+std::string fuse1Collada("phoenix-bird/phoenix-bird.dae");
+std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
+std::unique_ptr<AETextureImage> gTmpImage;
 
 double lastTime;
 double startTime;
@@ -353,21 +357,21 @@ bool CreateBuffers(void) {
   gibPlane = std::make_unique<AEBufferAS>(gDevice, gXZPlane->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gibPlane->CreateBuffer();
   gibPlane->CopyData((void*)gXZPlane->GetIndexAddress().data(), 0, gXZPlane->GetIndexBufferSize(), gQueue, gCommandPool);
-  //woman buffers
-  gvbWoman = std::make_unique<AEBufferAS>(gDevice, gWoman->GetVertexBufferSize(),
+  //woman buffers collada
+  gvbWoman = std::make_unique<AEBufferAS>(gDevice, gWomanCollada->GetVertexBufferSize(),
                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gvbWoman->CreateBuffer();
-  gvbWoman->CopyData((void *) gWoman->GetVertexAddress().data(), 0,
-                     gWoman->GetVertexBufferSize(), gQueue, gCommandPool);
-  gibWoman = std::make_unique<AEBufferAS>(gDevice, gWoman->GetIndexBufferSize(),
+  gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
+                     gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
+  gibWoman = std::make_unique<AEBufferAS>(gDevice, gWomanCollada->GetIndexBufferSize(),
                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gibWoman->CreateBuffer();
-  gibWoman->CopyData((void *) gWoman->GetIndexAddress().data(), 0, gWoman->GetIndexBufferSize(),
+  gibWoman->CopyData((void *) gWomanCollada->GetIndexAddress().data(), 0, gWomanCollada->GetIndexBufferSize(),
                      gQueue, gCommandPool);
   //offset
-  gWomanOffset = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * gWoman->GetTextureCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-  gWomanOffset->CreateBuffer();
-  gWomanOffset->CopyData((void*)gWoman->GetOffsetAll().data(), 0, sizeof(uint32_t) * gWoman->GetTextureCount(), gQueue, gCommandPool);
+//  gWomanOffset = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+//  gWomanOffset->CreateBuffer();
+//  gWomanOffset->CopyData((void*)gWomanCollada->GetOffsetAll().data(), 0, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), gQueue, gCommandPool);
   //prepare ray tracing objects
 //  gCube = std::make_unique<AECube>(2.0f, glm::vec3(-1.0f, 0.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 //  gVertexBuffer = new AEBufferAS(gDevice, sizeof(Vertex3D) * gCube->GetVertexSize(), (VkBufferUsageFlagBits)0);
@@ -378,18 +382,13 @@ bool CreateBuffers(void) {
 //  gIndexBuffer->CopyData((void*)gCube->GetIndexAddress().data(), 0, sizeof(uint32_t) * gCube->GetIndexSize(), gQueue, gCommandPool);
   BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(), *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
   BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(), *gvbPlane->GetBuffer(), *gibPlane->GetBuffer()};
-  BLASGeometryInfo womanInfo = {sizeof(Vertex3DObj), gWoman->GetVertexSize(), gWoman->GetIndexSize(), *gvbWoman->GetBuffer(), *gibWoman->GetBuffer()};
-  std::vector<BLASGeometryInfo> womanInfos;
-  for(uint32_t i = 0; i < gWoman->GetTextureCount(); i++)
-  {
-    BLASGeometryInfo womanInfo = {sizeof(Vertex3DObj), gWoman->GetVertexSize(), gWoman->GetIndexSize(), *gvbWoman->GetBuffer(), *gibWoman->GetBuffer()};
-  }
+  BLASGeometryInfo womanInfo = {sizeof(Vertex3DObj), gWomanCollada->GetVertexSize(), gWomanCollada->GetIndexSize(), *gvbWoman->GetBuffer(), *gibWoman->GetBuffer()};
   std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
   std::vector<BLASGeometryInfo> geometryPlane = {planeInfo};
   std::vector<BLASGeometryInfo> geometryWoman = {womanInfo};
   aslsPlane = std::make_unique<AERayTracingASBottom>(gDevice, geometryPlane, &modelview, gQueue, gCommandPool);
   aslsCubes = std::make_unique<AERayTracingASBottom>(gDevice, geometryCubes, &modelview, gQueue, gCommandPool);
-  aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman, &modelview, gQueue, gCommandPool);
+  aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman, &phoenixModelView, gQueue, gCommandPool);
   std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsCubes.get(), aslsWoman.get()};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
   return true;
@@ -417,11 +416,14 @@ VkResult CreateGraphicsPipeline() {
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
   gDescriptorSetLayout = std::make_unique<AEDescriptorSetLayout>(gDevice);
-  for(uint32_t i = 0; i < gWoman->GetTextureCount(); i++)
+  for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
   {
       gDescriptorSetLayout->AddDescriptorSetLayoutBinding(i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1,
                                                           nullptr);
   }
+  if(gWomanCollada->GetTextureCount() == 0)
+      gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1,
+                                                          nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   std::vector<const char*>paths =
@@ -504,10 +506,12 @@ bool InitVulkan(android_app* app) {
   //woman
   gWoman = std::make_unique<AEDrawObjectBaseObjFile>(fuse1ObjPath.c_str(), app, true);
   gWoman->Scale(0.01f);
+  gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(fuse1Collada.c_str(), app);
+  gWomanCollada->Scale(0.01f);
   //woman texture
-  for(uint32_t i = 0; i < gWoman->GetTextureCount(); i++)
+  for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
   {
-      std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, gWoman->GetTexturePath(i).c_str(), gCommandPool, gQueue, app));
+      std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, gWomanCollada->GetTexturePath(i).c_str(), gCommandPool, gQueue, app));
       texture->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
       gWomanTextures.push_back(std::move(texture));
   }
@@ -520,6 +524,15 @@ bool InitVulkan(android_app* app) {
                         0.1f, 100.0f);
   modelview.view = glm::mat4(1.0f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
+  phoenixModelView.rotate = glm::rotate(glm::mat4(1.0f), 90.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+  phoenixModelView.scale = glm::mat4(1.0f);
+  phoenixModelView.translate = glm::mat4(1.0f);
+  phoenixModelView.proj = glm::mat4(1.0f);
+  AEMatrix::Perspective(phoenixModelView.proj, 90.0f,
+                        (float)gSwapchain->GetExtents()[0].width / (float)gSwapchain->GetExtents()[0].height,
+                        0.1f, 100.0f);
+  phoenixModelView.view = glm::mat4(1.0f);
+  AEMatrix::View(phoenixModelView.view, cameraPos, cameraDirection, cameraUp);
   CreateBuffers();  // create vertex buffers
   // Create graphics pipeline
   CreateGraphicsPipeline();
@@ -570,16 +583,24 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorBuffers(4, {*gibPlane->GetBuffer(), *gIndexBuffer->GetBuffer()},
                                         {gXZPlane->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(), gWoman->GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(6, gibWoman->GetBuffer(), gWoman->GetIndexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(7, gWomanOffset->GetBuffer(), sizeof(uint32_t) * gWoman->GetTextureCount(),
-                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(), gWomanCollada->GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(6, gibWoman->GetBuffer(), gWomanCollada->GetIndexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+//  gDescriptorSet->BindDescriptorBuffer(7, gWomanOffset->GetBuffer(), sizeof(uint32_t) * gWomanCollada->GetTextureCount(),
+//                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
-  for(uint32_t i = 0; i < gWoman->GetTextureCount(); i++)
+  for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
     gWomanTextureSets->BindDescriptorImage(i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, gWomanTextures[i]->GetImageView(),
                                            gWomanTextures[i]->GetSampler());
+  if(gWomanCollada->GetTextureCount() == 0)
+  {
+      gTmpImage = std::make_unique<AETextureImage>(gDevice, std::string("phoenix-bird/Tex_Ride_FengHuang_01a_D_A.tga.png").c_str(),
+              gCommandPool, gQueue, app);
+      gTmpImage->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
+      gWomanTextureSets->BindDescriptorImage(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, gTmpImage->GetImageView(),
+                                             gTmpImage->GetSampler());
+  }
   gDescriptorSets.push_back(gWomanTextureSets);
   //create binding table buffer
   raygenSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 0, gQueue, gCommandPool);

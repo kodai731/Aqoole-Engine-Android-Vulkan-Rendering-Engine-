@@ -21,6 +21,9 @@
 #include <fstream>
 #include <string>
 #include <locale>
+#ifdef __ANDROID__
+#include <android_native_app_glue.h>
+#endif
 
 namespace boost { namespace property_tree { namespace xml_parser
 {
@@ -69,6 +72,7 @@ namespace boost { namespace property_tree { namespace xml_parser
      * @li @c no_comments -- Skip XML comments.
      * @param loc The locale to use when reading in the file contents.
      */
+#ifndef __ANDROID__
     template<class Ptree>
     void read_xml(const std::string &filename,
                   Ptree &pt,
@@ -84,6 +88,39 @@ namespace boost { namespace property_tree { namespace xml_parser
         stream.imbue(loc);
         read_xml_internal(stream, pt, flags, filename);
     }
+#else
+/**
+ * this is added for Android by Shigeoka Kodai
+ * @tparam Ptree
+ * @param filename
+ * @param pt
+ * @param flags
+ * @param loc
+ */
+    template<class Ptree>
+    void read_xml(const std::string &filename,
+                  Ptree &pt,
+                  android_app* app,
+                  int flags = 0,
+                  const std::locale &loc = std::locale())
+    {
+        BOOST_ASSERT(validate_flags(flags));
+        AAsset* file = AAssetManager_open(app->activity->assetManager,
+                                          filename.c_str(), AASSET_MODE_BUFFER);
+        size_t fileLength = AAsset_getLength(file);
+        char* fileContent = new char[fileLength];
+        AAsset_read(file, fileContent, fileLength);
+        std::stringbuf strbuf(fileContent);
+        std::basic_istream<typename Ptree::key_type::value_type> stream(&strbuf);
+//        std::basic_ifstream<typename Ptree::key_type::value_type>
+//                stream(filename.c_str());
+        if (!stream)
+            BOOST_PROPERTY_TREE_THROW(xml_parser_error(
+                                              "cannot open file", filename, 0));
+        stream.imbue(loc);
+        read_xml_internal(stream, pt, flags, filename);
+    }
+#endif
 
     /**
      * Translates the property tree to XML and writes it the given output
