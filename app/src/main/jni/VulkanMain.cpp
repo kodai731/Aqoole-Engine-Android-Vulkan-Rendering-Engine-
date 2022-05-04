@@ -533,7 +533,7 @@ bool InitVulkan(android_app* app) {
                         0.1f, 100.0f);
   phoenixModelView.view = glm::mat4(1.0f);
   AEMatrix::View(phoenixModelView.view, cameraPos, cameraDirection, cameraUp);
-  CreateBuffers();  // create vertex buffers
+  CreateBuffers();  // create vertex b
   // Create graphics pipeline
   CreateGraphicsPipeline();
   //prepare matrix

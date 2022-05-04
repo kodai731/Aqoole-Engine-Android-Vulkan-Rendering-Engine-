@@ -10,7 +10,13 @@
 //distributed under the License is distributed on an "AS IS" BASIS,
 //WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //See the License for the specific language governing permissions and
+//
 //        limitations under the License.
+//          Copyright Joe Coder 2004 - 2006.
+// Distributed under the Boost Software License, Version 1.0.
+//    (See accompanying file LICENSE_1_0.txt or copy at
+//          https://www.boost.org/LICENSE_1_0.txt)
+
 #include "AEDrawObjects.hpp"
 #include "AEUBO.hpp"
 #include "AEMatrix.hpp"
@@ -806,6 +812,15 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
         glm::vec2 oneVec2;
         std::vector<std::string> fields;
         std::vector<std::string> vertexWeights;
+        //read images
+        for(const ptree::value_type& images : tree.get_child("COLLADA.library_images"))
+        {
+            if (boost::optional<std::string> imageId = images.second.get_optional<std::string>("<xmlattr>.id"))
+            {
+                auto imageChild = images.second.get_child("init_from");
+                mTextureFiles.emplace_back(std::string(imageChild.data()));
+            }
+        }
         //read geometry
         Geometry oneGeometry;
         for(const ptree::value_type& geometry : tree.get_child("COLLADA.library_geometries")) 
@@ -858,6 +873,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                                 oneVec2.x = std::stof(fields[i * 2]);
                                 oneVec2.y = std::stof(fields[i * 2 + 1]);
                                 //mVertices[i].texcoord = oneVec2;
+                                mMaps.emplace_back(oneVec2);
                             }
 
                         }
@@ -1081,6 +1097,7 @@ void AEDrawObjectBaseCollada::MakeVertices()
     {
         oneVertex.pos = mPositions[i];
         oneVertex.normal = mNormals[i];
+        oneVertex.texcoord = mMaps[i];
         mVertices.push_back(oneVertex);
     }
     uint32_t indices = mPositionIndices.size();
@@ -1095,7 +1112,7 @@ uint32_t AEDrawObjectBaseCollada::GetVertexBufferSize(){return sizeof(Vertex3DOb
 
 /*
 read skeleton node
-condition : node exists
+if node exists
 */
 void AEDrawObjectBaseCollada::ReadSkeletonNode(boost::property_tree::ptree::const_iterator nowNode,
     std::unique_ptr<AEDrawObjectBaseCollada::SkeletonNode>& skeletonNode)

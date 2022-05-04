@@ -206,6 +206,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     std::vector<Geometry> mGeometries;
     std::vector<glm::vec3> mPositions;
     std::vector<glm::vec3> mNormals;
+    std::vector<glm::vec2> mMaps;
     std::vector<uint32_t> mPositionIndices;
     std::vector<uint32_t> mNormalsIndices;
     std::unique_ptr<AEDrawObjectBaseCollada::SkeletonNode> mRoot;
