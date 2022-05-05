@@ -360,6 +360,7 @@ void main()
   else
   {
     //woman
+    uint indexId = 0;
     ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 1],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 2]);  //

@@ -207,8 +207,9 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     std::vector<glm::vec3> mPositions;
     std::vector<glm::vec3> mNormals;
     std::vector<glm::vec2> mMaps;
-    std::vector<uint32_t> mPositionIndices;
-    std::vector<uint32_t> mNormalsIndices;
+    std::vector<std::vector<uint32_t>> mPositionIndices;
+    std::vector<std::vector<uint32_t>> mNormalsIndices;
+    std::vector<std::vector<uint32_t>> mMapIndices;
     std::unique_ptr<AEDrawObjectBaseCollada::SkeletonNode> mRoot;
     std::vector<std::string> mSkinJointsArray;
     std::vector<AEDrawObjectBaseCollada::JointWeight> mJointWeights;
@@ -233,6 +234,9 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     std::string& GetTexturePath(uint32_t index){return mTextureFiles[index];}
     uint32_t GetOffset(uint32_t index){return mOffsets[index];}
     std::vector<uint32_t>const& GetOffsetAll(){return mOffsets;}
+    std::vector<uint32_t>const& GetIndexAddress(uint32_t index)const{return mPositionIndices[index];}
+    std::vector<uint32_t>const& GetMapIndexAddress(uint32_t index)const{return mMapIndices[index];}
+    uint32_t GetMaterialSize(){return mPositionIndices.size();}
     //scale
     void Scale(float scale);
 };

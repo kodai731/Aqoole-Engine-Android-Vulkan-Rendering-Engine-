@@ -884,10 +884,15 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                         std::string data = geometryChild.second.get<std::string>("p");
                         AEDrawObject::Split(fields, data, ' ');
                         uint32_t size = fields.size() / 3;
+                        std::vector<uint32_t> indices;
+                        mPositionIndices.emplace_back(indices);
+                        mNormalsIndices.emplace_back(indices);
+                        mMapIndices.emplace_back(indices);
                         for(uint32_t i = 0; i < size; i++)
                         {
-                            mPositionIndices.push_back(std::stoi(fields[i * 3]));
-                            mNormalsIndices.push_back(std::stoi(fields[i * 3 + 1]));
+                            mPositionIndices[mPositionIndices.size() - 1].push_back(std::stoi(fields[i * 3]));
+                            mNormalsIndices[mNormalsIndices.size() - 1].push_back(std::stoi(fields[i * 3 + 1]));
+                            mMapIndices[mMapIndices.size() - 1].emplace_back(std::stoi(fields[i * 3 + 2]));
                         }
                     }
                 }
@@ -1100,9 +1105,6 @@ void AEDrawObjectBaseCollada::MakeVertices()
         oneVertex.texcoord = mMaps[i];
         mVertices.push_back(oneVertex);
     }
-    uint32_t indices = mPositionIndices.size();
-    for(uint32_t i = 0; i < indices; i++)
-        mIndices.emplace_back(mPositionIndices[i]);
 }
 
 /*
