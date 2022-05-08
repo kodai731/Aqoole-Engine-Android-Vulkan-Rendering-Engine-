@@ -308,7 +308,6 @@ void main()
   if(objId == 0)
   {
     //plane
-    /*
     ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
                       indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 1],   //
                       indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 2]);  //
@@ -317,18 +316,6 @@ void main()
     Vertex3D v2 = vertices[nonuniformEXT(objId)].v[ind.z];
     vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
     color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;
-    */
-        ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
-                          indicesobj[0].iobj[3 * gl_PrimitiveID + 1],   //
-                          indicesobj[0].iobj[3 * gl_PrimitiveID + 2]);  //
-        Vertex3DObj v0 = verticesobj[0].vobj[ind.x];
-        Vertex3DObj v1 = verticesobj[0].vobj[ind.y];
-        Vertex3DObj v2 = verticesobj[0].vobj[ind.z];
-        uint offset = gl_PrimitiveID;
-        if(offset <= 2653)
-          color = texture(texSampler0, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
-        else
-          color = texture(texSampler1, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
   }
   else if(objId == 1)
   {
@@ -380,7 +367,7 @@ void main()
     vec2 v0 = mapVertices[0].mapv[mapind.x];
     vec2 v1 = mapVertices[0].mapv[mapind.y];
     vec2 v2 = mapVertices[0].mapv[mapind.z];
-
+*/
     ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 1],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 2]);  //
@@ -392,7 +379,6 @@ void main()
       color = texture(texSampler0, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
     else
       color = texture(texSampler1, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
-  */
   }
   pld = vec4(color, 1.0);
 }
