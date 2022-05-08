@@ -171,6 +171,8 @@ std::unique_ptr<AEBufferAS> gibPlane;
 std::unique_ptr<AEDrawObjectBaseObjFile> gWoman;
 std::unique_ptr<AEBufferAS> gvbWoman;
 std::vector<std::unique_ptr<AEBufferAS>> gibWomans;
+std::unique_ptr<AEBufferAS> gmapVbWoman;
+std::unique_ptr<AEBufferAS> gmapIbWoman;
 std::vector<std::unique_ptr<AETextureImage>> gWomanTextures;
 std::vector<AEDescriptorSet*> gDescriptorSets;
 AEDescriptorSet* gWomanTextureSets;
@@ -364,13 +366,13 @@ bool CreateBuffers(void) {
   gvbWoman->CreateBuffer();
   gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
                      gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
-  for(uint32_t i = 0; i < gWomanCollada->GetMaterialSize(); i++)
+  for(uint32_t i = 0; i < 1; i++)
   {
-    std::unique_ptr<AEBufferAS> ib(new AEBufferAS(gDevice, sizeof(uint32_t) * gWomanCollada->GetIndexAddress(i).size(),
+    std::unique_ptr<AEBufferAS> ib(new AEBufferAS(gDevice, sizeof(uint32_t) * gWomanCollada->GetIndexAddress().size(),
                                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     ib->CreateBuffer();
-    ib->CopyData((void *) gWomanCollada->GetIndexAddress(i).data(), 0,
-                       sizeof(uint32_t) * gWomanCollada->GetIndexAddress(i).size(),
+    ib->CopyData((void *) gWomanCollada->GetIndexAddress().data(), 0,
+                       sizeof(uint32_t) * gWomanCollada->GetIndexAddress().size(),
                        gQueue, gCommandPool);
     gibWomans.emplace_back(std::move(ib));
   }
@@ -390,17 +392,14 @@ bool CreateBuffers(void) {
   BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(), *gvbPlane->GetBuffer(), *gibPlane->GetBuffer()};
   BLASGeometryInfo womanInfo0 = {sizeof(Vertex3DObj), gWomanCollada->GetVertexSize(), (uint32_t)gWomanCollada->GetIndexAddress(0).size(),
                                 *gvbWoman->GetBuffer(), *gibWomans[0]->GetBuffer()};
-  BLASGeometryInfo womanInfo1 = {sizeof(Vertex3DObj), gWomanCollada->GetVertexSize(), (uint32_t)gWomanCollada->GetIndexAddress(1).size(),
-                                *gvbWoman->GetBuffer(), *gibWomans[1]->GetBuffer()};
   std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
   std::vector<BLASGeometryInfo> geometryPlane = {planeInfo};
-  std::vector<BLASGeometryInfo> geometryWoman0 = {womanInfo0, womanInfo1};
-  std::vector<BLASGeometryInfo> geometryWoman1 = {womanInfo1};
+  std::vector<BLASGeometryInfo> geometryWoman0 = {womanInfo0};
   aslsPlane = std::make_unique<AERayTracingASBottom>(gDevice, geometryPlane, &modelview, gQueue, gCommandPool);
   aslsCubes = std::make_unique<AERayTracingASBottom>(gDevice, geometryCubes, &modelview, gQueue, gCommandPool);
   aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman0, &phoenixModelView, gQueue, gCommandPool);
   //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
-  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsCubes.get(), aslsWoman.get()/*, aslsWoman1.get()*/};
+  std::vector<AERayTracingASBottom*> bottoms= {aslsWoman.get()/*, aslsWoman1.get()*/};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
   return true;
 }
@@ -421,8 +420,10 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
@@ -536,7 +537,7 @@ bool InitVulkan(android_app* app) {
                         0.1f, 100.0f);
   modelview.view = glm::mat4(1.0f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-  phoenixModelView.rotate = glm::rotate(glm::mat4(1.0f), 90.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+  phoenixModelView.rotate = glm::rotate(glm::mat4(1.0f), 0.0f, glm::vec3(1.0f, 0.0f, 0.0f));
   phoenixModelView.scale = glm::mat4(1.0f);
   phoenixModelView.translate = glm::mat4(1.0f);
   phoenixModelView.proj = glm::mat4(1.0f);
@@ -583,6 +584,21 @@ bool InitVulkan(android_app* app) {
   gUboRTBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(UBORT));
   gUboRTBuffer->CreateBuffer();
   gUboRTBuffer->CopyData((void*)&uboRT, sizeof(UBORT));
+  //create map buffer
+  gmapVbWoman = std::make_unique<AEBufferAS>(gDevice, sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(),
+                                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gmapVbWoman->CreateBuffer();
+  gmapVbWoman->CopyData((void*)gWomanCollada->GetMapsAddress().data(), 0,
+                        sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(), gQueue, gCommandPool);
+  VkDeviceSize totalMapIndices = 0;
+  for(auto mapIndex : gWomanCollada->GetMapIndices())
+    totalMapIndices += mapIndex.size();
+  gmapIbWoman = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * totalMapIndices, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gmapIbWoman->CreateBuffer();
+  gmapIbWoman->CopyData((void*)gWomanCollada->GetEachMapIndices(0).data(), 0,
+                        sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(0).size(), gQueue, gCommandPool);
+  gmapIbWoman->CopyData((void*)gWomanCollada->GetEachMapIndices(1).data(), sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(0).size(),
+                        sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(1).size(), gQueue, gCommandPool);
   //descriptor set
   gDescriptorSet = new AEDescriptorSet(gDevice, gLayouts[0], gDescriptorPool);
   gDescriptorSet->BindAccelerationStructure(0, astop.get());
@@ -596,11 +612,13 @@ bool InitVulkan(android_app* app) {
                                         {gXZPlane->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(), gWomanCollada->GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffers(6, {*gibWomans[0]->GetBuffer(), *gibWomans[1]->GetBuffer()},
-                                        {sizeof(uint32_t) * gWomanCollada->GetIndexAddress(0).size(), sizeof(uint32_t) * gWomanCollada->GetIndexAddress(1).size()},
+  gDescriptorSet->BindDescriptorBuffer(6, gibWomans[0]->GetBuffer(),
+                                        gWomanCollada->GetIndexBufferSize(),
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-//  gDescriptorSet->BindDescriptorBuffer(7, gWomanOffset->GetBuffer(), sizeof(uint32_t) * gWomanCollada->GetTextureCount(),
-//                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(7, gmapVbWoman->GetBuffer(), sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(),
+                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(8, gmapIbWoman->GetBuffer(), sizeof(uint32_t) * totalMapIndices,
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);

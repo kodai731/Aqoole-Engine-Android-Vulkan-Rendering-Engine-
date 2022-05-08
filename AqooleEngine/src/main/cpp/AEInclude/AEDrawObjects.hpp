@@ -236,6 +236,9 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     std::vector<uint32_t>const& GetOffsetAll(){return mOffsets;}
     std::vector<uint32_t>const& GetIndexAddress(uint32_t index)const{return mPositionIndices[index];}
     std::vector<uint32_t>const& GetMapIndexAddress(uint32_t index)const{return mMapIndices[index];}
+    std::vector<glm::vec2>const& GetMapsAddress()const{return mMaps;}
+    std::vector<uint32_t>const& GetEachMapIndices(uint32_t index)const{return mMapIndices[index];}
+    std::vector<std::vector<uint32_t>>const& GetMapIndices()const{return mMapIndices;}
     uint32_t GetMaterialSize(){return mPositionIndices.size();}
     //scale
     void Scale(float scale);

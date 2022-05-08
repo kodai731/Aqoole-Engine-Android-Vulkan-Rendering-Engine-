@@ -871,7 +871,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                             for(uint32_t i = 0; i < size; i++)
                             {
                                 oneVec2.x = std::stof(fields[i * 2]);
-                                oneVec2.y = std::stof(fields[i * 2 + 1]);
+                                oneVec2.y = 1.0f - std::stof(fields[i * 2 + 1]);
                                 //mVertices[i].texcoord = oneVec2;
                                 mMaps.emplace_back(oneVec2);
                             }
@@ -890,8 +890,8 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                         mMapIndices.emplace_back(indices);
                         for(uint32_t i = 0; i < size; i++)
                         {
-                            mPositionIndices[mPositionIndices.size() - 1].push_back(std::stoi(fields[i * 3]));
-                            mNormalsIndices[mNormalsIndices.size() - 1].push_back(std::stoi(fields[i * 3 + 1]));
+                            mPositionIndices[mPositionIndices.size() - 1].emplace_back(std::stoi(fields[i * 3]));
+                            mNormalsIndices[mNormalsIndices.size() - 1].emplace_back(std::stoi(fields[i * 3 + 1]));
                             mMapIndices[mMapIndices.size() - 1].emplace_back(std::stoi(fields[i * 3 + 2]));
                         }
                     }
@@ -1095,15 +1095,21 @@ make vertices data
 */
 void AEDrawObjectBaseCollada::MakeVertices()
 {
-    uint32_t vertices = mPositions.size();
+    uint32_t materials = mPositionIndices.size();
     Vertex3DObj oneVertex;
-    oneVertex.texcoord = glm::vec2(0.5f, 0.5f);
-    for(uint32_t i = 0; i < vertices; i++)
+    uint32_t index = 0;
+    for(uint32_t i = 0; i < materials; i++)
     {
-        oneVertex.pos = mPositions[i];
-        oneVertex.normal = mNormals[i];
-        oneVertex.texcoord = mMaps[i];
-        mVertices.push_back(oneVertex);
+        uint32_t vertices = mPositionIndices[i].size();
+        for(uint32_t j = 0; j < vertices; j++)
+        {
+            oneVertex.pos = mPositions[mPositionIndices[i][j]];
+            oneVertex.normal = mNormals[mNormalsIndices[i][j]];
+            oneVertex.texcoord = mMaps[mMapIndices[i][j]];
+            mVertices.emplace_back(oneVertex);
+            mIndices.emplace_back(index);
+            index++;
+        }
     }
 }
 
