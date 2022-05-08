@@ -537,7 +537,7 @@ bool InitVulkan(android_app* app) {
                         0.1f, 100.0f);
   modelview.view = glm::mat4(1.0f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-  phoenixModelView.rotate = glm::rotate(glm::mat4(1.0f), 0.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+  phoenixModelView.rotate = glm::rotate(glm::mat4(1.0f), -90.0f, glm::vec3(1.0f, 0.0f, 0.0f));
   phoenixModelView.scale = glm::mat4(1.0f);
   phoenixModelView.translate = glm::mat4(1.0f);
   phoenixModelView.proj = glm::mat4(1.0f);
@@ -778,6 +778,7 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     }
     //cameraPos += glm::vec3(0.0f, 0.0f, 0.1f);
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
+    phoenixModelView.view = modelview.view;
     glm::mat4 modelViewInverse = glm::inverse(
             modelview.translate * modelview.rotate * modelview.scale);
     modelViewInverse = glm::transpose(modelViewInverse);
@@ -787,9 +788,9 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     uboRT.normalMatrix = modelViewInverse;
     gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
     //update AS
-    aslsPlane->Update(&modelview, gQueue, gCommandPool);
-    aslsCubes->Update(&modelview, gQueue, gCommandPool);
-    aslsWoman->Update(&modelview, gQueue, gCommandPool);
+    //aslsPlane->Update(&modelview, gQueue, gCommandPool);
+    //aslsCubes->Update(&modelview, gQueue, gCommandPool);
+    //aslsWoman->Update(&modelview, gQueue, gCommandPool);
     //aslsWoman1->Update(&modelview, gQueue, gCommandPool);
   }
 //  astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
