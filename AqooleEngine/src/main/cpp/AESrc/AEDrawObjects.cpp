@@ -898,6 +898,21 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
         }
+        //read animations
+        ptree animationNode = tree.get_child("COLLADA.library_animations");
+        for(const ptree::value_type& node : animationNode.get_child("animation"))
+        {
+            std::string id;
+            if(strcmp(node.first.data(), "<xmlattr>") == 0)
+            {
+                id = (node.second.get_optional<std::string>("id"))->c_str();
+            }
+            if(strcmp(node.first.data(), "animation") == 0)
+            {
+                 std::string animationId = node.second.get_optional<std::string>("<xmlattr>.id")->c_str();
+                 ReadAnimation(node, animationId);
+            }
+        }
         //read library_visual_scenes
         ptree visualNodes = tree.get_child("COLLADA.library_visual_scenes.visual_scene");
         auto numChildren = visualNodes.size() - visualNodes.count("<xmlattr>");
@@ -1149,6 +1164,36 @@ void AEDrawObjectBaseCollada::ReadSkeletonNode(boost::property_tree::ptree::cons
         ReadSkeletonNode(child, node);
         skeletonNode->children.push_back(std::move(node));
     }
+}
+
+/*
+ * read animation data time and matrix
+ */
+void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::value_type& node, const std::string& animationId)
+{
+    using namespace boost::property_tree;
+    AnimationMatrix a{};
+    a.id = animationId;
+    for(const ptree::value_type& source : node.second.get_child("source"))
+    {
+        auto sourceId = source.first.data();
+        if(strcmp(sourceId, "<xmlattr>") == 0)
+            continue;
+        if(strcmp(sourceId, "float_array") == 0)
+        {
+            if (std::regex_search(source.second.get_optional<std::string>("<xmlattr>.id")->c_str(), std::regex("input")))
+            {
+                std::string timeListS = source.second.get<std::string>("");
+                std::vector<std::string> timeList;
+                AEDrawObject::Split(timeList, timeListS, ' ');
+                for (uint32_t i = 0; i < timeList.size(); i++) {
+                    float time = std::stof(timeList[i]);
+                    a.timeList.emplace_back(time);
+                }
+            }
+        }
+    }
+    mAnimationMatrices.emplace_back(a);
 }
 
 /*

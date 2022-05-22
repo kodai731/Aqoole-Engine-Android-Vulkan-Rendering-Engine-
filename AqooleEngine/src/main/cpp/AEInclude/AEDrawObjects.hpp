@@ -36,6 +36,7 @@
 #include "boost/property_tree/xml_parser.hpp"
 #include "boost/foreach.hpp"
 #include "boost/lexical_cast.hpp"
+#include "regex"
 
 
 /*
@@ -198,6 +199,12 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
         std::vector<uint32_t> jointIndices;
         std::vector<float> weights; 
     };
+    struct AnimationMatrix
+    {
+        std::string id;
+        std::vector<float> timeList;
+        std::vector<glm::mat4> matrixList;
+    };
     std::vector<Vertex3DObj> mVertices;
     std::vector<std::string> mMaterials;
     std::vector<uint32_t> mOffsets;
@@ -214,6 +221,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     std::vector<std::string> mSkinJointsArray;
     std::vector<AEDrawObjectBaseCollada::JointWeight> mJointWeights;
     std::vector<glm::mat4> mInverseMatrices;
+    std::vector<AnimationMatrix> mAnimationMatrices;
     //functions
     void ProcessGeometry(std::ifstream &file);
     void MakeVertices();
@@ -221,6 +229,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
         std::unique_ptr<AEDrawObjectBaseCollada::SkeletonNode>& skeletonNode);
     void DebugRootNode();
     void GetVertexWeights(std::vector<float> &vertexWeights, std::string const& weightString);
+    void ReadAnimation(const boost::property_tree::ptree::value_type& node, const std::string& animationId);
     public:
     AEDrawObjectBaseCollada(const char* filePath, android_app* app);
     virtual ~AEDrawObjectBaseCollada();
