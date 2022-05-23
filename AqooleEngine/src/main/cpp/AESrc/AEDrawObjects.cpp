@@ -1174,21 +1174,41 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
     using namespace boost::property_tree;
     AnimationMatrix a{};
     a.id = animationId;
-    for(const ptree::value_type& source : node.second.get_child("source"))
+    BOOST_FOREACH(const auto& source, node.second.get_child(""))
     {
-        auto sourceId = source.first.data();
-        if(strcmp(sourceId, "<xmlattr>") == 0)
+        auto childId = source.first.data();
+        if(strcmp(childId, "<xmlattr>") == 0)
             continue;
-        if(strcmp(sourceId, "float_array") == 0)
+        if(strcmp(childId, "source") == 0)
         {
+            auto floatId = source.second.get_optional<std::string>("<xmlattr>.id")->c_str();
             if (std::regex_search(source.second.get_optional<std::string>("<xmlattr>.id")->c_str(), std::regex("input")))
             {
-                std::string timeListS = source.second.get<std::string>("");
+                std::string timeListS = source.second.get<std::string>("float_array");
                 std::vector<std::string> timeList;
                 AEDrawObject::Split(timeList, timeListS, ' ');
                 for (uint32_t i = 0; i < timeList.size(); i++) {
                     float time = std::stof(timeList[i]);
                     a.timeList.emplace_back(time);
+                }
+            }
+            else if(std::regex_search(source.second.get_optional<std::string>("<xmlattr>.id")->c_str(), std::regex("output")))
+            {
+                std::string matrixListS = source.second.get<std::string>("float_array");
+                std::vector<std::string> matrixList;
+                AEDrawObject::Split(matrixList, matrixListS, ' ');
+                for (uint32_t i = 0; i < matrixList.size(); i =  i + 16)
+                {
+                    glm::mat4 m;
+                    for(uint32_t j = 0; j < 4; j++)
+                    {
+                        for(uint32_t k = 0; k < 4; k++)
+                        {
+                            float e = std::stof(matrixList[i + (4 * j) + k]);
+                            m[j][k] = e;
+                        }
+                    }
+                    a.matrixList.emplace_back(m);
                 }
             }
         }
