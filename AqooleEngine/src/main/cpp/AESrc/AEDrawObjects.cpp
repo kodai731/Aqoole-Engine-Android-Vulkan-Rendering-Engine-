@@ -918,7 +918,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
         auto numChildren = visualNodes.size() - visualNodes.count("<xmlattr>");
         for(ptree::const_iterator obj = visualNodes.begin(); obj != visualNodes.end(); ++obj)
         {
-            //jump if first is <xmlattr>
+            //skip if first is <xmlattr>
             if(strncmp(obj->first.data(), "<xmlattr>", 10) == 0)
                 continue;
             //skeleton is node
@@ -1146,7 +1146,10 @@ void AEDrawObjectBaseCollada::ReadSkeletonNode(boost::property_tree::ptree::cons
     std::string strrrr = nowNode->second.data();
     auto sidName = nowNode->second.get_optional<std::string>("<xmlattr>.sid");
     if(sidName.is_initialized())
+    {
         skeletonNode->sidName = sidName.get();
+        skeletonNode->id = nowNode->second.get_optional<std::string>("<xmlattr>.id")->c_str();
+    }
     //matrix
     std::vector<std::string> fields;
     std::string matrixString = nowNode->second.get_optional<std::string>("matrix").get();
@@ -1211,6 +1214,11 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
                     a.matrixList.emplace_back(m);
                 }
             }
+        }
+        if(strcmp(childId, "channel") == 0)
+        {
+            std::string target = source.second.get_optional<std::string>("<xmlattr>.target")->c_str();
+            a.target = target.replace(target.find("/transform"), 10, "");
         }
     }
     mAnimationMatrices.emplace_back(a);

@@ -192,6 +192,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     {
         glm::mat4 matrix;
         std::string sidName;
+        std::string id;
         std::vector<std::unique_ptr<SkeletonNode>> children;
     };
     struct JointWeight
@@ -204,6 +205,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
         std::string id;
         std::vector<float> timeList;
         std::vector<glm::mat4> matrixList;
+        std::string target;
     };
     std::vector<Vertex3DObj> mVertices;
     std::vector<std::string> mMaterials;
