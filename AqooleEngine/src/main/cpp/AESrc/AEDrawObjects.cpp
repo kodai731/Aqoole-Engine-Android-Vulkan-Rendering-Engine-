@@ -923,7 +923,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                  ReadAnimation(node, animationId);
             }
         }
-        /*
         //read library_visual_scenes
         ptree visualNodes = tree.get_child("COLLADA.library_visual_scenes.visual_scene");
         auto numChildren = visualNodes.size() - visualNodes.count("<xmlattr>");
@@ -932,16 +931,14 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             //skip if first is <xmlattr>
             if(strncmp(obj->first.data(), "<xmlattr>", 10) == 0)
                 continue;
+            //check type joint
+            if(obj->second.get_optional<std::string>("<xmlattr>.type") == boost::none)
+                continue;
             //skeleton is node
             auto nodeId = obj->second.get_optional<std::string>("<xmlattr>.id").get();
-            if(strncmp(nodeId.c_str(), "Armature", 9) == 0)
-            {
-                if(std::strncmp(nodeId.c_str(), "Armature", 9) == 0)
-                {
-                    ReadSkeletonNode(obj, mRoot);
-                }
-            }
+            ReadSkeletonNode(obj, mRoot);
         }
+        /*
         //read skinning information
         //bind_shape_matrix
         ptree skinNodes = tree.get_child("COLLADA.library_controllers.controller.skin");
