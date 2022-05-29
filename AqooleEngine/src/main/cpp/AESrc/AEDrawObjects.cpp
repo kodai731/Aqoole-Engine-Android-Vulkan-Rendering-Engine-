@@ -57,7 +57,7 @@ void AEDrawObject::Split(std::vector<std::string> &fields, std::string const& on
     while (std::getline(stream, field, delimiter)) 
         fields.push_back(field);
     //check the head is EOL or not
-    if(strcmp(fields[0].c_str(), "") == 0)
+    while(strcmp(fields[0].c_str(), "") == 0)
         fields.erase(fields.begin());
 }
 
@@ -903,7 +903,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
         }
-        /*
         //read animations
         ptree animationNode = tree.get_child("COLLADA.library_animations");
         std::string animationId;
@@ -918,6 +917,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                  ReadAnimation(node, animationId);
             }
         }
+        /*
         //read library_visual_scenes
         ptree visualNodes = tree.get_child("COLLADA.library_visual_scenes.visual_scene");
         auto numChildren = visualNodes.size() - visualNodes.count("<xmlattr>");
@@ -1196,6 +1196,7 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
             if (std::regex_search(source.second.get_optional<std::string>("<xmlattr>.id")->c_str(), std::regex("input")))
             {
                 std::string timeListS = source.second.get<std::string>("float_array");
+                timeListS = std::regex_replace(timeListS, std::regex("\n"), " ");
                 std::vector<std::string> timeList;
                 AEDrawObject::Split(timeList, timeListS, ' ');
                 for (uint32_t i = 0; i < timeList.size(); i++) {
@@ -1206,6 +1207,7 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
             else if(std::regex_search(source.second.get_optional<std::string>("<xmlattr>.id")->c_str(), std::regex("output")))
             {
                 std::string matrixListS = source.second.get<std::string>("float_array");
+                matrixListS = std::regex_replace(matrixListS, std::regex("\n"), " ");
                 std::vector<std::string> matrixList;
                 AEDrawObject::Split(matrixList, matrixListS, ' ');
                 for (uint32_t i = 0; i < matrixList.size(); i =  i + 16)
@@ -1226,7 +1228,7 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
         if(strcmp(childId, "channel") == 0)
         {
             std::string target = source.second.get_optional<std::string>("<xmlattr>.target")->c_str();
-            a.target = target.replace(target.find("/transform"), 10, "");
+            a.target = target.replace(target.find("/"), target.size() - target.find("/"), "");
         }
     }
     mAnimationMatrices.emplace_back(a);
