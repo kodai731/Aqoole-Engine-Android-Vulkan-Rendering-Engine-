@@ -179,7 +179,7 @@ AEDescriptorSet* gWomanTextureSets;
 std::unique_ptr<AEBufferAS> gWomanOffset;
 std::string fuse1ObjPath("fuse-woman-1/source/woman.obj");
 std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
-std::string fuse1Collada("phoenix-bird/phoenix-bird.dae");
+std::string fuse1Collada("phoenix-bird/fly.dae");
 std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
 

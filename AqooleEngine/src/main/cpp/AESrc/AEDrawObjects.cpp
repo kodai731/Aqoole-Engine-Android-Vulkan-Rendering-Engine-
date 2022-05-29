@@ -56,6 +56,9 @@ void AEDrawObject::Split(std::vector<std::string> &fields, std::string const& on
     fields.clear();
     while (std::getline(stream, field, delimiter)) 
         fields.push_back(field);
+    //check the head is EOL or not
+    if(strcmp(fields[0].c_str(), "") == 0)
+        fields.erase(fields.begin());
 }
 
 /*
@@ -839,10 +842,11 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                             "float_array.<xmlattr>.id");
                         auto floatArrayStr = floatArrayId.get();
                         //positions or normals
-                        if(floatArrayStr.find("positions") != std::string::npos || 
-                            floatArrayStr.find("normals") != std::string::npos)
+                        if(std::regex_search(floatArrayStr.c_str(), std::regex("position", std::regex::icase)) ||
+                                std::regex_search(floatArrayStr.c_str(), std::regex("normal", std::regex::icase)))
                         {
                             std::string oneLinePositions = geometryChild.second.get<std::string>("float_array");
+                            oneLinePositions = std::regex_replace(oneLinePositions, std::regex("\n"), " ");
                             AEDrawObject::Split(fields, oneLinePositions, ' ');
                             uint32_t size = fields.size() / 3;
                             for(uint32_t i = 0; i < size; i++)
@@ -850,22 +854,24 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                                 oneVec3.x = std::stof(fields[i * 3]);
                                 oneVec3.y = std::stof(fields[i * 3 + 1]);
                                 oneVec3.z = std::stof(fields[i * 3 + 2]);
-                                if(floatArrayStr.find("positions") != std::string::npos)
+                                if(std::regex_search(floatArrayStr.c_str(), std::regex("position", std::regex::icase)))
                                 {
                                     //one3DObj.pos = oneVec3;
                                     //mVertices.push_back(one3DObj);
                                     mPositions.push_back(oneVec3);
                                 }
-                                else if(floatArrayStr.find("normals") != std::string::npos)
+                                else if(std::regex_search(floatArrayStr.c_str(), std::regex("normal", std::regex::icase)))
                                 {
                                     //mVertices[i].normal = oneVec3;
                                     mNormals.push_back(oneVec3);
                                 }
                             }
                         }
-                        else if(floatArrayStr.find("map") != std::string::npos)
+                        else if(std::regex_search(floatArrayStr.c_str(), std::regex("map", std::regex::icase)) ||
+                                std::regex_search(floatArrayStr.c_str(), std::regex("uv", std::regex::icase)))
                         {
                             std::string oneLinePositions = geometryChild.second.get<std::string>("float_array");
+                            oneLinePositions = std::regex_replace(oneLinePositions, std::regex("\n"), " ");
                             AEDrawObject::Split(fields, oneLinePositions, ' ');
                             uint32_t size = fields.size() / 2;
                             for(uint32_t i = 0; i < size; i++)
@@ -875,7 +881,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                                 //mVertices[i].texcoord = oneVec2;
                                 mMaps.emplace_back(oneVec2);
                             }
-
                         }
                     }
                     //triangles
