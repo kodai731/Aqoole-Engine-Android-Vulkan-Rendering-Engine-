@@ -537,7 +537,7 @@ bool InitVulkan(android_app* app) {
                         0.1f, 100.0f);
   modelview.view = glm::mat4(1.0f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-  phoenixModelView.rotate = glm::rotate(glm::mat4(1.0f), -90.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+  phoenixModelView.rotate = glm::rotate(glm::mat4(1.0f), (float)M_PI * 0.25f, glm::vec3(1.0f, 0.0f, 0.0f));
   phoenixModelView.scale = glm::mat4(1.0f);
   phoenixModelView.translate = glm::mat4(1.0f);
   phoenixModelView.proj = glm::mat4(1.0f);

@@ -821,7 +821,13 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             if (boost::optional<std::string> imageId = images.second.get_optional<std::string>("<xmlattr>.id"))
             {
                 auto imageChild = images.second.get_child("init_from");
-                mTextureFiles.emplace_back(std::string(imageChild.data()));
+                std::string imageName(imageChild.data());
+                while(imageName.find("\\") != std::string::npos)
+                {
+                    imageName.replace(0, imageName.find("\\") + 1, "");
+                }
+                imageName += std::string(".png");
+                mTextureFiles.emplace_back(imageName);
             }
         }
         //read geometry
@@ -1059,8 +1065,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
         }
         */
          MakeVertices();
-         //temporary clear
-         mTextureFiles.clear();
     }
 }
 
