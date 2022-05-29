@@ -903,18 +903,18 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
         }
+        /*
         //read animations
         ptree animationNode = tree.get_child("COLLADA.library_animations");
+        std::string animationId;
         for(const ptree::value_type& node : animationNode.get_child("animation"))
         {
-            std::string id;
             if(strcmp(node.first.data(), "<xmlattr>") == 0)
             {
-                id = (node.second.get_optional<std::string>("id"))->c_str();
+                animationId = (node.second.get_optional<std::string>("id"))->c_str();
             }
             if(strcmp(node.first.data(), "animation") == 0)
             {
-                 std::string animationId = node.second.get_optional<std::string>("<xmlattr>.id")->c_str();
                  ReadAnimation(node, animationId);
             }
         }
@@ -1057,7 +1057,10 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
         }
-        MakeVertices();
+        */
+         MakeVertices();
+         //temporary clear
+         mTextureFiles.clear();
     }
 }
 
