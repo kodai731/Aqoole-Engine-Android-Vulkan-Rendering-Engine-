@@ -49,12 +49,14 @@ load model
 /*
 split
 */
-void AEDrawObject::Split(std::vector<std::string> &fields, std::string const& oneLine, const char delimiter)
+void AEDrawObject::Split(std::vector<std::string> &fields, std::string& oneLine, const char delimiter)
 {
+    oneLine = std::regex_replace(oneLine, std::regex("\n"), " ");
     std::istringstream stream(oneLine);
     std::string field;
     fields.clear();
-    while (std::getline(stream, field, delimiter)) 
+    //format oneline
+    while (std::getline(stream, field, delimiter))
         fields.push_back(field);
     //check the head is EOL or not
     while(strcmp(fields[0].c_str(), "") == 0)
@@ -852,7 +854,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                                 std::regex_search(floatArrayStr.c_str(), std::regex("normal", std::regex::icase)))
                         {
                             std::string oneLinePositions = geometryChild.second.get<std::string>("float_array");
-                            oneLinePositions = std::regex_replace(oneLinePositions, std::regex("\n"), " ");
                             AEDrawObject::Split(fields, oneLinePositions, ' ');
                             uint32_t size = fields.size() / 3;
                             for(uint32_t i = 0; i < size; i++)
@@ -877,7 +878,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                                 std::regex_search(floatArrayStr.c_str(), std::regex("uv", std::regex::icase)))
                         {
                             std::string oneLinePositions = geometryChild.second.get<std::string>("float_array");
-                            oneLinePositions = std::regex_replace(oneLinePositions, std::regex("\n"), " ");
                             AEDrawObject::Split(fields, oneLinePositions, ' ');
                             uint32_t size = fields.size() / 2;
                             for(uint32_t i = 0; i < size; i++)
@@ -938,7 +938,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             auto nodeId = obj->second.get_optional<std::string>("<xmlattr>.id").get();
             ReadSkeletonNode(obj, mRoot);
         }
-        /*
         //read skinning information
         //bind_shape_matrix
         ptree skinNodes = tree.get_child("COLLADA.library_controllers.controller.skin");
@@ -960,8 +959,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             //source id = skin-joints
             if(strncmp(obj->first.data(), "source", 7) == 0)
             {
-                if(obj->second.get_optional<std::string>("<xmlattr>.id").get().find("skin-joints") !=
-                    std::string::npos)
+                if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("joint", std::regex::icase)))
                 {
                     for(boost::property_tree::ptree::const_iterator child = obj->second.begin();
                         child != obj->second.end(); ++child)
@@ -977,8 +975,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             //source id = skin-weights
             if(strncmp(obj->first.data(), "source", 7) == 0)
             {
-                if(obj->second.get_optional<std::string>("<xmlattr>.id").get().find("skin-weights") !=
-                    std::string::npos)
+                if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("weight", std::regex::icase)))
                 {
                     for(boost::property_tree::ptree::const_iterator child = obj->second.begin();
                         child != obj->second.end(); ++child)
@@ -1012,6 +1009,12 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                         oneJointWeight.weights.push_back(std::stof(vertexWeights[std::stoi(jointWeightList[nowPointing])]));
                         nowPointing++;
                     }
+                    //check total weight
+                    float total = 0.0f;
+                    for(uint32_t j = 0; j < influenceCount; j++)
+                        total += oneJointWeight.weights[j];
+                    if( !(0.99f < total && total < 1.01f))
+                        __android_log_print(ANDROID_LOG_DEBUG, "collada", "total weight is not 1.0f", 0);
                     mJointWeights.push_back(oneJointWeight);
                 }
             }
@@ -1060,7 +1063,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
         }
-        */
          MakeVertices();
     }
 }
@@ -1197,7 +1199,6 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
             if (std::regex_search(source.second.get_optional<std::string>("<xmlattr>.id")->c_str(), std::regex("input")))
             {
                 std::string timeListS = source.second.get<std::string>("float_array");
-                timeListS = std::regex_replace(timeListS, std::regex("\n"), " ");
                 std::vector<std::string> timeList;
                 AEDrawObject::Split(timeList, timeListS, ' ');
                 for (uint32_t i = 0; i < timeList.size(); i++) {
@@ -1208,7 +1209,6 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
             else if(std::regex_search(source.second.get_optional<std::string>("<xmlattr>.id")->c_str(), std::regex("output")))
             {
                 std::string matrixListS = source.second.get<std::string>("float_array");
-                matrixListS = std::regex_replace(matrixListS, std::regex("\n"), " ");
                 std::vector<std::string> matrixList;
                 AEDrawObject::Split(matrixList, matrixListS, ' ');
                 for (uint32_t i = 0; i < matrixList.size(); i =  i + 16)
@@ -1247,7 +1247,7 @@ void AEDrawObjectBaseCollada::DebugRootNode()
 get vertex weights
 */
 void AEDrawObjectBaseCollada::GetVertexWeights(std::vector<float> &vertexWeights,
-    std::string const& weightString)
+    std::string& weightString)
 {
     std::vector<std::string> fields;
     AEDrawObject::Split(fields, weightString, ' ');

@@ -29,6 +29,7 @@
 #include <fstream>
 #include <random>
 #include <thread>
+#include <android/log.h>
 #include <android_native_app_glue.h>
 #include <cstring>
 #include <limits>
@@ -53,7 +54,7 @@ namespace AEDrawObject
     void AddOffsetToIndex(std::vector<uint32_t> &indices, uint32_t offset);
     void LoadModel();
     //for private
-    void Split(std::vector<std::string> &fields, std::string const& oneLine, const char delimiter);
+    void Split(std::vector<std::string> &fields, std::string& oneLine, const char delimiter);
     void GetInAngleBrackets(std::string &output, std::string const& oneLine);
 }
 
@@ -230,7 +231,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     void ReadSkeletonNode(boost::property_tree::ptree::const_iterator nowNode,
         std::unique_ptr<AEDrawObjectBaseCollada::SkeletonNode>& skeletonNode);
     void DebugRootNode();
-    void GetVertexWeights(std::vector<float> &vertexWeights, std::string const& weightString);
+    void GetVertexWeights(std::vector<float> &vertexWeights, std::string& weightString);
     void ReadAnimation(const boost::property_tree::ptree::value_type& node, const std::string& animationId);
     public:
     AEDrawObjectBaseCollada(const char* filePath, android_app* app);
