@@ -207,6 +207,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
         std::vector<float> timeList;
         std::vector<glm::mat4> matrixList;
         std::string target;
+        uint32_t jointNo;
     };
     std::vector<Vertex3DObj> mVertices;
     std::vector<std::string> mMaterials;

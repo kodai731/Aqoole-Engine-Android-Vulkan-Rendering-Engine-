@@ -1129,6 +1129,18 @@ void AEDrawObjectBaseCollada::MakeVertices()
             index++;
         }
     }
+    //joint No
+    for(auto& anim : mAnimationMatrices)
+    {
+        for(uint32_t i = 0; i < mSkinJointsArray.size(); i++)
+        {
+            if(anim.target == mSkinJointsArray[i])
+            {
+                anim.jointNo = i;
+                break;
+            }
+        }
+    }
 }
 
 /*
