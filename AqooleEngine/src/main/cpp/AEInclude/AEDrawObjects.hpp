@@ -225,6 +225,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     std::vector<AEDrawObjectBaseCollada::JointWeight> mJointWeights;
     std::vector<glm::mat4> mInverseMatrices;
     std::vector<AnimationMatrix> mAnimationMatrices;
+    glm::mat4 mBSM;
     //functions
     void ProcessGeometry(std::ifstream &file);
     void MakeVertices();
@@ -232,7 +233,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
         std::unique_ptr<AEDrawObjectBaseCollada::SkeletonNode>& skeletonNode);
     void DebugRootNode();
     void GetVertexWeights(std::vector<float> &vertexWeights, std::string& weightString);
-    void ReadAnimation(const boost::property_tree::ptree::value_type& node, const std::string& animationId);
+    void ReadAnimation(const boost::property_tree::ptree::value_type& node);
     public:
     AEDrawObjectBaseCollada(const char* filePath, android_app* app);
     virtual ~AEDrawObjectBaseCollada();

@@ -910,18 +910,9 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             }
         }
         //read animations
-        ptree animationNode = tree.get_child("COLLADA.library_animations");
-        std::string animationId;
-        for(const ptree::value_type& node : animationNode.get_child("animation"))
+        BOOST_FOREACH(const auto& animation, tree.get_child("COLLADA.library_animations"))
         {
-            if(strcmp(node.first.data(), "<xmlattr>") == 0)
-            {
-                animationId = (node.second.get_optional<std::string>("id"))->c_str();
-            }
-            if(strcmp(node.first.data(), "animation") == 0)
-            {
-                 ReadAnimation(node, animationId);
-            }
+            ReadAnimation(animation);
         }
         //read library_visual_scenes
         ptree visualNodes = tree.get_child("COLLADA.library_visual_scenes.visual_scene");
@@ -955,6 +946,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 for(uint32_t i = 0; i < 4; i++)
                     for(uint32_t j = 0; j < 4; j++)
                         bindShapeMatrix[i][j] = std::stof(fields[4 * i + j]);
+                mBSM = bindShapeMatrix;
             }
             //source id = skin-joints
             if(strncmp(obj->first.data(), "source", 7) == 0)
@@ -1183,12 +1175,14 @@ void AEDrawObjectBaseCollada::ReadSkeletonNode(boost::property_tree::ptree::cons
 /*
  * read animation data time and matrix
  */
-void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::value_type& node, const std::string& animationId)
+void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::value_type& node)
 {
     using namespace boost::property_tree;
     AnimationMatrix a{};
-    a.id = animationId;
-    BOOST_FOREACH(const auto& source, node.second.get_child(""))
+    std::string first = node.first.data();
+    if(node.second.get_optional<std::string>("<xmlattr>.id") != boost::none)
+        a.id = node.second.get_optional<std::string>("<xmlattr>.id").get();
+    BOOST_FOREACH(const auto& source, node.second.get_child("animation"))
     {
         auto childId = source.first.data();
         if(strcmp(childId, "<xmlattr>") == 0)
