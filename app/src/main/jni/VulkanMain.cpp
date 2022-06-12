@@ -1101,6 +1101,9 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
   if (isTouchButton(touchPositions, pauseButtonPos, buttonSize))                            // Buttons return true when clicked (most widgets return true when edited/activated)
   {
       isPaused = !isPaused;
+      gWomanCollada->Animation();
+      gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
+                         gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   }
   ImGui::SameLine();
   ImGui::End();

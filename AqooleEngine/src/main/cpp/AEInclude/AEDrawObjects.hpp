@@ -183,7 +183,7 @@ class AEDrawObjectBaseObjFile : public AEDrawObjectBase
 
 class AEDrawObjectBaseCollada : public AEDrawObjectBase
 {
-    protected:
+protected:
     struct Geometry
     {
         std::string geometryId;
@@ -195,6 +195,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
         std::string sidName;
         std::string id;
         std::vector<std::unique_ptr<SkeletonNode>> children;
+        uint32_t jointNo;
     };
     struct JointWeight
     {
@@ -207,7 +208,12 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
         std::vector<float> timeList;
         std::vector<glm::mat4> matrixList;
         std::string target;
-        uint32_t jointNo;
+    };
+    struct JointMapper
+    {
+        std::string jointName;
+        uint32_t animNo;
+        std::vector<uint32_t> indices;
     };
     std::vector<Vertex3DObj> mVertices;
     std::vector<std::string> mMaterials;
@@ -222,7 +228,7 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     std::vector<std::vector<uint32_t>> mNormalsIndices;
     std::vector<std::vector<uint32_t>> mMapIndices;
     std::unique_ptr<AEDrawObjectBaseCollada::SkeletonNode> mRoot;
-    std::vector<std::string> mSkinJointsArray;
+    std::vector<JointMapper> mSkinJointsArray;
     std::vector<AEDrawObjectBaseCollada::JointWeight> mJointWeights;
     std::vector<glm::mat4> mInverseMatrices;
     std::vector<AnimationMatrix> mAnimationMatrices;
@@ -235,7 +241,8 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     void DebugRootNode();
     void GetVertexWeights(std::vector<float> &vertexWeights, std::string& weightString);
     void ReadAnimation(const boost::property_tree::ptree::value_type& node);
-    public:
+    void SkeletonJointNo(SkeletonNode* node);
+public:
     AEDrawObjectBaseCollada(const char* filePath, android_app* app);
     virtual ~AEDrawObjectBaseCollada();
     //iterator
@@ -256,6 +263,8 @@ class AEDrawObjectBaseCollada : public AEDrawObjectBase
     uint32_t GetMaterialSize(){return mPositionIndices.size();}
     //scale
     void Scale(float scale);
+    //animation
+    void Animation();
 };
 
 /*

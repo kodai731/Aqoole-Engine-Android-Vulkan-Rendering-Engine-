@@ -960,7 +960,13 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                         if(strncmp(child->first.data(), "Name_array", 11) != 0)
                             continue;
                         std::string nameArrayString = child->second.get_value_optional<std::string>().get();
-                        AEDrawObject::Split(mSkinJointsArray, nameArrayString, ' ');
+                        AEDrawObject::Split(fields, nameArrayString, ' ');
+                        for(auto f : fields)
+                        {
+                            JointMapper j;
+                            j.jointName = f;
+                            mSkinJointsArray.emplace_back(j);
+                        }
                     }
                 }
             }
@@ -1008,6 +1014,9 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                     if( !(0.99f < total && total < 1.01f))
                         __android_log_print(ANDROID_LOG_DEBUG, "collada", "total weight is not 1.0f", 0);
                     mJointWeights.push_back(oneJointWeight);
+                    //mapping each positon to influenced joints
+                    for(auto jointNo : oneJointWeight.jointIndices)
+                        mSkinJointsArray[jointNo].indices.emplace_back(i);
                 }
             }
             //inverse matrices
@@ -1055,7 +1064,8 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
         }
-         MakeVertices();
+        Animation();
+        MakeVertices();
     }
 }
 
@@ -1127,18 +1137,6 @@ void AEDrawObjectBaseCollada::MakeVertices()
             mVertices.emplace_back(oneVertex);
             mIndices.emplace_back(index);
             index++;
-        }
-    }
-    //joint No
-    for(auto& anim : mAnimationMatrices)
-    {
-        for(uint32_t i = 0; i < mSkinJointsArray.size(); i++)
-        {
-            if(anim.target == mSkinJointsArray[i])
-            {
-                anim.jointNo = i;
-                break;
-            }
         }
     }
 }
@@ -1219,7 +1217,7 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
                 AEDrawObject::Split(matrixList, matrixListS, ' ');
                 for (uint32_t i = 0; i < matrixList.size(); i =  i + 16)
                 {
-                    glm::mat4 m;
+                    glm::mat4 m(1.0f);
                     for(uint32_t j = 0; j < 4; j++)
                     {
                         for(uint32_t k = 0; k < 4; k++)
@@ -1260,6 +1258,59 @@ void AEDrawObjectBaseCollada::GetVertexWeights(std::vector<float> &vertexWeights
     vertexWeights.resize(fields.size());
     for(uint32_t i = 0; i < fields.size(); i++)
         vertexWeights[i] = std::stof(fields[i]);
+}
+
+/*
+ * animation
+ *
+ */
+void AEDrawObjectBaseCollada::Animation()
+{
+    //joint mapper
+    for(auto& joint : mSkinJointsArray)
+    {
+        for(uint32_t i = 0; i < mAnimationMatrices.size(); i++)
+        {
+            if(joint.jointName == mAnimationMatrices[i].target)
+            {
+                joint.animNo = i;
+                break;
+            }
+        }
+    }
+    //mapping skeleton joint to joint array
+    SkeletonJointNo(mRoot.get());
+    //calc animation position
+    for (uint32_t i = 0; i < mPositions.size(); i++) {
+        glm::vec4 pos = glm::vec4(mPositions[i], 1.0f);
+        glm::vec4 newpos = glm::vec4(0.0f);
+        auto jw = mJointWeights[i];
+        for (uint32_t j = 0; j < jw.jointIndices.size(); j++) {
+            newpos += jw.weights[j] *
+                      pos * mBSM * mInverseMatrices[jw.jointIndices[j]] *
+                      mAnimationMatrices[mSkinJointsArray[jw.jointIndices[j]].animNo].matrixList[1];
+        }
+        mPositions[i] = glm::vec3(newpos.x, newpos.y, newpos.z);
+    }
+}
+
+/*
+ * mapping skeleton joint no
+ */
+void AEDrawObjectBaseCollada::SkeletonJointNo(SkeletonNode* node)
+{
+    for(uint32_t i = 0; i < mSkinJointsArray.size(); i++)
+    {
+        if(node->sidName == mSkinJointsArray[i].jointName)
+        {
+            node->jointNo = i;
+            break;
+        }
+    }
+    for(uint32_t i = 0; i < node->children.size(); i++)
+    {
+        SkeletonJointNo(node->children[i].get());
+    }
 }
 
 //=====================================================================
