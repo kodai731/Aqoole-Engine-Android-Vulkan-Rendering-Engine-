@@ -1169,6 +1169,7 @@ make vertices data
 */
 void AEDrawObjectBaseCollada::MakeVertices()
 {
+    /*
     //vertices
     Vertex3DObj oneVertex;
     for(uint32_t i = 0; i < mPositions.size(); i++)
@@ -1191,6 +1192,21 @@ void AEDrawObjectBaseCollada::MakeVertices()
             mIndices.emplace_back(offset + mPositionIndices[i][j]);
         }
         offset += mPositions[i].size();
+    }
+     */
+    uint32_t index = 0;
+    Vertex3DObj oneVertex;
+    for(uint32_t i = 0; i < mPositionIndices.size(); i++)
+    {
+        for(uint32_t j = 0; j < mPositionIndices[i].size(); j++)
+        {
+            oneVertex.pos = mPositions[i][mPositionIndices[i][j]];
+            oneVertex.normal = mNormals[i][mNormalsIndices[i][j]];
+            oneVertex.texcoord = mMaps[i * 3][mMapIndices[i][j]];
+            mVertices.emplace_back(oneVertex);
+            mIndices.emplace_back(index);
+            index++;
+        }
     }
 }
 
