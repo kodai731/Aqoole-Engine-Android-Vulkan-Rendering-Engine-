@@ -214,6 +214,7 @@ protected:
         std::string jointName;
         uint32_t animNo;
         std::vector<uint32_t> indices;
+        glm::mat4 controllerMatrix;
     };
     std::vector<Vertex3DObj> mVertices;
     std::vector<std::string> mMaterials;
@@ -221,9 +222,9 @@ protected:
     std::string mMatFileName;
     std::vector<std::string> mTextureFiles;
     std::vector<Geometry> mGeometries;
-    std::vector<glm::vec3> mPositions;
-    std::vector<glm::vec3> mNormals;
-    std::vector<glm::vec2> mMaps;
+    std::vector<std::vector<glm::vec3>> mPositions;
+    std::vector<std::vector<glm::vec3>> mNormals;
+    std::vector<std::vector<glm::vec2>> mMaps;
     std::vector<std::vector<uint32_t>> mPositionIndices;
     std::vector<std::vector<uint32_t>> mNormalsIndices;
     std::vector<std::vector<uint32_t>> mMapIndices;
@@ -242,6 +243,7 @@ protected:
     void GetVertexWeights(std::vector<float> &vertexWeights, std::string& weightString);
     void ReadAnimation(const boost::property_tree::ptree::value_type& node);
     void SkeletonJointNo(SkeletonNode* node);
+    void SkeletonAnimation(SkeletonNode* node, glm::mat4 parentMatrix, glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions);
 public:
     AEDrawObjectBaseCollada(const char* filePath, android_app* app);
     virtual ~AEDrawObjectBaseCollada();
@@ -255,9 +257,8 @@ public:
     std::string& GetTexturePath(uint32_t index){return mTextureFiles[index];}
     uint32_t GetOffset(uint32_t index){return mOffsets[index];}
     std::vector<uint32_t>const& GetOffsetAll(){return mOffsets;}
-    std::vector<uint32_t>const& GetIndexAddress(uint32_t index)const{return mPositionIndices[index];}
     std::vector<uint32_t>const& GetMapIndexAddress(uint32_t index)const{return mMapIndices[index];}
-    std::vector<glm::vec2>const& GetMapsAddress()const{return mMaps;}
+    std::vector<glm::vec2>const& GetMapsAddress()const{return mMaps[0];}
     std::vector<uint32_t>const& GetEachMapIndices(uint32_t index)const{return mMapIndices[index];}
     std::vector<std::vector<uint32_t>>const& GetMapIndices()const{return mMapIndices;}
     uint32_t GetMaterialSize(){return mPositionIndices.size();}

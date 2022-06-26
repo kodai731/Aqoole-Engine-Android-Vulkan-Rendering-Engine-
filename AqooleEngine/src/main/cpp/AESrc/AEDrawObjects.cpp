@@ -828,7 +828,8 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 {
                     imageName.replace(0, imageName.find("\\") + 1, "");
                 }
-                imageName += std::string(".png");
+                if(!std::regex_search(imageName.c_str(), std::regex("\\.png")))
+                    imageName += std::string(".png");
                 mTextureFiles.emplace_back(imageName);
             }
         }
@@ -853,6 +854,18 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                         if(std::regex_search(floatArrayStr.c_str(), std::regex("position", std::regex::icase)) ||
                                 std::regex_search(floatArrayStr.c_str(), std::regex("normal", std::regex::icase)))
                         {
+                            std::vector<glm::vec3> v;
+                            uint32_t targetIndex = 0;
+                            if(std::regex_search(floatArrayStr.c_str(), std::regex("position", std::regex::icase)))
+                            {
+                                targetIndex = mPositions.size();
+                                mPositions.emplace_back(v);
+                            }
+                            else if(std::regex_search(floatArrayStr.c_str(), std::regex("normal", std::regex::icase)))
+                            {
+                                targetIndex = mNormals.size();
+                                mNormals.emplace_back(v);
+                            }
                             std::string oneLinePositions = geometryChild.second.get<std::string>("float_array");
                             AEDrawObject::Split(fields, oneLinePositions, ' ');
                             uint32_t size = fields.size() / 3;
@@ -865,12 +878,12 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                                 {
                                     //one3DObj.pos = oneVec3;
                                     //mVertices.push_back(one3DObj);
-                                    mPositions.push_back(oneVec3);
+                                    mPositions[targetIndex].push_back(oneVec3);
                                 }
                                 else if(std::regex_search(floatArrayStr.c_str(), std::regex("normal", std::regex::icase)))
                                 {
                                     //mVertices[i].normal = oneVec3;
-                                    mNormals.push_back(oneVec3);
+                                    mNormals[targetIndex].push_back(oneVec3);
                                 }
                             }
                         }
@@ -880,12 +893,15 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                             std::string oneLinePositions = geometryChild.second.get<std::string>("float_array");
                             AEDrawObject::Split(fields, oneLinePositions, ' ');
                             uint32_t size = fields.size() / 2;
+                            uint32_t targetIndex = mMaps.size();
+                            std::vector<glm::vec2> v;
+                            mMaps.emplace_back(v);
                             for(uint32_t i = 0; i < size; i++)
                             {
                                 oneVec2.x = std::stof(fields[i * 2]);
                                 oneVec2.y = 1.0f - std::stof(fields[i * 2 + 1]);
                                 //mVertices[i].texcoord = oneVec2;
-                                mMaps.emplace_back(oneVec2);
+                                mMaps[targetIndex].emplace_back(oneVec2);
                             }
                         }
                     }
@@ -910,7 +926,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             }
         }
         //read animations
-        BOOST_FOREACH(const auto& animation, tree.get_child("COLLADA.library_animations"))
+        BOOST_FOREACH(const auto& animation, tree.get_child("COLLADA.library_animations.animation"))
         {
             ReadAnimation(animation);
         }
@@ -966,6 +982,36 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                             JointMapper j;
                             j.jointName = f;
                             mSkinJointsArray.emplace_back(j);
+                        }
+                    }
+                }
+            }
+            //source id = matrices
+            if(strncmp(obj->first.data(), "source", 7) == 0)
+            {
+                if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("matrices", std::regex::icase)))
+                {
+                    for(boost::property_tree::ptree::const_iterator child = obj->second.begin();
+                        child != obj->second.end(); ++child)
+                    {
+                        //find Name_array
+                        if(strncmp(child->first.data(), "float_array", 11) != 0)
+                            continue;
+                        std::string matricesString = child->second.get_value_optional<std::string>().get();
+                        AEDrawObject::Split(fields, matricesString, ' ');
+                        uint32_t index = 0;
+                        for(uint32_t i = 0; i < fields.size(); i = i + 16)
+                        {
+                            glm::mat4 m;
+                            for (uint32_t j = 0; j < 4; j++)
+                            {
+                                for (uint32_t k = 0; k < 4; k++)
+                                {
+                                    m[j][k] = std::stof(fields[i + j * 4 + k]);
+                                }
+                            }
+                            mSkinJointsArray[index].controllerMatrix = m;
+                            index++;
                         }
                     }
                 }
@@ -1064,7 +1110,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
         }
-        Animation();
+        //Animation();
         MakeVertices();
     }
 }
@@ -1123,21 +1169,28 @@ make vertices data
 */
 void AEDrawObjectBaseCollada::MakeVertices()
 {
-    uint32_t materials = mPositionIndices.size();
+    //vertices
     Vertex3DObj oneVertex;
-    uint32_t index = 0;
-    for(uint32_t i = 0; i < materials; i++)
+    for(uint32_t i = 0; i < mPositions.size(); i++)
     {
-        uint32_t vertices = mPositionIndices[i].size();
+        uint32_t vertices = mPositions[i].size();
         for(uint32_t j = 0; j < vertices; j++)
         {
-            oneVertex.pos = mPositions[mPositionIndices[i][j]];
-            oneVertex.normal = mNormals[mNormalsIndices[i][j]];
-            oneVertex.texcoord = mMaps[mMapIndices[i][j]];
+            oneVertex.pos = mPositions[i][j];
+            oneVertex.normal = mNormals[i][mNormalsIndices[i][j]];
+            oneVertex.texcoord = mMaps[i][mMapIndices[i][j]];
             mVertices.emplace_back(oneVertex);
-            mIndices.emplace_back(index);
-            index++;
         }
+    }
+    //indices
+    uint32_t offset = 0;
+    for(uint32_t i = 0; i < mPositionIndices.size(); i++)
+    {
+        for(uint32_t j = 0; j < mPositionIndices[i].size(); j++)
+        {
+            mIndices.emplace_back(offset + mPositionIndices[i][j]);
+        }
+        offset += mPositions[i].size();
     }
 }
 
@@ -1190,9 +1243,10 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
     using namespace boost::property_tree;
     AnimationMatrix a{};
     std::string first = node.first.data();
-    if(node.second.get_optional<std::string>("<xmlattr>.id") != boost::none)
-        a.id = node.second.get_optional<std::string>("<xmlattr>.id").get();
-    BOOST_FOREACH(const auto& source, node.second.get_child("animation"))
+    if(node.second.get_optional<std::string>("<xmlattr>.id") == boost::none)
+        return;
+    a.id = node.second.get_optional<std::string>("<xmlattr>.id").get();
+    BOOST_FOREACH(const auto& source, node.second.get_child(""))
     {
         auto childId = source.first.data();
         if(strcmp(childId, "<xmlattr>") == 0)
@@ -1281,17 +1335,12 @@ void AEDrawObjectBaseCollada::Animation()
     //mapping skeleton joint to joint array
     SkeletonJointNo(mRoot.get());
     //calc animation position
-    for (uint32_t i = 0; i < mPositions.size(); i++) {
-        glm::vec4 pos = glm::vec4(mPositions[i], 1.0f);
-        glm::vec4 newpos = glm::vec4(0.0f);
-        auto jw = mJointWeights[i];
-        for (uint32_t j = 0; j < jw.jointIndices.size(); j++) {
-            newpos += jw.weights[j] *
-                      pos * mBSM * mInverseMatrices[jw.jointIndices[j]] *
-                      mAnimationMatrices[mSkinJointsArray[jw.jointIndices[j]].animNo].matrixList[1];
-        }
-        mPositions[i] = glm::vec3(newpos.x, newpos.y, newpos.z);
-    }
+    std::vector<glm::vec3> tmpPositions = mPositions[0];
+    for(auto& p : tmpPositions)
+        p = glm::vec3(0.0f);
+    SkeletonAnimation(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), tmpPositions);
+    for(uint32_t i = 0; i < mPositions.size(); i++)
+        mPositions[0][i] = tmpPositions[i];
 }
 
 /*
@@ -1311,6 +1360,35 @@ void AEDrawObjectBaseCollada::SkeletonJointNo(SkeletonNode* node)
     {
         SkeletonJointNo(node->children[i].get());
     }
+}
+
+/*
+ * skeleton animation
+ */
+void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 parentMatrix, glm::mat4 ibp,std::vector<glm::vec3>& tmpPositions)
+{
+    glm::mat4 animationMatrix = mAnimationMatrices[mSkinJointsArray[node->jointNo].animNo].matrixList[0];
+    animationMatrix = glm::mat4(1.0f);
+    glm::mat4 nodematrix = animationMatrix * node->matrix;
+    ibp = mInverseMatrices[node->jointNo] * ibp;
+    parentMatrix = nodematrix * parentMatrix;
+    for(uint32_t positionIndice : mSkinJointsArray[node->jointNo].indices)
+    {
+        glm::vec4 oldpos = glm::vec4(mPositions[0][positionIndice], 1.0f);
+        uint32_t weightIndice = 0;
+        for(uint32_t i = 0; i < mJointWeights[positionIndice].weights.size(); i++)
+        {
+            if(mJointWeights[positionIndice].jointIndices[i] == positionIndice)
+            {
+                weightIndice = i;
+                break;
+            }
+        }
+        glm::vec4 newpos = mJointWeights[positionIndice].weights[weightIndice] * parentMatrix * ibp * oldpos;
+        tmpPositions[positionIndice] += glm::vec3(newpos.x, newpos.y, newpos.z);
+    }
+    for(auto& child : node->children)
+        SkeletonAnimation(child.get(), parentMatrix, ibp, tmpPositions);
 }
 
 //=====================================================================

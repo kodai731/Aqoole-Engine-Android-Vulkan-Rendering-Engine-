@@ -179,7 +179,7 @@ AEDescriptorSet* gWomanTextureSets;
 std::unique_ptr<AEBufferAS> gWomanOffset;
 std::string fuse1ObjPath("fuse-woman-1/source/woman.obj");
 std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
-std::string fuse1Collada("phoenix-bird/fly.dae");
+std::string fuse1Collada("phoenix-bird/phoenix-bird2.dae");
 std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
 
@@ -368,12 +368,11 @@ bool CreateBuffers(void) {
                      gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   for(uint32_t i = 0; i < 1; i++)
   {
-    std::unique_ptr<AEBufferAS> ib(new AEBufferAS(gDevice, sizeof(uint32_t) * gWomanCollada->GetIndexAddress().size(),
+    std::unique_ptr<AEBufferAS> ib(new AEBufferAS(gDevice, gWomanCollada->GetIndexBufferSize(),
                                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     ib->CreateBuffer();
     ib->CopyData((void *) gWomanCollada->GetIndexAddress().data(), 0,
-                       sizeof(uint32_t) * gWomanCollada->GetIndexAddress().size(),
-                       gQueue, gCommandPool);
+                       gWomanCollada->GetIndexBufferSize(), gQueue, gCommandPool);
     gibWomans.emplace_back(std::move(ib));
   }
   //offset
@@ -388,9 +387,10 @@ bool CreateBuffers(void) {
 //  gIndexBuffer = new AEBufferAS(gDevice, sizeof(uint32_t) * gCube->GetIndexSize(), (VkBufferUsageFlagBits)0);
 //  gIndexBuffer->CreateBuffer();
 //  gIndexBuffer->CopyData((void*)gCube->GetIndexAddress().data(), 0, sizeof(uint32_t) * gCube->GetIndexSize(), gQueue, gCommandPool);
-  BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(), *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
+  BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(),
+                                *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
   BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(), *gvbPlane->GetBuffer(), *gibPlane->GetBuffer()};
-  BLASGeometryInfo womanInfo0 = {sizeof(Vertex3DObj), gWomanCollada->GetVertexSize(), (uint32_t)gWomanCollada->GetIndexAddress(0).size(),
+  BLASGeometryInfo womanInfo0 = {sizeof(Vertex3DObj), gWomanCollada->GetVertexSize(), (uint32_t)gWomanCollada->GetIndexAddress().size(),
                                 *gvbWoman->GetBuffer(), *gibWomans[0]->GetBuffer()};
   std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
   std::vector<BLASGeometryInfo> geometryPlane = {planeInfo};
@@ -612,9 +612,7 @@ bool InitVulkan(android_app* app) {
                                         {gXZPlane->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(), gWomanCollada->GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(6, gibWomans[0]->GetBuffer(),
-                                        gWomanCollada->GetIndexBufferSize(),
-                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(6, gibWomans[0]->GetBuffer(), gWomanCollada->GetIndexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(7, gmapVbWoman->GetBuffer(), sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(),
                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(8, gmapIbWoman->GetBuffer(), sizeof(uint32_t) * totalMapIndices,
