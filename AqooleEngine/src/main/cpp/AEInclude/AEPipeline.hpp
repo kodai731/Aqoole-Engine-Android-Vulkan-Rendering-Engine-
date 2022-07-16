@@ -62,9 +62,11 @@ class AEPipeline
     uint32_t FindShaderModuleIndex(const char* shaderPath);
     //functions
     void CreatePipelineLayout(std::vector<std::unique_ptr<AEDescriptorSetLayout>> const* layouts, std::vector<VkPushConstantRange>* pushConstants = nullptr);
-    void CreateShaderStage(VkPipelineShaderStageCreateInfo *stageInfo, const char* shaderPath,
-        std::vector<VkShaderModule> &shaderModules);
-    public:
+    void CreatePipelineLayout(AEDescriptorSetLayout const* layout, std::vector<VkPushConstantRange>* pushConstants = nullptr);
+    void CreateShaderStage(VkPipelineShaderStageCreateInfo *stageInfo, const char* shaderPath, std::vector<VkShaderModule> &shaderModules);
+    void CreateShaderStage(VkPipelineShaderStageCreateInfo *stageInfo, const char* shaderPath, std::vector<VkShaderModule> &shaderModules,
+                           android_app *app);
+public:
     AEPipeline(AELogicalDevice const* device);
     virtual ~AEPipeline();
     //iterator
@@ -83,6 +85,8 @@ class AEComputePipeline : public AEPipeline
     public:
     AEComputePipeline(AELogicalDevice const* device,  std::vector<const char*> &shaderPaths,
         std::vector<std::unique_ptr<AEDescriptorSetLayout>> const* layouts);
+    AEComputePipeline(AELogicalDevice const* device,  std::vector<const char*> &shaderPaths,
+                      AEDescriptorSetLayout const* layout, android_app* app);
     ~AEComputePipeline();
     //iterator
     //

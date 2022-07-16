@@ -180,6 +180,7 @@ std::unique_ptr<AEBufferAS> gWomanOffset;
 std::string fuse1ObjPath("fuse-woman-1/source/woman.obj");
 std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
 std::string fuse1Collada("phoenix-bird/phoenix-bird2.dae");
+std::string computeShaderPath("shaders/07_animationVertexComp.spv");
 std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
 
@@ -518,7 +519,10 @@ bool InitVulkan(android_app* app) {
   //woman
   gWoman = std::make_unique<AEDrawObjectBaseObjFile>(fuse1ObjPath.c_str(), app, true);
   gWoman->Scale(0.01f);
-  gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(fuse1Collada.c_str(), app);
+  std::vector<const char*> c;
+  c.emplace_back(computeShaderPath.c_str());
+  gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(fuse1Collada.c_str(), app, gDevice, c, gCommandPool, gQueue);
+  gWomanCollada->MakeAnimation();
   gWomanCollada->Scale(0.01f);
   //woman texture
   for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
@@ -812,8 +816,7 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
                               .signalSemaphoreCount = 1,
                               .pSignalSemaphores = &render.presentSemaphore_,};
   CALL_VK(vkQueueSubmit(device.queue_, 1, &submit_info, render.fence_));
-  CALL_VK(
-      vkWaitForFences(device.device_, 1, &render.fence_, VK_TRUE, 100000000));
+  vkWaitForFences(device.device_, 1, &render.fence_, VK_TRUE, 100000000);
 
   LOGI("Drawing frames......");
 

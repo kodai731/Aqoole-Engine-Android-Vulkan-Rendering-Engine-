@@ -38,6 +38,7 @@
 #include "boost/foreach.hpp"
 #include "boost/lexical_cast.hpp"
 #include "regex"
+#include "mutex"
 
 
 /*
@@ -48,6 +49,10 @@ struct Vertex3DTexture;
 struct Vertex3DObj;
 struct Vertex2D;
 struct Vertex3DTEST;
+class AEComputePipeline;
+class AELogicalDevice;
+class AECommandPool;
+class AEDeviceQueue;
 
 namespace AEDrawObject
 {
@@ -195,7 +200,7 @@ protected:
         std::string sidName;
         std::string id;
         std::vector<std::unique_ptr<SkeletonNode>> children;
-        uint32_t jointNo;
+        int jointNo;
     };
     struct JointWeight
     {
@@ -212,7 +217,8 @@ protected:
     struct JointMapper
     {
         std::string jointName;
-        uint32_t animNo;
+        int animNo;
+        std::string nodeId;
         std::vector<uint32_t> indices;
         glm::mat4 controllerMatrix;
     };
@@ -234,6 +240,7 @@ protected:
     std::vector<glm::mat4> mInverseMatrices;
     std::vector<AnimationMatrix> mAnimationMatrices;
     glm::mat4 mBSM;
+    std::unique_ptr<AEComputePipeline> mComputePipeline;
     //functions
     void ProcessGeometry(std::ifstream &file);
     void MakeVertices();
@@ -245,7 +252,8 @@ protected:
     void SkeletonJointNo(SkeletonNode* node);
     void SkeletonAnimation(SkeletonNode* node, glm::mat4 parentMatrix, glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions);
 public:
-    AEDrawObjectBaseCollada(const char* filePath, android_app* app);
+    AEDrawObjectBaseCollada(const char* filePath, android_app* app, AELogicalDevice* device, std::vector<const char*> &shaderPaths,
+                            AECommandPool* commandPool, AEDeviceQueue* queue);
     virtual ~AEDrawObjectBaseCollada();
     //iterator
     uint32_t GetVertexSize(){return mVertices.size();}
@@ -262,6 +270,11 @@ public:
     std::vector<uint32_t>const& GetEachMapIndices(uint32_t index)const{return mMapIndices[index];}
     std::vector<std::vector<uint32_t>>const& GetMapIndices()const{return mMapIndices;}
     uint32_t GetMaterialSize(){return mPositionIndices.size();}
+    void MakeAnimation()
+    {
+        Animation();
+        MakeVertices();
+    }
     //scale
     void Scale(float scale);
     //animation

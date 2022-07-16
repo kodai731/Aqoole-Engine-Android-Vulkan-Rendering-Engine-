@@ -65,6 +65,7 @@ android {
         }
     }
    externalNativeBuild.cmake.path 'CMakeLists.txt'
+   buildTypes.debug.minifyEnabled = true
    buildTypes.release.minifyEnabled = false
    sourceSets {
        main {

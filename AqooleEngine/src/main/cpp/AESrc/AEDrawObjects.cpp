@@ -20,6 +20,11 @@
 #include "AEDrawObjects.hpp"
 #include "AEUBO.hpp"
 #include "AEMatrix.hpp"
+#include "AEDevice.hpp"
+#include "AEPipeline.hpp"
+#include "descriptorSet.hpp"
+#include "AEBuffer.hpp"
+#include "AEDeviceQueue.hpp"
 
 
 //=====================================================================
@@ -796,9 +801,19 @@ uint32_t AEDrawObjectBaseObjFile::GetVertexBufferSize(){return sizeof(Vertex3DOb
 /*
 constructor
 */
-AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_app* app)
+AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_app* app, AELogicalDevice* device,
+                                                 std::vector<const char*> &shaderPaths, AECommandPool* commandPool, AEDeviceQueue* queue)
     : AEDrawObjectBase()
 {
+//    //create compute pipeline
+//    AEDescriptorSetLayout layout(device);
+//    layout.AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+//                                         nullptr);
+//    layout.AddDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+//                                         nullptr);
+//    layout.CreateDescriptorSetLayout();
+//
+//    mComputePipeline = std::make_unique<AEComputePipeline>(device, shaderPaths, &layout, app);
     //using boost
     {
         using namespace boost::property_tree;
@@ -943,7 +958,10 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 continue;
             //skeleton is node
             auto nodeId = obj->second.get_optional<std::string>("<xmlattr>.id").get();
-            ReadSkeletonNode(obj, mRoot);
+            if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("model", std::regex::icase)))
+            {
+                ReadSkeletonNode(obj, mRoot);
+            }
         }
         //read skinning information
         //bind_shape_matrix
@@ -981,6 +999,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                         {
                             JointMapper j;
                             j.jointName = f;
+                            j.animNo = -1;
                             mSkinJointsArray.emplace_back(j);
                         }
                     }
@@ -1110,8 +1129,22 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
         }
-        //Animation();
-        MakeVertices();
+//        //create buffers to use in animation
+//        VkDeviceSize vbSize = sizeof(float) * 3 * mPositions[0].size();
+//        std::unique_ptr<AEBufferUtilOnGPU> vb(new AEBufferUtilOnGPU(device, vbSize ,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
+//        vb->CreateBuffer();
+//        vb->CopyData(mPositions[0].data(), 0, vbSize, queue, commandPool);
+//        std::unique_ptr<AEBufferUtilOnGPU> vbdst(new AEBufferUtilOnGPU(device, vbSize ,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
+//        vbdst->CreateBuffer();
+//        vbdst->CopyData(mPositions[0].data(), 0, vbSize, queue, commandPool);
+//        std::vector<VkDescriptorPoolSize> poolSize =
+//                {
+//                        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10000},
+//                        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10000}
+//                };
+//        AEDescriptorPool pool(device, poolSize.size(), poolSize.data());
+//        AEDescriptorSet ds(device, &layout, &pool);
+//        ds.BindDescriptorBuffer(0, vb->GetBuffer(), vbSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     }
 }
 
@@ -1227,11 +1260,15 @@ void AEDrawObjectBaseCollada::ReadSkeletonNode(boost::property_tree::ptree::cons
     //node name
     std::string strrrr = nowNode->second.data();
     auto sidName = nowNode->second.get_optional<std::string>("<xmlattr>.sid");
+    if(sidName == boost::none)
+        sidName = nowNode->second.get_optional<std::string>("<xmlattr>.id");
     if(sidName.is_initialized())
     {
         skeletonNode->sidName = sidName.get();
         skeletonNode->id = nowNode->second.get_optional<std::string>("<xmlattr>.id")->c_str();
     }
+    //joint no
+    skeletonNode->jointNo = -1;
     //matrix
     std::vector<std::string> fields;
     std::string matrixString = nowNode->second.get_optional<std::string>("matrix").get();
@@ -1336,26 +1373,27 @@ void AEDrawObjectBaseCollada::GetVertexWeights(std::vector<float> &vertexWeights
  */
 void AEDrawObjectBaseCollada::Animation()
 {
+    //mapping skeleton joint to joint array
+    SkeletonJointNo(mRoot.get());
     //joint mapper
     for(auto& joint : mSkinJointsArray)
     {
         for(uint32_t i = 0; i < mAnimationMatrices.size(); i++)
         {
-            if(joint.jointName == mAnimationMatrices[i].target)
+            if(joint.nodeId == mAnimationMatrices[i].target)
             {
                 joint.animNo = i;
                 break;
             }
         }
     }
-    //mapping skeleton joint to joint array
-    SkeletonJointNo(mRoot.get());
     //calc animation position
     std::vector<glm::vec3> tmpPositions = mPositions[0];
     for(auto& p : tmpPositions)
         p = glm::vec3(0.0f);
+    __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "start animation calclation %u", 0);
     SkeletonAnimation(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), tmpPositions);
-    for(uint32_t i = 0; i < mPositions.size(); i++)
+    for(uint32_t i = 0; i < mPositions[0].size(); i++)
         mPositions[0][i] = tmpPositions[i];
 }
 
@@ -1369,6 +1407,7 @@ void AEDrawObjectBaseCollada::SkeletonJointNo(SkeletonNode* node)
         if(node->sidName == mSkinJointsArray[i].jointName)
         {
             node->jointNo = i;
+            mSkinJointsArray[i].nodeId = node->id;
             break;
         }
     }
@@ -1383,25 +1422,50 @@ void AEDrawObjectBaseCollada::SkeletonJointNo(SkeletonNode* node)
  */
 void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 parentMatrix, glm::mat4 ibp,std::vector<glm::vec3>& tmpPositions)
 {
-    glm::mat4 animationMatrix = mAnimationMatrices[mSkinJointsArray[node->jointNo].animNo].matrixList[0];
-    animationMatrix = glm::mat4(1.0f);
-    glm::mat4 nodematrix = animationMatrix * node->matrix;
-    ibp = mInverseMatrices[node->jointNo] * ibp;
-    parentMatrix = nodematrix * parentMatrix;
-    for(uint32_t positionIndice : mSkinJointsArray[node->jointNo].indices)
+    int jointnum = node->jointNo;
+    int animnum = mSkinJointsArray[jointnum].animNo;
+    __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation",
+                        (std::string("anim num = ") + std::to_string(animnum)).c_str(), 0);
+    if(mAnimationMatrices.empty())
     {
-        glm::vec4 oldpos = glm::vec4(mPositions[0][positionIndice], 1.0f);
-        uint32_t weightIndice = 0;
-        for(uint32_t i = 0; i < mJointWeights[positionIndice].weights.size(); i++)
-        {
-            if(mJointWeights[positionIndice].jointIndices[i] == positionIndice)
-            {
-                weightIndice = i;
-                break;
+        __android_log_print(ANDROID_LOG_ERROR, "aqoole animation", "no animation matrices");
+    }
+    if(jointnum >= 0 && animnum >= 0)
+    {
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("node id = ") + node->id).c_str(), 0);
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("joint no = ") + std::to_string(node->jointNo)).c_str(), 0);
+//        try
+//        {
+//        }
+//        catch (std::runtime_error re)
+//        {
+//            __android_log_print(ANDROID_LOG_ERROR, "aqoole animation", re.what(), 0);
+//        }
+//        catch (...)
+//        {
+//            __android_log_print(ANDROID_LOG_ERROR, "aqoole animation", "unknown error", 0);
+//        }
+        //animationMatrix = glm::mat4(1.0f);
+        glm::mat4 nodematrix = mAnimationMatrices[mSkinJointsArray[node->jointNo].animNo].matrixList[0]/* * node->matrix*/;
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "node matrix retrieved successfully");
+        ibp = mInverseMatrices[node->jointNo] * ibp;
+        parentMatrix = nodematrix * parentMatrix;
+        glm::mat4 localMatrix = parentMatrix * ibp;
+        glm::vec4 oldpos;
+        glm::vec4 newpos;
+
+        for (uint32_t positionIndice: mSkinJointsArray[node->jointNo].indices) {
+            oldpos = glm::vec4(mPositions[0][positionIndice], 1.0f);
+            uint32_t weightIndice = 0;
+            for (uint32_t i = 0; i < mJointWeights[positionIndice].weights.size(); i++) {
+                if (mJointWeights[positionIndice].jointIndices[i] == positionIndice) {
+                    weightIndice = i;
+                    break;
+                }
             }
+            newpos =mJointWeights[positionIndice].weights[weightIndice] * localMatrix * oldpos;
+            tmpPositions[positionIndice] += glm::vec3(newpos);
         }
-        glm::vec4 newpos = mJointWeights[positionIndice].weights[weightIndice] * parentMatrix * ibp * oldpos;
-        tmpPositions[positionIndice] += glm::vec3(newpos.x, newpos.y, newpos.z);
     }
     for(auto& child : node->children)
         SkeletonAnimation(child.get(), parentMatrix, ibp, tmpPositions);
