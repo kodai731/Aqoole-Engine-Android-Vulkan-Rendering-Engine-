@@ -240,6 +240,7 @@ protected:
     std::vector<glm::mat4> mInverseMatrices;
     std::vector<AnimationMatrix> mAnimationMatrices;
     glm::mat4 mBSM;
+    glm::mat4 mGlobalInverseMatrix;
     std::unique_ptr<AEComputePipeline> mComputePipeline;
     //functions
     void ProcessGeometry(std::ifstream &file);
@@ -272,7 +273,7 @@ public:
     uint32_t GetMaterialSize(){return mPositionIndices.size();}
     void MakeAnimation()
     {
-        Animation();
+        //Animation();
         MakeVertices();
     }
     //scale

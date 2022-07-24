@@ -937,6 +937,24 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                             mMapIndices[mMapIndices.size() - 1].emplace_back(std::stoi(fields[i * 3 + 2]));
                         }
                     }
+                    //polylist
+                    if(std::regex_search(geometryChildTag, std::regex("polylist", std::regex::icase)))
+                    {
+                        std::string data = geometryChild.second.get<std::string>("p");
+                        AEDrawObject::Split(fields, data, ' ');
+                        uint32_t vcount = 4;
+                        uint32_t size = fields.size() / vcount;
+                        std::vector<uint32_t> indices;
+                        mPositionIndices.emplace_back(indices);
+                        mNormalsIndices.emplace_back(indices);
+                        mMapIndices.emplace_back(indices);
+                        for(uint32_t i = 0; i < size; i++)
+                        {
+                            mPositionIndices[mPositionIndices.size() - 1].emplace_back(std::stoi(fields[i * vcount]));
+                            mNormalsIndices[mNormalsIndices.size() - 1].emplace_back(std::stoi(fields[i * vcount + 1]));
+                            mMapIndices[mMapIndices.size() - 1].emplace_back(std::stoi(fields[i * vcount + 2]));
+                        }
+                    }
                 }
             }
         }
@@ -958,7 +976,8 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 continue;
             //skeleton is node
             auto nodeId = obj->second.get_optional<std::string>("<xmlattr>.id").get();
-            if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("model", std::regex::icase)))
+            if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("model", std::regex::icase)) ||
+            std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("armature", std::regex::icase)))
             {
                 ReadSkeletonNode(obj, mRoot);
             }
@@ -1271,11 +1290,25 @@ void AEDrawObjectBaseCollada::ReadSkeletonNode(boost::property_tree::ptree::cons
     skeletonNode->jointNo = -1;
     //matrix
     std::vector<std::string> fields;
-    std::string matrixString = nowNode->second.get_optional<std::string>("matrix").get();
-    AEDrawObject::Split(fields, matrixString, ' ');
-    for(uint32_t i = 0; i < 4; i++)
-        for(uint32_t j = 0; j < 4; j++)
-            skeletonNode->matrix[i][j] = std::stof(fields[(i * 4) + j]);
+    std::string matrixString;
+    if(nowNode->second.get_optional<std::string>("matrix") != boost::none)
+    {
+        matrixString = nowNode->second.get_optional<std::string>("matrix").get();
+        AEDrawObject::Split(fields, matrixString, ' ');
+
+    }
+    else
+        matrixString.clear();
+    if(matrixString.size() > 0)
+    {
+        for (uint32_t i = 0; i < 4; i++)
+            for (uint32_t j = 0; j < 4; j++)
+                skeletonNode->matrix[i][j] = std::stof(fields[(i * 4) + j]);
+    }
+    else
+    {
+        skeletonNode->matrix = glm::mat4(1.0f);
+    }
     for(boost::property_tree::ptree::const_iterator child = nowNode->second.begin();
         child != nowNode->second.end(); ++child)
     {
@@ -1392,6 +1425,7 @@ void AEDrawObjectBaseCollada::Animation()
     for(auto& p : tmpPositions)
         p = glm::vec3(0.0f);
     __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "start animation calclation %u", 0);
+    mGlobalInverseMatrix = glm::inverse(mRoot->matrix);
     SkeletonAnimation(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), tmpPositions);
     for(uint32_t i = 0; i < mPositions[0].size(); i++)
         mPositions[0][i] = tmpPositions[i];
@@ -1434,26 +1468,13 @@ void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 pa
     {
         __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("node id = ") + node->id).c_str(), 0);
         __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("joint no = ") + std::to_string(node->jointNo)).c_str(), 0);
-//        try
-//        {
-//        }
-//        catch (std::runtime_error re)
-//        {
-//            __android_log_print(ANDROID_LOG_ERROR, "aqoole animation", re.what(), 0);
-//        }
-//        catch (...)
-//        {
-//            __android_log_print(ANDROID_LOG_ERROR, "aqoole animation", "unknown error", 0);
-//        }
-        //animationMatrix = glm::mat4(1.0f);
-        glm::mat4 nodematrix = mAnimationMatrices[mSkinJointsArray[node->jointNo].animNo].matrixList[0]/* * node->matrix*/;
+        parentMatrix = parentMatrix * node->matrix;
+        glm::mat4 animationTransform = mAnimationMatrices[mSkinJointsArray[node->jointNo].animNo].matrixList[0];
         __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "node matrix retrieved successfully");
-        ibp = mInverseMatrices[node->jointNo] * ibp;
-        parentMatrix = nodematrix * parentMatrix;
-        glm::mat4 localMatrix = parentMatrix * ibp;
+        ibp = ibp * mInverseMatrices[node->jointNo];
+        glm::mat4 finalTransform = mInverseMatrices[node->jointNo] * parentMatrix * mInverseMatrices[node->jointNo];
         glm::vec4 oldpos;
         glm::vec4 newpos;
-
         for (uint32_t positionIndice: mSkinJointsArray[node->jointNo].indices) {
             oldpos = glm::vec4(mPositions[0][positionIndice], 1.0f);
             uint32_t weightIndice = 0;
@@ -1463,7 +1484,7 @@ void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 pa
                     break;
                 }
             }
-            newpos =mJointWeights[positionIndice].weights[weightIndice] * localMatrix * oldpos;
+            newpos =mJointWeights[positionIndice].weights[weightIndice] * finalTransform * oldpos;
             tmpPositions[positionIndice] += glm::vec3(newpos);
         }
     }

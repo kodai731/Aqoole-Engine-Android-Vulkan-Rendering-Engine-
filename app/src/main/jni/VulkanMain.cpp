@@ -179,7 +179,8 @@ AEDescriptorSet* gWomanTextureSets;
 std::unique_ptr<AEBufferAS> gWomanOffset;
 std::string fuse1ObjPath("fuse-woman-1/source/woman.obj");
 std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
-std::string fuse1Collada("phoenix-bird/phoenix-bird2.dae");
+//std::string fuse1Collada("phoenix-bird/phoenix-bird2.dae");
+std::string fuse1Collada("cowboy/cowboy.dae");
 std::string computeShaderPath("shaders/07_animationVertexComp.spv");
 std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
@@ -421,8 +422,8 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 2, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
@@ -523,11 +524,11 @@ bool InitVulkan(android_app* app) {
   c.emplace_back(computeShaderPath.c_str());
   gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(fuse1Collada.c_str(), app, gDevice, c, gCommandPool, gQueue);
   gWomanCollada->MakeAnimation();
-  gWomanCollada->Scale(0.01f);
+  gWomanCollada->Scale(0.5f);
   //woman texture
   for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
   {
-      std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, (std::string("phoenix-bird/") + gWomanCollada->GetTexturePath(i)).c_str(),
+      std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, (std::string("cowboy/") + gWomanCollada->GetTexturePath(i)).c_str(),
                                                                  gCommandPool, gQueue, app));
       texture->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
       gWomanTextures.push_back(std::move(texture));
@@ -550,7 +551,7 @@ bool InitVulkan(android_app* app) {
                         0.1f, 100.0f);
   phoenixModelView.view = glm::mat4(1.0f);
   AEMatrix::View(phoenixModelView.view, cameraPos, cameraDirection, cameraUp);
-  CreateBuffers();  // create vertex b
+  CreateBuffers();  // create vertex
   // Create graphics pipeline
   CreateGraphicsPipeline();
   //prepare matrix
@@ -584,25 +585,25 @@ bool InitVulkan(android_app* app) {
   uboRT.viewInverse = glm::inverse(modelview.view);
   uboRT.projInverse = glm::inverse(modelview.proj);
   uboRT.modelViewProj = modelview.translate * modelview.rotate * modelview.scale;
-  uboRT.normalMatrix = glm::mat4(1.0f);
+  uboRT.normalMatrix = glm::mat4(0.5f);
   gUboRTBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(UBORT));
   gUboRTBuffer->CreateBuffer();
   gUboRTBuffer->CopyData((void*)&uboRT, sizeof(UBORT));
   //create map buffer
-  gmapVbWoman = std::make_unique<AEBufferAS>(gDevice, sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(),
-                                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-  gmapVbWoman->CreateBuffer();
-  gmapVbWoman->CopyData((void*)gWomanCollada->GetMapsAddress().data(), 0,
-                        sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(), gQueue, gCommandPool);
-  VkDeviceSize totalMapIndices = 0;
-  for(auto mapIndex : gWomanCollada->GetMapIndices())
-    totalMapIndices += mapIndex.size();
-  gmapIbWoman = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * totalMapIndices, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-  gmapIbWoman->CreateBuffer();
-  gmapIbWoman->CopyData((void*)gWomanCollada->GetEachMapIndices(0).data(), 0,
-                        sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(0).size(), gQueue, gCommandPool);
-  gmapIbWoman->CopyData((void*)gWomanCollada->GetEachMapIndices(1).data(), sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(0).size(),
-                        sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(1).size(), gQueue, gCommandPool);
+//  gmapVbWoman = std::make_unique<AEBufferAS>(gDevice, sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(),
+//                                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+//  gmapVbWoman->CreateBuffer();
+//  gmapVbWoman->CopyData((void*)gWomanCollada->GetMapsAddress().data(), 0,
+//                        sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(), gQueue, gCommandPool);
+//  VkDeviceSize totalMapIndices = 0;
+//  for(auto mapIndex : gWomanCollada->GetMapIndices())
+//    totalMapIndices += mapIndex.size();
+//  gmapIbWoman = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * totalMapIndices, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+//  gmapIbWoman->CreateBuffer();
+//  gmapIbWoman->CopyData((void*)gWomanCollada->GetEachMapIndices(0).data(), 0,
+//                        sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(0).size(), gQueue, gCommandPool);
+//  gmapIbWoman->CopyData((void*)gWomanCollada->GetEachMapIndices(1).data(), sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(0).size(),
+//                        sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(1).size(), gQueue, gCommandPool);
   //descriptor set
   gDescriptorSet = new AEDescriptorSet(gDevice, gLayouts[0], gDescriptorPool);
   gDescriptorSet->BindAccelerationStructure(0, astop.get());
@@ -617,10 +618,10 @@ bool InitVulkan(android_app* app) {
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(), gWomanCollada->GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(6, gibWomans[0]->GetBuffer(), gWomanCollada->GetIndexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(7, gmapVbWoman->GetBuffer(), sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(),
-                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(8, gmapIbWoman->GetBuffer(), sizeof(uint32_t) * totalMapIndices,
-                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+//  gDescriptorSet->BindDescriptorBuffer(7, gmapVbWoman->GetBuffer(), sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(),
+//                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+//  gDescriptorSet->BindDescriptorBuffer(8, gmapIbWoman->GetBuffer(), sizeof(uint32_t) * totalMapIndices,
+//                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
