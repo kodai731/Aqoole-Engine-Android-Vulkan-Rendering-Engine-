@@ -959,7 +959,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             }
         }
         //read animations
-        BOOST_FOREACH(const auto& animation, tree.get_child("COLLADA.library_animations.animation"))
+        BOOST_FOREACH(const auto& animation, tree.get_child("COLLADA.library_animations"))
         {
             ReadAnimation(animation);
         }
@@ -1045,7 +1045,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                             {
                                 for (uint32_t k = 0; k < 4; k++)
                                 {
-                                    m[j][k] = std::stof(fields[i + j * 4 + k]);
+                                    m[k][j] = std::stof(fields[i + j * 4 + k]);
                                 }
                             }
                             mSkinJointsArray[index].controllerMatrix = m;
@@ -1057,7 +1057,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             //source id = skin-weights
             if(strncmp(obj->first.data(), "source", 7) == 0)
             {
-                if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("weight", std::regex::icase)))
+                if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("skin-weights", std::regex::icase)))
                 {
                     for(boost::property_tree::ptree::const_iterator child = obj->second.begin();
                         child != obj->second.end(); ++child)
@@ -1071,7 +1071,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
             //vertex_weights
-            if(strncmp(obj->first.data(), "vertex_weights", 15) == 0)
+            if(std::regex_search(obj->first.data(), std::regex("vertex_weights", std::regex::icase)))
             {
                 auto vcountString = obj->second.get_optional<std::string>("vcount").get();
                 std::vector<std::string> influenceCounts;
@@ -1080,6 +1080,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 std::vector<std::string> jointWeightList;
                 AEDrawObject::Split(jointWeightList, vString, ' ');
                 uint32_t nowPointing = 0;
+                uint32_t vertexIndex = 0;
                 for(uint32_t i = 0; i < influenceCounts.size(); i++)
                 {
                     JointWeight oneJointWeight;
@@ -1096,11 +1097,15 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                     for(uint32_t j = 0; j < influenceCount; j++)
                         total += oneJointWeight.weights[j];
                     if( !(0.99f < total && total < 1.01f))
-                        __android_log_print(ANDROID_LOG_DEBUG, "collada", "total weight is not 1.0f", 0);
+                        __android_log_print(ANDROID_LOG_DEBUG, "animation", "total weight is not 1.0f", 0);
                     mJointWeights.push_back(oneJointWeight);
                     //mapping each positon to influenced joints
-                    for(auto jointNo : oneJointWeight.jointIndices)
-                        mSkinJointsArray[jointNo].indices.emplace_back(i);
+                    for(uint32_t k = 0; k < influenceCount; k++) {
+                        std::pair<uint32_t, float> p;
+                        p = {vertexIndex, oneJointWeight.weights[k]};
+                        mSkinJointsArray[oneJointWeight.jointIndices[k]].indexWeight.emplace_back(p);
+                    }
+                    vertexIndex++;
                 }
             }
             //inverse matrices
@@ -1139,7 +1144,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                                 {
                                     for(uint32_t j = 0; j < 4; j++)
                                         for(uint32_t k = 0; k < 4; k++)
-                                            oneMatrix[j][k] = std::stof(fields[16 * i + 4 * j + k]);
+                                            oneMatrix[k][j] = std::stof(fields[16 * i + 4 * j + k]);
                                     mInverseMatrices.push_back(oneMatrix);
                                 }
                             }
@@ -1363,7 +1368,7 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
                         for(uint32_t k = 0; k < 4; k++)
                         {
                             float e = std::stof(matrixList[i + (4 * j) + k]);
-                            m[j][k] = e;
+                            m[k][j] = e;
                         }
                     }
                     a.matrixList.emplace_back(m);
@@ -1420,13 +1425,29 @@ void AEDrawObjectBaseCollada::Animation()
             }
         }
     }
+    //check vertices for each joint
+    uint32_t i = 0;
+    for(auto joint : mSkinJointsArray){
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("joint no = ") + std::to_string(i)).c_str(), 0);
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("joint name = ") + joint.jointName).c_str(), 0);
+        std::string index;
+        std::string weight;
+        for(auto vw : joint.indexWeight){
+            index += std::to_string(vw.first);
+            index += std::string(" ");
+            weight += (std::to_string(vw.second) + std::string(" "));
+        }
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("vertex in joint = ") + index).c_str(), 0);
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("weight in joint = ") + weight).c_str(), 0);
+        i++;
+    }
     //calc animation position
     std::vector<glm::vec3> tmpPositions = mPositions[0];
     for(auto& p : tmpPositions)
         p = glm::vec3(0.0f);
     __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "start animation calclation %u", 0);
     mGlobalInverseMatrix = glm::inverse(mRoot->matrix);
-    SkeletonAnimation(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), tmpPositions);
+    SkeletonAnimation(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f), tmpPositions);
     for(uint32_t i = 0; i < mPositions[0].size(); i++)
         mPositions[0][i] = tmpPositions[i];
 }
@@ -1454,42 +1475,42 @@ void AEDrawObjectBaseCollada::SkeletonJointNo(SkeletonNode* node)
 /*
  * skeleton animation
  */
-void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 parentMatrix, glm::mat4 ibp,std::vector<glm::vec3>& tmpPositions)
+void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix,
+                                                glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions)
 {
     int jointnum = node->jointNo;
     int animnum = mSkinJointsArray[jointnum].animNo;
     __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation",
                         (std::string("anim num = ") + std::to_string(animnum)).c_str(), 0);
+    __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation",
+                        (std::string("joint num = ") + std::to_string(jointnum)).c_str(), 0);
+    __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("node id = ") + node->id).c_str(), 0);
     if(mAnimationMatrices.empty())
     {
         __android_log_print(ANDROID_LOG_ERROR, "aqoole animation", "no animation matrices");
     }
-    if(jointnum >= 0 && animnum >= 0)
-    {
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("node id = ") + node->id).c_str(), 0);
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("joint no = ") + std::to_string(node->jointNo)).c_str(), 0);
-        parentMatrix = parentMatrix * node->matrix;
+    if(jointnum >= 0 && animnum >= 0) {
         glm::mat4 animationTransform = mAnimationMatrices[mSkinJointsArray[node->jointNo].animNo].matrixList[0];
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "node matrix retrieved successfully");
+        parentAnimationMatrix = parentAnimationMatrix * animationTransform;
+        parentBindPoseMatrix = parentBindPoseMatrix * node->matrix;
+        glm::mat4 inverseBindPose = glm::inverse(parentBindPoseMatrix);
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation",
+                            "node matrix retrieved successfully");
         ibp = ibp * mInverseMatrices[node->jointNo];
-        glm::mat4 finalTransform = mInverseMatrices[node->jointNo] * parentMatrix * mInverseMatrices[node->jointNo];
         glm::vec4 oldpos;
         glm::vec4 newpos;
-        for (uint32_t positionIndice: mSkinJointsArray[node->jointNo].indices) {
-            oldpos = glm::vec4(mPositions[0][positionIndice], 1.0f);
-            uint32_t weightIndice = 0;
-            for (uint32_t i = 0; i < mJointWeights[positionIndice].weights.size(); i++) {
-                if (mJointWeights[positionIndice].jointIndices[i] == positionIndice) {
-                    weightIndice = i;
-                    break;
-                }
-            }
-            newpos =mJointWeights[positionIndice].weights[weightIndice] * finalTransform * oldpos;
-            tmpPositions[positionIndice] += glm::vec3(newpos);
+        glm::mat4 finalTransform = glm::mat4(1.0f);
+        for (auto indexWeight: mSkinJointsArray[jointnum].indexWeight) {
+            oldpos = glm::vec4(mPositions[0][indexWeight.first], 1.0f);
+            newpos = indexWeight.second * finalTransform * oldpos;
+            tmpPositions[indexWeight.first] += glm::vec3(newpos);
         }
     }
-    for(auto& child : node->children)
-        SkeletonAnimation(child.get(), parentMatrix, ibp, tmpPositions);
+    if(node->children.size() > 0) {
+        for (auto &child: node->children)
+            SkeletonAnimation(child.get(), parentBindPoseMatrix, parentAnimationMatrix, ibp,
+                              tmpPositions);
+    }
 }
 
 //=====================================================================

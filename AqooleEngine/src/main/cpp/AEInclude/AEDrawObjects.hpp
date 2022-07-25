@@ -219,7 +219,7 @@ protected:
         std::string jointName;
         int animNo;
         std::string nodeId;
-        std::vector<uint32_t> indices;
+        std::vector<std::pair<uint32_t, float>> indexWeight;
         glm::mat4 controllerMatrix;
     };
     std::vector<Vertex3DObj> mVertices;
@@ -251,7 +251,7 @@ protected:
     void GetVertexWeights(std::vector<float> &vertexWeights, std::string& weightString);
     void ReadAnimation(const boost::property_tree::ptree::value_type& node);
     void SkeletonJointNo(SkeletonNode* node);
-    void SkeletonAnimation(SkeletonNode* node, glm::mat4 parentMatrix, glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions);
+    void SkeletonAnimation(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions);
 public:
     AEDrawObjectBaseCollada(const char* filePath, android_app* app, AELogicalDevice* device, std::vector<const char*> &shaderPaths,
                             AECommandPool* commandPool, AEDeviceQueue* queue);
@@ -273,7 +273,7 @@ public:
     uint32_t GetMaterialSize(){return mPositionIndices.size();}
     void MakeAnimation()
     {
-        //Animation();
+        Animation();
         MakeVertices();
     }
     //scale
