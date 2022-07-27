@@ -1045,7 +1045,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                             {
                                 for (uint32_t k = 0; k < 4; k++)
                                 {
-                                    m[k][j] = std::stof(fields[i + j * 4 + k]);
+                                    m[j][k] = std::stof(fields[i + j * 4 + k]);
                                 }
                             }
                             mSkinJointsArray[index].controllerMatrix = m;
@@ -1144,7 +1144,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                                 {
                                     for(uint32_t j = 0; j < 4; j++)
                                         for(uint32_t k = 0; k < 4; k++)
-                                            oneMatrix[k][j] = std::stof(fields[16 * i + 4 * j + k]);
+                                            oneMatrix[j][k] = std::stof(fields[16 * i + 4 * j + k]);
                                     mInverseMatrices.push_back(oneMatrix);
                                 }
                             }
@@ -1368,7 +1368,7 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
                         for(uint32_t k = 0; k < 4; k++)
                         {
                             float e = std::stof(matrixList[i + (4 * j) + k]);
-                            m[k][j] = e;
+                            m[j][k] = e;
                         }
                     }
                     a.matrixList.emplace_back(m);
@@ -1421,6 +1421,11 @@ void AEDrawObjectBaseCollada::Animation()
             if(joint.nodeId == mAnimationMatrices[i].target)
             {
                 joint.animNo = i;
+                //check anim <-> joint in logs
+                __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("animation id = ") + mAnimationMatrices[i].id).c_str(), 0);
+                __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("animation target = ") + mAnimationMatrices[i].target).c_str(), 0);
+                __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("joint name = ") + joint.jointName).c_str(), 0);
+                __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("node id = ") + joint.nodeId).c_str(), 0);
                 break;
             }
         }
@@ -1446,7 +1451,6 @@ void AEDrawObjectBaseCollada::Animation()
     for(auto& p : tmpPositions)
         p = glm::vec3(0.0f);
     __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "start animation calclation %u", 0);
-    mGlobalInverseMatrix = glm::inverse(mRoot->matrix);
     SkeletonAnimation(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f), tmpPositions);
     for(uint32_t i = 0; i < mPositions[0].size(); i++)
         mPositions[0][i] = tmpPositions[i];
@@ -1490,7 +1494,16 @@ void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 pa
         __android_log_print(ANDROID_LOG_ERROR, "aqoole animation", "no animation matrices");
     }
     if(jointnum >= 0 && animnum >= 0) {
-        glm::mat4 animationTransform = mAnimationMatrices[mSkinJointsArray[node->jointNo].animNo].matrixList[0];
+        //transpose matrix
+        node->matrix = glm::transpose(node->matrix);
+        glm::mat4 animationTransform = mAnimationMatrices[animnum].matrixList[0];
+        animationTransform = glm::transpose(animationTransform);
+//        //rotate
+//            glm::mat4 r = glm::rotate(glm::mat4(1.0f), 90.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+//            animationTransform = r * animationTransform;
+//            node->matrix = r * node->matrix;
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation transform", (std::string("animation name = ") + mAnimationMatrices[animnum].id).c_str(), 0);
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation transform", (std::string("joint name = ") + node->id).c_str(), 0);
         parentAnimationMatrix = parentAnimationMatrix * animationTransform;
         parentBindPoseMatrix = parentBindPoseMatrix * node->matrix;
         glm::mat4 inverseBindPose = glm::inverse(parentBindPoseMatrix);
@@ -1499,7 +1512,7 @@ void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 pa
         ibp = ibp * mInverseMatrices[node->jointNo];
         glm::vec4 oldpos;
         glm::vec4 newpos;
-        glm::mat4 finalTransform = glm::mat4(1.0f);
+        glm::mat4 finalTransform = parentAnimationMatrix * inverseBindPose;
         for (auto indexWeight: mSkinJointsArray[jointnum].indexWeight) {
             oldpos = glm::vec4(mPositions[0][indexWeight.first], 1.0f);
             newpos = indexWeight.second * finalTransform * oldpos;
