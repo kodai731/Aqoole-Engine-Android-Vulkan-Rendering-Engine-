@@ -131,6 +131,8 @@ class AEBufferUtilOnGPU : public AEBufferBase
     //copy data
     void CopyData(void *data, VkDeviceSize offset, VkDeviceSize dataSize, AEDeviceQueue* queue,
         AECommandPool* commandPool);
+    //update buffer
+    void UpdateBuffer(AEDeviceQueue *queue, AECommandPool* commandPool);
 };
 
 class AEBufferUniform : public AEBufferBase

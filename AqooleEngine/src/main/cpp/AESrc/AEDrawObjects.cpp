@@ -25,6 +25,7 @@
 #include "descriptorSet.hpp"
 #include "AEBuffer.hpp"
 #include "AEDeviceQueue.hpp"
+#include "AECommand.hpp"
 
 
 //=====================================================================
@@ -805,15 +806,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                                                  std::vector<const char*> &shaderPaths, AECommandPool* commandPool, AEDeviceQueue* queue)
     : AEDrawObjectBase()
 {
-//    //create compute pipeline
-//    AEDescriptorSetLayout layout(device);
-//    layout.AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
-//                                         nullptr);
-//    layout.AddDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
-//                                         nullptr);
-//    layout.CreateDescriptorSetLayout();
-//
-//    mComputePipeline = std::make_unique<AEComputePipeline>(device, shaderPaths, &layout, app);
     //using boost
     {
         using namespace boost::property_tree;
@@ -993,13 +985,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             //bind_shape_matrix
             if(strncmp(obj->first.data(), "bind_shape_matrix", 18) == 0)
             {
-                std::string matrixString = obj->second.get_value<std::string>();
-                AEDrawObject::Split(fields, matrixString, ' ');
-                glm::mat4 bindShapeMatrix;
-                for(uint32_t i = 0; i < 4; i++)
-                    for(uint32_t j = 0; j < 4; j++)
-                        bindShapeMatrix[i][j] = std::stof(fields[4 * i + j]);
-                mBSM = bindShapeMatrix;
             }
             //source id = skin-joints
             if(strncmp(obj->first.data(), "source", 7) == 0)
@@ -1087,10 +1072,15 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                     uint32_t influenceCount = std::stoi(influenceCounts[i]);
                     for(uint32_t j = 0; j < influenceCount; j++)
                     {
-                        oneJointWeight.jointIndices.push_back(std::stoi(jointWeightList[nowPointing]));
+                        int joint = std::stoi(jointWeightList[nowPointing]);
+                        oneJointWeight.jointIndices.push_back(joint);
+                        mJoints.emplace_back(joint);
                         nowPointing++;
-                        oneJointWeight.weights.push_back(std::stof(vertexWeights[std::stoi(jointWeightList[nowPointing])]));
+                        float f = std::stof(vertexWeights[std::stoi(jointWeightList[nowPointing])]);
+                        oneJointWeight.weights.push_back(f);
+                        mWeights.emplace_back(f);
                         nowPointing++;
+                        mVerteces2.emplace_back(vertexIndex);
                     }
                     //check total weight
                     float total = 0.0f;
@@ -1153,6 +1143,16 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
         }
+//            //create compute pipeline
+//    AEDescriptorSetLayout layout(device);
+//    layout.AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+//                                         nullptr);
+//    layout.AddDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+//                                         nullptr);
+//    layout.AddDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+//                                             nullptr);
+//        layout.CreateDescriptorSetLayout();
+//    mComputePipeline = std::make_unique<AEComputePipeline>(device, shaderPaths, &layout, app);
 //        //create buffers to use in animation
 //        VkDeviceSize vbSize = sizeof(float) * 3 * mPositions[0].size();
 //        std::unique_ptr<AEBufferUtilOnGPU> vb(new AEBufferUtilOnGPU(device, vbSize ,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
@@ -1169,6 +1169,21 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
 //        AEDescriptorPool pool(device, poolSize.size(), poolSize.data());
 //        AEDescriptorSet ds(device, &layout, &pool);
 //        ds.BindDescriptorBuffer(0, vb->GetBuffer(), vbSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+//        AECommandBuffer command(device, commandPool);
+//        AECommand::BeginCommand(&command);
+//        AECommand::BindPipeline(&command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
+//        vkCmdDispatch(*command.GetCommandBuffer(), 100, 100, 100);
+//        AECommand::EndCommand(&command);
+//        VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+//                .pNext = nullptr,
+//                .waitSemaphoreCount = 0,
+//                .pWaitSemaphores = nullptr,
+//                .pWaitDstStageMask = 0,
+//                .commandBufferCount = 1,
+//                .pCommandBuffers = command.GetCommandBuffer(),
+//                .signalSemaphoreCount = 0,
+//                .pSignalSemaphores = nullptr,};
+//        vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
     }
 }
 
@@ -1226,7 +1241,6 @@ make vertices data
 */
 void AEDrawObjectBaseCollada::MakeVertices()
 {
-    /*
     //vertices
     Vertex3DObj oneVertex;
     for(uint32_t i = 0; i < mPositions.size(); i++)
@@ -1236,7 +1250,7 @@ void AEDrawObjectBaseCollada::MakeVertices()
         {
             oneVertex.pos = mPositions[i][j];
             oneVertex.normal = mNormals[i][mNormalsIndices[i][j]];
-            oneVertex.texcoord = mMaps[i][mMapIndices[i][j]];
+            oneVertex.texcoord = mMaps[i * 3][mMapIndices[i][j]];
             mVertices.emplace_back(oneVertex);
         }
     }
@@ -1250,21 +1264,20 @@ void AEDrawObjectBaseCollada::MakeVertices()
         }
         offset += mPositions[i].size();
     }
-     */
-    uint32_t index = 0;
-    Vertex3DObj oneVertex;
-    for(uint32_t i = 0; i < mPositionIndices.size(); i++)
-    {
-        for(uint32_t j = 0; j < mPositionIndices[i].size(); j++)
-        {
-            oneVertex.pos = mPositions[i][mPositionIndices[i][j]];
-            oneVertex.normal = mNormals[i][mNormalsIndices[i][j]];
-            oneVertex.texcoord = mMaps[i * 3][mMapIndices[i][j]];
-            mVertices.emplace_back(oneVertex);
-            mIndices.emplace_back(index);
-            index++;
-        }
-    }
+//    uint32_t index = 0;
+//    Vertex3DObj oneVertex;
+//    for(uint32_t i = 0; i < mPositionIndices.size(); i++)
+//    {
+//        for(uint32_t j = 0; j < mPositionIndices[i].size(); j++)
+//        {
+//            oneVertex.pos = mPositions[i][mPositionIndices[i][j]];
+//            oneVertex.normal = mNormals[i][mNormalsIndices[i][j]];
+//            oneVertex.texcoord = mMaps[i * 3][mMapIndices[i][j]];
+//            mVertices.emplace_back(oneVertex);
+//            mIndices.emplace_back(index);
+//            index++;
+//        }
+//    }
 }
 
 /*
@@ -1496,7 +1509,7 @@ void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 pa
     if(jointnum >= 0 && animnum >= 0) {
         //transpose matrix
         node->matrix = glm::transpose(node->matrix);
-        glm::mat4 animationTransform = mAnimationMatrices[animnum].matrixList[0];
+        glm::mat4 animationTransform = mAnimationMatrices[animnum].matrixList[4];
         animationTransform = glm::transpose(animationTransform);
 //        //rotate
 //            glm::mat4 r = glm::rotate(glm::mat4(1.0f), 90.0f, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -1523,6 +1536,112 @@ void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 pa
         for (auto &child: node->children)
             SkeletonAnimation(child.get(), parentBindPoseMatrix, parentAnimationMatrix, ibp,
                               tmpPositions);
+    }
+}
+
+/*
+ *
+ * animation dispatch compute entry function
+ */
+void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders, AEBufferBase* buffers[],
+                                                AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool)
+{
+    AEDescriptorSetLayout cl(device);
+    cl.AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
+    cl.AddDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
+    cl.AddDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
+    cl.AddDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
+    cl.AddDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
+    cl.AddDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
+    cl.CreateDescriptorSetLayout();
+    mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
+    //command record for each joint
+    AECommand::BeginCommand(command);
+    AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
+    mAnimationTransforms.clear();
+    mAnimationTransforms.resize(mSkinJointsArray.size());
+    AnimationDispatchJoint(device, mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), queue, commandPool, &cl, buffers, command);
+    //create buffers
+    VkDeviceSize indicesBufferSize = mVerteces2.size() * sizeof(uint32_t);
+    VkDeviceSize jointsBufferSize = mJoints.size() * sizeof(uint32_t);
+    VkDeviceSize weightsBufferSize = mWeights.size() * sizeof(float);
+    VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
+    //indices
+    std::unique_ptr<AEBufferUtilOnGPU> indicesBuffer = std::make_unique<AEBufferUtilOnGPU>(device, indicesBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    indicesBuffer->CreateBuffer();
+    indicesBuffer->CopyData((void*)mVerteces2.data(), 0, indicesBufferSize, queue, commandPool);
+    mBuffers.emplace_back(std::move(indicesBuffer));
+    //joints
+    std::unique_ptr<AEBufferUtilOnGPU> jointBuffer = std::make_unique<AEBufferUtilOnGPU>(device, jointsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    jointBuffer->CreateBuffer();
+    jointBuffer->CopyData((void*)mJoints.data(), 0, jointsBufferSize, queue, commandPool);
+    mBuffers.emplace_back(std::move(jointBuffer));
+    //weights
+    std::unique_ptr<AEBufferUtilOnGPU> weightBuffer = std::make_unique<AEBufferUtilOnGPU>(device, weightsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    weightBuffer->CreateBuffer();
+    weightBuffer->CopyData((void*)mWeights.data(), 0, weightsBufferSize, queue, commandPool);
+    mBuffers.emplace_back(std::move(weightBuffer));
+    //animation mats
+    std::unique_ptr<AEBufferUtilOnGPU> matsBuffer = std::make_unique<AEBufferUtilOnGPU>(device, matBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    matsBuffer->CreateBuffer();
+    matsBuffer->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
+    mBuffers.emplace_back(std::move(matsBuffer));
+    //prepare descriptor set
+    mDs = std::make_unique<AEDescriptorSet>(device, &cl, descriptorPool);
+    mDs->BindDescriptorBuffer(0, buffers[0]->GetBuffer(), GetVertexBufferSize(),
+                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(1, buffers[1]->GetBuffer(), GetVertexBufferSize(),
+                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(2, mBuffers[0]->GetBuffer(), indicesBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(3, mBuffers[1]->GetBuffer(), jointsBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(4, mBuffers[2]->GetBuffer(), weightsBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(5, mBuffers[3]->GetBuffer(), matBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline->GetPipelineLayout(),
+                                  1, mDs->GetDescriptorSet());
+    //dispatch
+    vkCmdDispatch(*command->GetCommandBuffer(), mVerteces2.size(), 1, 1);
+    AECommand::EndCommand(command);
+    //submit
+    VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .waitSemaphoreCount = 0,
+            .pWaitSemaphores = nullptr,
+            .pWaitDstStageMask = 0,
+            .commandBufferCount = 1,
+            .pCommandBuffers = command->GetCommandBuffer(),
+            .signalSemaphoreCount = 0,
+            .pSignalSemaphores = nullptr,};
+    vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
+}
+
+/*
+ * animation dispatch for each joint
+ */
+void AEDrawObjectBaseCollada::AnimationDispatchJoint(AELogicalDevice* device, SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix,
+                                                     AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorSetLayout* layout,
+                                                     AEBufferBase* buffers[], AECommandBuffer* command)
+{
+    //create joint and weight buffer
+    int jointnum = node->jointNo;
+    int animnum = mSkinJointsArray[node->jointNo].animNo;
+    if(jointnum >= 0 && animnum >= 0) {
+        //compute matrices and put uniform buffer
+        parentAnimationMatrix = parentAnimationMatrix * glm::transpose(mAnimationMatrices[animnum].matrixList[0]);
+        parentBindPoseMatrix = parentBindPoseMatrix * glm::transpose(node->matrix);
+        glm::mat4 inverseBindPose = glm::inverse(parentBindPoseMatrix);
+        glm::mat4 finalTransform = parentAnimationMatrix * inverseBindPose;
+        mAnimationTransforms[jointnum] = finalTransform;
+    }
+    //continue to child
+    if(node->children.size() > 0) {
+        for (auto &child: node->children)
+            AnimationDispatchJoint(device, child.get(), parentBindPoseMatrix, parentAnimationMatrix, queue, commandPool, layout, buffers, command);
     }
 }
 

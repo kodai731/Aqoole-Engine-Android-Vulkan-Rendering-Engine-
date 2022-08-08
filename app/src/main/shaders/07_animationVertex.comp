@@ -5,16 +5,18 @@
 #include "07_raycommon.glsl"
 
 
-layout(binding = 0, set = 0, scalar) buffer Verticesobj {vec3 vobj[];} verticesobj[];
-layout(binding = 1, set = 0, scalar) buffer VerticesobjDst {vec3 vobjDst[];} verticesobjDst[];
-layout(binding = 2) uniform Mat
-{
-  mat4 m;
-}mat;
-
+layout(binding = 0, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} verticesobj;
+layout(binding = 1, set = 0, scalar) buffer VerticesobjDst {Vertex3DObj vobjDst[];} verticesobjDst;
+layout(binding = 2, set = 0, scalar) buffer Indices {uint i[];} indices[];
+layout(binding = 3, set = 0, scalar) buffer Joints {uint j[];} joints[];
+layout(binding = 4, set = 0, scalar) buffer Weights {float f[];} weights[];
+layout(binding = 5, set = 0, scalar) buffer Mats{mat4 m[];} mats[];
 void main()
 {
-  vec3 v0 = verticesobj[0].vobj[gl_GlobalInvocationID.x];
+  //uint index = indices[0].i[gl_GlobalInvocationID.x];
+  uint index = indices[0].i[gl_GlobalInvocationID.x];
+  float w = weights[0].f[gl_GlobalInvocationID.x];
+  vec3 v0 = verticesobj.vobj[index].pos;
     /*
   const float PI       = 3.14159265;
   const float signY    = (v0.pos.y >= 0 ? 1 : -1);
@@ -35,5 +37,8 @@ void main()
     v0.nrm               = normalize(vec3(v0.pos.x * xzFactor, yFactor, v0.pos.z * xzFactor));
   }
 */
-  verticesobjDst[0].vobjDst[gl_GlobalInvocationID.x] = (mat.m * vec4(v0, 1.0)).xyz;
+  uint j = joints[0].j[gl_GlobalInvocationID.x];
+  v0 = (w * (mats[0].m[j] * vec4(v0, 1.0))).xyz;
+  verticesobjDst.vobjDst[index].pos += v0;
+  //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
 }

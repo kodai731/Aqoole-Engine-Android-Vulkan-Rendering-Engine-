@@ -164,8 +164,15 @@ AEDescriptorSet::AEDescriptorSet(AELogicalDevice const* device,
 	allocInfo.descriptorPool = *mPool->GetDescriptorPool();
 	allocInfo.descriptorSetCount = 1;
 	allocInfo.pSetLayouts = mLayout->GetDescriptorSetLayout();
-	if (vkAllocateDescriptorSets(*mDevice->GetDevice(), &allocInfo, &mDescriptorSet) != VK_SUCCESS)
-		std::runtime_error("failed to create descriptor sets");
+    VkResult ret = vkAllocateDescriptorSets(*mDevice->GetDevice(), &allocInfo, &mDescriptorSet);
+	if (ret != VK_SUCCESS) {
+#ifndef __ANDROID__
+        std::runtime_error("failed to create descriptor sets");
+#else
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole descriptorset",
+                            (std::string("failed to create descriptor set ret = ") + std::to_string(ret)).c_str(), 0);
+#endif
+    }
     return;
 }
 
@@ -180,8 +187,15 @@ AEDescriptorSet::AEDescriptorSet(AELogicalDevice const* device, AEDescriptorSetL
     allocInfo.descriptorPool = *mPool->GetDescriptorPool();
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = mLayout->GetDescriptorSetLayout();
-    if (vkAllocateDescriptorSets(*mDevice->GetDevice(), &allocInfo, &mDescriptorSet) != VK_SUCCESS)
+    VkResult ret = vkAllocateDescriptorSets(*mDevice->GetDevice(), &allocInfo, &mDescriptorSet);
+    if (ret != VK_SUCCESS) {
+#ifndef __ANDROID__
         std::runtime_error("failed to create descriptor sets");
+#else
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole descriptorset",
+                            (std::string("failed to create descriptor set ret = ") + std::to_string(ret)).c_str(), 0);
+#endif
+    }
     return;
 }
 

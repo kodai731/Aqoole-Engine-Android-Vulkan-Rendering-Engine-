@@ -385,4 +385,9 @@ struct DebugGLSL
 	float z;
 };
 
+struct MatrixUBO
+{
+	glm::mat4 m;
+};
+
 #endif

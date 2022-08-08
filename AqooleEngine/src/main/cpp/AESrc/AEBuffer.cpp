@@ -418,6 +418,14 @@ void AEBufferUtilOnGPU::CopyData(void *data, VkDeviceSize offset, VkDeviceSize d
     return;
 }
 
+/*
+ * update buffer
+ */
+void AEBufferUtilOnGPU::UpdateBuffer(AEDeviceQueue *queue, AECommandPool* commandPool)
+{
+    AEBuffer::CopyBuffer(mStagingBuffer, mBuffer, mSize, mDevice, queue, commandPool);
+}
+
 //=====================================================================
 //AE buffer uniform
 //=====================================================================

@@ -53,6 +53,13 @@ class AEComputePipeline;
 class AELogicalDevice;
 class AECommandPool;
 class AEDeviceQueue;
+class AECommandBuffer;
+class AEDescriptorSetLayout;
+class AEDescriptorPool;
+class AEBufferBase;
+class AEDescriptorSet;
+class AEBufferUtilOnGPU;
+class AEBufferUniform;
 
 namespace AEDrawObject
 {
@@ -239,9 +246,14 @@ protected:
     std::vector<AEDrawObjectBaseCollada::JointWeight> mJointWeights;
     std::vector<glm::mat4> mInverseMatrices;
     std::vector<AnimationMatrix> mAnimationMatrices;
-    glm::mat4 mBSM;
     glm::mat4 mGlobalInverseMatrix;
     std::unique_ptr<AEComputePipeline> mComputePipeline;
+    std::vector<glm::mat4> mAnimationTransforms;
+    std::vector<uint32_t> mVerteces2;
+    std::vector<uint32_t> mJoints;
+    std::vector<float> mWeights;
+    std::unique_ptr<AEDescriptorSet> mDs;
+    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBuffers;
     //functions
     void ProcessGeometry(std::ifstream &file);
     void MakeVertices();
@@ -270,6 +282,7 @@ public:
     std::vector<glm::vec2>const& GetMapsAddress()const{return mMaps[0];}
     std::vector<uint32_t>const& GetEachMapIndices(uint32_t index)const{return mMapIndices[index];}
     std::vector<std::vector<uint32_t>>const& GetMapIndices()const{return mMapIndices;}
+    std::vector<glm::vec3>const& GetPositions(uint32_t index)const{return mPositions[index];}
     uint32_t GetMaterialSize(){return mPositionIndices.size();}
     void MakeAnimation()
     {
@@ -280,6 +293,12 @@ public:
     void Scale(float scale);
     //animation
     void Animation();
+    void AnimationDispatch(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders, AEBufferBase* buffers[],
+                           AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
+    void AnimationDispatchJoint(AELogicalDevice* device, SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix,
+                                AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorSetLayout* layout,
+                                AEBufferBase* buffers[], AECommandBuffer* command);
+    void RecordCommand(AELogicalDevice* device, AECommandBuffer* commandBuffer);
 };
 
 /*

@@ -7,7 +7,7 @@ setlocal
 %TOOL_DIR%\glslc --target-spv=spv1.4 -std=460 07_shadow.rmiss -o %DST_DIR%\07_shadowRmiss.spv
 %TOOL_DIR%\glslc --target-spv=spv1.4 -std=460 07_closestHit.rchit -o %DST_DIR%\07_rayRchit.spv
 %TOOL_DIR%\glslc --target-spv=spv1.4 -std=460 07_colorBlend.rchit -o %DST_DIR%\07_colorBlendRchit.spv
-%TOOL_DIR%\glslc --target-spv=spv1.4 -std=460 07_animationVertex.comp -o %DST_DIR%\07_animationVertexComp.spv
+%TOOL_DIR%\glslc --target-spv=spv1.4 -std=460 07_animationVertex.comp -o %DST_DIR%\07_animationComp.spv
 @rem #/usr/bin/glslc --target-spv=spv1.4 -std=460 07_rayQueue.frag -o 07_rayQueueFrag.spv
 @rem #/usr/bin/glslc --target-spv=spv1.4 -std=460 07_causticsGen.rgen -o 07_causticsRgen.spv
 @rem #/usr/bin/glslc --target-spv=spv1.4 -std=460 07_causticsChit.rchit -o 07_causticsRchit.spv

@@ -23,6 +23,7 @@
 #else
 #include <vulkan_wrapper.h>
 #include <android_native_app_glue.h>
+#include <android/log.h>
 #endif
 
 /*

@@ -369,10 +369,12 @@ AEComputePipeline::AEComputePipeline(AELogicalDevice const* device,  std::vector
     //get limits
     VkPhysicalDeviceProperties prop;
     vkGetPhysicalDeviceProperties(*device->GetPhysicalDevice(), &prop);
-    std::ofstream limit("limits.txt", std::ios::out | std::ios::trunc);
-    limit << "maxComputeWorkGroupCount X = " << prop.limits.maxComputeWorkGroupCount[0] << std::endl
-          << "maxComputeWorkGroupCount Y = " << prop.limits.maxComputeWorkGroupCount[1] << std::endl
-          << "maxComputeWorkGroupCount Z = " << prop.limits.maxComputeWorkGroupCount[2] << std::endl;
+    __android_log_print(ANDROID_LOG_DEBUG, "aqoole compute pipeline",
+						(std::string("maxComputeWorkGroupCount X = ") + std::to_string(prop.limits.maxComputeWorkGroupCount[0])).c_str(), 0);
+	__android_log_print(ANDROID_LOG_DEBUG, "aqoole compute pipeline",
+						(std::string("maxComputeWorkGroupCount Y = ") + std::to_string(prop.limits.maxComputeWorkGroupCount[1])).c_str(), 0);
+	__android_log_print(ANDROID_LOG_DEBUG, "aqoole compute pipeline",
+						(std::string("maxComputeWorkGroupCount Z = ") + std::to_string(prop.limits.maxComputeWorkGroupCount[2])).c_str(), 0);
     //shader stage
     uint32_t shaderCount = shaderPaths.size();
     std::vector<VkShaderModule> shaderModules;

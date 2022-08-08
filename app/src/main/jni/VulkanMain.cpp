@@ -181,9 +181,11 @@ std::string fuse1ObjPath("fuse-woman-1/source/woman.obj");
 std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
 //std::string fuse1Collada("phoenix-bird/phoenix-bird2.dae");
 std::string fuse1Collada("cowboy/cowboy.dae");
-std::string computeShaderPath("shaders/07_animationVertexComp.spv");
+std::string computeShaderPath("shaders/07_animationComp.spv");
 std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
+std::unique_ptr<AECommandBuffer> gComputeCommandBuffer;
+std::unique_ptr<AEDescriptorSet> gComputeDescriptor;
 
 double lastTime;
 double startTime;
@@ -366,8 +368,32 @@ bool CreateBuffers(void) {
   gvbWoman = std::make_unique<AEBufferAS>(gDevice, gWomanCollada->GetVertexBufferSize(),
                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gvbWoman->CreateBuffer();
-  gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
+  std::vector<Vertex3DObj> tmpData;
+  Vertex3DObj v = {};
+  v.pos = glm::vec3(0.0f);
+  for(auto &i : gWomanCollada->GetVertexAddress())
+  {
+    v.normal = i.normal;
+    v.texcoord = i.texcoord;
+    tmpData.emplace_back(i);
+  }
+  gvbWoman->CopyData((void *) tmpData.data(), 0,
                      gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
+  //compute pipeline shader
+  std::vector<const char*> c;
+  c.emplace_back(computeShaderPath.c_str());
+  //create source buffer
+  std::unique_ptr<AEBufferAS> sourceBuffer = std::make_unique<AEBufferAS>(gDevice, gWomanCollada->GetVertexBufferSize(),
+                                                                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  sourceBuffer->CreateBuffer();
+  sourceBuffer->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
+                         gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
+  AEBufferAS* buffers[] = {sourceBuffer.get(), gvbWoman.get()};
+  gComputeCommandBuffer = std::make_unique<AECommandBuffer>(gDevice, gCommandPool);
+  //gWomanCollada->AnimationDispatch(androidAppCtx, gDevice, c, (AEBufferBase**)buffers, gComputeCommandBuffer.get(),
+  //                                 gQueue, gCommandPool, gDescriptorPool);
+  //gvbWoman->UpdateBuffer(gQueue, gCommandPool);
+  //index buffer
   for(uint32_t i = 0; i < 1; i++)
   {
     std::unique_ptr<AEBufferAS> ib(new AEBufferAS(gDevice, gWomanCollada->GetIndexBufferSize(),
@@ -487,6 +513,18 @@ bool InitVulkan(android_app* app) {
   // -----------------------------------------------------------------
   // Create 2 frame buffers.
   CreateFrameBuffers(render.renderPass_);
+  //descriptor pool
+  //descriptor pool
+  std::vector<VkDescriptorPoolSize> poolSizeRT =
+          {
+                  {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 2},
+                  {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2},
+                  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10000},
+                  {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 20000},
+                  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 20},
+                  {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 20}
+          };
+  gDescriptorPool = new AEDescriptorPool(gDevice, poolSizeRT.size(), poolSizeRT.data());
   //create objects
   //cubes
   float offsetX = -1.0f;
@@ -555,17 +593,6 @@ bool InitVulkan(android_app* app) {
   // Create graphics pipeline
   CreateGraphicsPipeline();
   //prepare matrix
-  //descriptor pool
-  std::vector<VkDescriptorPoolSize> poolSizeRT =
-          {
-                  {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 2},
-                  {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2},
-                  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
-                  {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 20},
-                  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 20},
-                  {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 20}
-          };
-  gDescriptorPool = new AEDescriptorPool(gDevice, poolSizeRT.size(), poolSizeRT.data());
   //create image
   gStorageImage = std::make_unique<AEStorageImage>(gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gCommandPool, gQueue,
                                                    VkImageUsageFlagBits (VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
