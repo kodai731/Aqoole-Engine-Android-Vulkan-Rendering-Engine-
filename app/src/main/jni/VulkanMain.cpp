@@ -390,8 +390,10 @@ bool CreateBuffers(void) {
                          gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   AEBufferAS* buffers[] = {sourceBuffer.get(), gvbWoman.get()};
   gComputeCommandBuffer = std::make_unique<AECommandBuffer>(gDevice, gCommandPool);
-  //gWomanCollada->AnimationDispatch(androidAppCtx, gDevice, c, (AEBufferBase**)buffers, gComputeCommandBuffer.get(),
-  //                                 gQueue, gCommandPool, gDescriptorPool);
+  gWomanCollada->AnimationDispatch(androidAppCtx, gDevice, c, (AEBufferBase**)buffers, gComputeCommandBuffer.get(),
+                                   gQueue, gCommandPool, gDescriptorPool);
+  //test cpu only
+  gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   //gvbWoman->UpdateBuffer(gQueue, gCommandPool);
   //index buffer
   for(uint32_t i = 0; i < 1; i++)

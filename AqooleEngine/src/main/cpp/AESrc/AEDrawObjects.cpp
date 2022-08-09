@@ -1058,6 +1058,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
             //vertex_weights
             if(std::regex_search(obj->first.data(), std::regex("vertex_weights", std::regex::icase)))
             {
+                uint32_t totalVCount = 0;
                 auto vcountString = obj->second.get_optional<std::string>("vcount").get();
                 std::vector<std::string> influenceCounts;
                 AEDrawObject::Split(influenceCounts, vcountString, ' ');
@@ -1070,6 +1071,7 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 {
                     JointWeight oneJointWeight;
                     uint32_t influenceCount = std::stoi(influenceCounts[i]);
+                    totalVCount += influenceCount;
                     for(uint32_t j = 0; j < influenceCount; j++)
                     {
                         int joint = std::stoi(jointWeightList[nowPointing]);
@@ -1096,6 +1098,10 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                         mSkinJointsArray[oneJointWeight.jointIndices[k]].indexWeight.emplace_back(p);
                     }
                     vertexIndex++;
+                }
+                //check values
+                if(totalVCount != mVerteces2.size()){
+                    __android_log_print(ANDROID_LOG_DEBUG, "animation", "vcount not equal to VList", 0);
                 }
             }
             //inverse matrices
@@ -1460,13 +1466,13 @@ void AEDrawObjectBaseCollada::Animation()
         i++;
     }
     //calc animation position
-    std::vector<glm::vec3> tmpPositions = mPositions[0];
-    for(auto& p : tmpPositions)
-        p = glm::vec3(0.0f);
-    __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "start animation calclation %u", 0);
-    SkeletonAnimation(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f), tmpPositions);
-    for(uint32_t i = 0; i < mPositions[0].size(); i++)
-        mPositions[0][i] = tmpPositions[i];
+//    std::vector<glm::vec3> tmpPositions = mPositions[0];
+//    for(auto& p : tmpPositions)
+//        p = glm::vec3(0.0f);
+//    __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "start animation calclation %u", 0);
+//    SkeletonAnimation(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f), tmpPositions);
+//    for(uint32_t i = 0; i < mPositions[0].size(); i++)
+//        mPositions[0][i] = tmpPositions[i];
 }
 
 /*
@@ -1564,8 +1570,9 @@ void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevic
     //command record for each joint
     AECommand::BeginCommand(command);
     AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
-    mAnimationTransforms.clear();
-    mAnimationTransforms.resize(mSkinJointsArray.size());
+    for(uint32_t i = 0; i < mSkinJointsArray.size(); i++){
+        mAnimationTransforms.emplace_back(glm::mat4(1.0f));
+    }
     AnimationDispatchJoint(device, mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), queue, commandPool, &cl, buffers, command);
     //create buffers
     VkDeviceSize indicesBufferSize = mVerteces2.size() * sizeof(uint32_t);
@@ -1605,7 +1612,7 @@ void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevic
     AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline->GetPipelineLayout(),
                                   1, mDs->GetDescriptorSet());
     //dispatch
-    vkCmdDispatch(*command->GetCommandBuffer(), mVerteces2.size(), 1, 1);
+    //vkCmdDispatch(*command->GetCommandBuffer(), mVerteces2.size(), 1, 1);
     AECommand::EndCommand(command);
     //submit
     VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -1617,7 +1624,26 @@ void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevic
             .pCommandBuffers = command->GetCommandBuffer(),
             .signalSemaphoreCount = 0,
             .pSignalSemaphores = nullptr,};
-    vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
+    //vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
+    std::vector<Vertex3DObj> tmp;
+    Vertex3DObj tmpV;
+    tmpV.pos = glm::vec3(0.0f);
+    //prepare zero data
+    for(uint32_t i = 0; i < mVertices.size(); i++){
+        tmpV.texcoord = mVertices[i].texcoord;
+        tmpV.normal = mVertices[i].normal;
+        tmp.emplace_back(tmpV);
+    }
+    //calc animation
+    for(uint32_t i = 0; i < mVerteces2.size(); i++){
+        uint32_t index = mVerteces2[i];
+        float f = mWeights[i];
+        glm::vec3 pos = mVertices[index].pos;
+        uint32_t j = mJoints[i];
+        pos = f * glm::vec3(mAnimationTransforms[j] * glm::vec4(pos, 1.0f));
+        tmp[index].pos += pos;
+    }
+    mVertices = tmp;
 }
 
 /*

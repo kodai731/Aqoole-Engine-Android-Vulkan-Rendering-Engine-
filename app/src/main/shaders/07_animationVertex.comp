@@ -38,7 +38,7 @@ void main()
   }
 */
   uint j = joints[0].j[gl_GlobalInvocationID.x];
-  v0 = (w * (mats[0].m[j] * vec4(v0, 1.0))).xyz;
+  v0 = w * (mats[0].m[j] * vec4(v0, 1.0)).xyz;
   verticesobjDst.vobjDst[index].pos += v0;
   //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
 }
