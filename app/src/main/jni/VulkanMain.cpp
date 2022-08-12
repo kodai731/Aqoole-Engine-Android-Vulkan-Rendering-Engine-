@@ -371,11 +371,12 @@ bool CreateBuffers(void) {
   std::vector<Vertex3DObj> tmpData;
   Vertex3DObj v = {};
   v.pos = glm::vec3(0.0f);
-  for(auto &i : gWomanCollada->GetVertexAddress())
+  v.vertexTangent = glm::vec4(0.0f);
+  for(uint32_t i = 0; i < gWomanCollada->GetVertexAddress().size(); i++)
   {
-    v.normal = i.normal;
-    v.texcoord = i.texcoord;
-    tmpData.emplace_back(i);
+    v.normal = gWomanCollada->GetVertexAddress()[i].normal;
+    v.texcoord = gWomanCollada->GetVertexAddress()[i].texcoord;
+    tmpData.emplace_back(v);
   }
   gvbWoman->CopyData((void *) tmpData.data(), 0,
                      gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
@@ -390,11 +391,11 @@ bool CreateBuffers(void) {
                          gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   AEBufferAS* buffers[] = {sourceBuffer.get(), gvbWoman.get()};
   gComputeCommandBuffer = std::make_unique<AECommandBuffer>(gDevice, gCommandPool);
+  AESemaphore semaphore(gDevice);
   gWomanCollada->AnimationDispatch(androidAppCtx, gDevice, c, (AEBufferBase**)buffers, gComputeCommandBuffer.get(),
-                                   gQueue, gCommandPool, gDescriptorPool);
-  //test cpu only
-  gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
-  //gvbWoman->UpdateBuffer(gQueue, gCommandPool);
+                                   gQueue, gCommandPool, gDescriptorPool, &semaphore);
+//  //test cpu only
+//  gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   //index buffer
   for(uint32_t i = 0; i < 1; i++)
   {
@@ -431,6 +432,7 @@ bool CreateBuffers(void) {
   //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
   std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsCubes.get(), aslsWoman.get()/*, aslsWoman1.get()*/};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
+  gWomanCollada->Debug(gQueue, gCommandPool);
   return true;
 }
 

@@ -4,19 +4,24 @@
 #extension GL_GOOGLE_include_directive : enable
 #include "07_raycommon.glsl"
 
+//layout(local_size_x = 1024, local_size_y = 2, local_size_z = 1) in;
 
-layout(binding = 0, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} verticesobj;
-layout(binding = 1, set = 0, scalar) buffer VerticesobjDst {Vertex3DObj vobjDst[];} verticesobjDst;
+layout(binding = 0, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} verticesobj[];
+layout(binding = 1, set = 0, scalar) buffer VerticesobjDst {Vertex3DObj vobjDst[];} verticesobjDst[];
 layout(binding = 2, set = 0, scalar) buffer Indices {uint i[];} indices[];
 layout(binding = 3, set = 0, scalar) buffer Joints {uint j[];} joints[];
 layout(binding = 4, set = 0, scalar) buffer Weights {float f[];} weights[];
 layout(binding = 5, set = 0, scalar) buffer Mats{mat4 m[];} mats[];
+layout(binding = 6, set = 0) uniform Size{uint s;} size;
+layout(binding = 7, set = 0, scalar) buffer Debug {uint d[];} debug[];
+
 void main()
 {
-  //uint index = indices[0].i[gl_GlobalInvocationID.x];
-  uint index = indices[0].i[gl_GlobalInvocationID.x];
-  float w = weights[0].f[gl_GlobalInvocationID.x];
-  vec3 v0 = verticesobj.vobj[index].pos;
+  uint ii = gl_WorkGroupID.y * 1024 + gl_WorkGroupID.x;
+  if(ii < size.s){
+    uint index = indices[0].i[ii];
+    float w = weights[0].f[ii];
+    vec3 v0 = verticesobj[0].vobj[index].pos;
     /*
   const float PI       = 3.14159265;
   const float signY    = (v0.pos.y >= 0 ? 1 : -1);
@@ -37,8 +42,13 @@ void main()
     v0.nrm               = normalize(vec3(v0.pos.x * xzFactor, yFactor, v0.pos.z * xzFactor));
   }
 */
-  uint j = joints[0].j[gl_GlobalInvocationID.x];
-  v0 = w * (mats[0].m[j] * vec4(v0, 1.0)).xyz;
-  verticesobjDst.vobjDst[index].pos += v0;
-  //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
+//    memoryBarrierShared();
+//    barrier();
+    verticesobjDst[0].vobjDst[index].pos = v0;
+    //  uint j = joints[0].j[gl_GlobalInvocationID.x];
+    //  v0 = w * (mats[0].m[j] * vec4(v0, 1.0)).xyz;
+    //  verticesobjDst.vobjDst[index].pos += v0;
+    //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
+    debug[0].d[ii] = index;
+  }
 }

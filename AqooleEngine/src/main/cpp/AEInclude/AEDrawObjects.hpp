@@ -60,6 +60,7 @@ class AEBufferBase;
 class AEDescriptorSet;
 class AEBufferUtilOnGPU;
 class AEBufferUniform;
+class AESemaphore;
 
 namespace AEDrawObject
 {
@@ -254,6 +255,7 @@ protected:
     std::vector<float> mWeights;
     std::unique_ptr<AEDescriptorSet> mDs;
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBuffers;
+    std::vector<std::unique_ptr<AEBufferUniform>> mUniformBuffers;
     //functions
     void ProcessGeometry(std::ifstream &file);
     void MakeVertices();
@@ -294,11 +296,14 @@ public:
     //animation
     void Animation();
     void AnimationDispatch(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders, AEBufferBase* buffers[],
-                           AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
+                           AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool,
+                           AESemaphore* signal);
     void AnimationDispatchJoint(AELogicalDevice* device, SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix,
                                 AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorSetLayout* layout,
                                 AEBufferBase* buffers[], AECommandBuffer* command);
     void RecordCommand(AELogicalDevice* device, AECommandBuffer* commandBuffer);
+    AEBufferUtilOnGPU* GetBuffer(uint32_t index){return mBuffers[index].get();}
+    void Debug(AEDeviceQueue* queue, AECommandPool* commandPool);
 };
 
 /*

@@ -87,7 +87,8 @@ namespace AEBuffer
     void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize bufferSize,
         AELogicalDevice* device, AEDeviceQueue* queue,
         AECommandPool* commandPool);
-
+    void BackData(AELogicalDevice const* device, VkDeviceMemory bufferMemory,
+                  VkDeviceSize bufferSize, void *data);
 #ifdef __RAY_TRACING__
     VkDeviceAddress GetBufferDeviceAddress(AELogicalDevice const* device, VkBuffer buffer);
 #endif
@@ -133,6 +134,8 @@ class AEBufferUtilOnGPU : public AEBufferBase
         AECommandPool* commandPool);
     //update buffer
     void UpdateBuffer(AEDeviceQueue *queue, AECommandPool* commandPool);
+    void BackData(void *data, VkDeviceSize offset, VkDeviceSize dataSize, AEDeviceQueue* queue,
+                  AECommandPool* commandPool);
 };
 
 class AEBufferUniform : public AEBufferBase

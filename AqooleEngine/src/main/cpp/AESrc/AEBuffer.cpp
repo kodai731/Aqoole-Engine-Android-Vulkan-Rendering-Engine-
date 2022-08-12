@@ -310,6 +310,20 @@ void AEBuffer::CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize b
     return;
 }
 
+/*
+ * back vulkan memory data to data
+ */
+void AEBuffer::BackData(AELogicalDevice const* device, VkDeviceMemory bufferMemory,
+              VkDeviceSize bufferSize, void *data)
+{
+    VkDevice const* localDevice = device->GetDevice();
+    void *tmpBuffer;
+    vkMapMemory(*localDevice, bufferMemory, 0, bufferSize, 0, &tmpBuffer);
+    memcpy(data, tmpBuffer, bufferSize);
+    vkUnmapMemory(*localDevice, bufferMemory);
+}
+
+
 #ifdef __RAY_TRACING__
 VkDeviceAddress AEBuffer::GetBufferDeviceAddress(AELogicalDevice const* device, VkBuffer buffer)
 {
@@ -425,6 +439,19 @@ void AEBufferUtilOnGPU::UpdateBuffer(AEDeviceQueue *queue, AECommandPool* comman
 {
     AEBuffer::CopyBuffer(mStagingBuffer, mBuffer, mSize, mDevice, queue, commandPool);
 }
+
+/*
+ * back data
+ */
+void AEBufferUtilOnGPU::BackData(void *data, VkDeviceSize offset, VkDeviceSize dataSize, AEDeviceQueue* queue,
+              AECommandPool* commandPool)
+{
+    //gpu memory to staging memory
+    //AEBuffer::CopyBuffer(mBuffer, mStagingBuffer, mSize, mDevice, queue, commandPool);
+    //copy buffer to data
+    AEBuffer::BackData(mDevice, mBufferMemory, dataSize, data);
+}
+
 
 //=====================================================================
 //AE buffer uniform
