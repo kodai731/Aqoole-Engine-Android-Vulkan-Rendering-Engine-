@@ -394,8 +394,10 @@ bool CreateBuffers(void) {
   AESemaphore semaphore(gDevice);
   gWomanCollada->AnimationDispatch(androidAppCtx, gDevice, c, (AEBufferBase**)buffers, gComputeCommandBuffer.get(),
                                    gQueue, gCommandPool, gDescriptorPool, &semaphore);
+//  vkDeviceWaitIdle(*gDevice->GetDevice());
+  //gWomanCollada->Debug(gQueue, gCommandPool);
 //  //test cpu only
-//  gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
+  gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   //index buffer
   for(uint32_t i = 0; i < 1; i++)
   {
@@ -432,7 +434,6 @@ bool CreateBuffers(void) {
   //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
   std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsCubes.get(), aslsWoman.get()/*, aslsWoman1.get()*/};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
-  gWomanCollada->Debug(gQueue, gCommandPool);
   return true;
 }
 

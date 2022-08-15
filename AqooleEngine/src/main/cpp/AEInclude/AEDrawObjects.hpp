@@ -256,6 +256,7 @@ protected:
     std::unique_ptr<AEDescriptorSet> mDs;
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBuffers;
     std::vector<std::unique_ptr<AEBufferUniform>> mUniformBuffers;
+    std::vector<glm::vec3> mAnimationPositionDebug;
     //functions
     void ProcessGeometry(std::ifstream &file);
     void MakeVertices();

@@ -14,6 +14,7 @@ layout(binding = 4, set = 0, scalar) buffer Weights {float f[];} weights[];
 layout(binding = 5, set = 0, scalar) buffer Mats{mat4 m[];} mats[];
 layout(binding = 6, set = 0) uniform Size{uint s;} size;
 layout(binding = 7, set = 0, scalar) buffer Debug {uint d[];} debug[];
+layout(binding = 8, set = 0, scalar) buffer DebugVertex {Vertex3DObj dv[];} debugV[];
 
 void main()
 {
@@ -44,11 +45,14 @@ void main()
 */
 //    memoryBarrierShared();
 //    barrier();
-    verticesobjDst[0].vobjDst[index].pos = v0;
-    //  uint j = joints[0].j[gl_GlobalInvocationID.x];
-    //  v0 = w * (mats[0].m[j] * vec4(v0, 1.0)).xyz;
+    //verticesobjDst[0].vobjDst[index].pos += w * v0;
+//    memoryBarrierBuffer();
+    uint jj = joints[0].j[ii];
+    vec3 v1 = w * (mats[0].m[jj] * vec4(v0, 1.0)).xyz;
+    //v0 = w * v0;
     //  verticesobjDst.vobjDst[index].pos += v0;
     //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
-    debug[0].d[ii] = index;
+    debug[0].d[ii] = joints[0].j[ii];
+    debugV[0].dv[ii].pos = v1;
   }
 }
