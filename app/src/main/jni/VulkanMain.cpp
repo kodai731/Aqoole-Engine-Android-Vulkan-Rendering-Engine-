@@ -394,8 +394,8 @@ bool CreateBuffers(void) {
   AESemaphore semaphore(gDevice);
   gWomanCollada->AnimationDispatch(androidAppCtx, gDevice, c, (AEBufferBase**)buffers, gComputeCommandBuffer.get(),
                                    gQueue, gCommandPool, gDescriptorPool, &semaphore);
-//  vkDeviceWaitIdle(*gDevice->GetDevice());
-  //gWomanCollada->Debug(gQueue, gCommandPool);
+  vkDeviceWaitIdle(*gDevice->GetDevice());
+  gWomanCollada->Debug(gQueue, gCommandPool);
 //  //test cpu only
   gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   //index buffer

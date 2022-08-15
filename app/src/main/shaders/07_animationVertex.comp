@@ -6,7 +6,7 @@
 
 //layout(local_size_x = 1024, local_size_y = 2, local_size_z = 1) in;
 
-layout(binding = 0, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} verticesobj[];
+layout(binding = 0, set = 0, scalar) buffer Verticesobj {vec3 vobj[];} verticesobj[];
 layout(binding = 1, set = 0, scalar) buffer VerticesobjDst {Vertex3DObj vobjDst[];} verticesobjDst[];
 layout(binding = 2, set = 0, scalar) buffer Indices {uint i[];} indices[];
 layout(binding = 3, set = 0, scalar) buffer Joints {uint j[];} joints[];
@@ -22,7 +22,7 @@ void main()
   if(ii < size.s){
     uint index = indices[0].i[ii];
     float w = weights[0].f[ii];
-    vec3 v0 = verticesobj[0].vobj[index].pos;
+    vec3 v0 = verticesobj[0].vobj[index];
     /*
   const float PI       = 3.14159265;
   const float signY    = (v0.pos.y >= 0 ? 1 : -1);
