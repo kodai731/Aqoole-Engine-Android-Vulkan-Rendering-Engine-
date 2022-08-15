@@ -1679,7 +1679,7 @@ void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevic
         for (uint32_t i = 0; i < mVerteces2.size(); i++) {
             uint32_t index = mVerteces2[i];
             float f = mWeights[i];
-            glm::vec3 pos = mVertices[index].pos;
+            glm::vec3 pos = mPositions[0][index];
             uint32_t j = mJoints[i];
             pos = f * glm::vec3(mAnimationTransforms[j] * glm::vec4(pos, 1.0f));
             tmp[index].pos += pos;
