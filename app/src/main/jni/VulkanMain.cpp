@@ -384,16 +384,13 @@ bool CreateBuffers(void) {
   std::vector<const char*> c;
   c.emplace_back(computeShaderPath.c_str());
   //create source buffer
-  std::unique_ptr<AEBufferAS> sourceBuffer = std::make_unique<AEBufferAS>(gDevice, gWomanCollada->GetVertexBufferSize(),
-                                                                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-  sourceBuffer->CreateBuffer();
-  sourceBuffer->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
-                         gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
-  AEBufferAS* buffers[] = {sourceBuffer.get(), gvbWoman.get()};
+  AEBufferAS* buffers[] = {gvbWoman.get()};
   gComputeCommandBuffer = std::make_unique<AECommandBuffer>(gDevice, gCommandPool);
   AESemaphore semaphore(gDevice);
-  gWomanCollada->AnimationDispatch(androidAppCtx, gDevice, c, (AEBufferBase**)buffers, gComputeCommandBuffer.get(),
-                                   gQueue, gCommandPool, gDescriptorPool, &semaphore);
+  gWomanCollada->AnimationPrepare(androidAppCtx, gDevice, c, (AEBufferBase**)buffers,
+                                  gQueue, gCommandPool, gDescriptorPool);
+  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(),
+                                   gQueue, gCommandPool, &semaphore, 0);
   vkDeviceWaitIdle(*gDevice->GetDevice());
   gWomanCollada->Debug(gQueue, gCommandPool);
 //  //test cpu only
@@ -850,7 +847,6 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
                               .pSignalSemaphores = &render.presentSemaphore_,};
   CALL_VK(vkQueueSubmit(device.queue_, 1, &submit_info, render.fence_));
   vkWaitForFences(device.device_, 1, &render.fence_, VK_TRUE, 100000000);
-
   LOGI("Drawing frames......");
 
   VkResult result;

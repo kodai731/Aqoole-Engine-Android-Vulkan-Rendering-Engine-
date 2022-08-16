@@ -1548,13 +1548,12 @@ void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 pa
 }
 
 /*
- *
- * animation dispatch compute entry function
+ * animation compute pipeline
  */
-void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders, AEBufferBase* buffers[],
-                                                AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool,
-                                                AESemaphore *signalSemaphore)
+void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
+                                               AEBufferBase* buffers[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool)
 {
+    //compute pipeline
     AEDescriptorSetLayout cl(device);
     cl.AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
                                      nullptr);
@@ -1576,19 +1575,11 @@ void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevic
                                      nullptr);
     cl.CreateDescriptorSetLayout();
     mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
-    //command record for each joint
-    AECommand::BeginCommand(command);
-    AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
-    for(uint32_t i = 0; i < mSkinJointsArray.size(); i++){
-        mAnimationTransforms.emplace_back(glm::mat4(1.0f));
-    }
-    AnimationDispatchJoint(device, mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), queue, commandPool, &cl, buffers, command);
-    //create buffers
+    //buffers for descriptor set
     VkDeviceSize positionBufferSize = mPositions[0].size() * sizeof(glm::vec3);
     VkDeviceSize indicesBufferSize = mVerteces2.size() * sizeof(uint32_t);
     VkDeviceSize jointsBufferSize = mJoints.size() * sizeof(uint32_t);
     VkDeviceSize weightsBufferSize = mWeights.size() * sizeof(float);
-    VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
     //positions
     std::unique_ptr<AEBufferUtilOnGPU> positionBuffer = std::make_unique<AEBufferUtilOnGPU>(device, positionBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     positionBuffer->CreateBuffer();
@@ -1610,6 +1601,10 @@ void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevic
     weightBuffer->CopyData((void*)mWeights.data(), 0, weightsBufferSize, queue, commandPool);
     mBuffers.emplace_back(std::move(weightBuffer));
     //animation mats
+    for(uint32_t i = 0; i < mSkinJointsArray.size(); i++){
+        mAnimationTransforms.emplace_back(glm::mat4(1.0f));
+    }
+    VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
     std::unique_ptr<AEBufferUtilOnGPU> matsBuffer = std::make_unique<AEBufferUtilOnGPU>(device, matBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     matsBuffer->CreateBuffer();
     matsBuffer->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
@@ -1644,9 +1639,9 @@ void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevic
     //prepare descriptor set
     mDs = std::make_unique<AEDescriptorSet>(device, &cl, descriptorPool);
     mDs->BindDescriptorBuffer(0, mBuffers[0]->GetBuffer(), positionBufferSize,
-                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    mDs->BindDescriptorBuffer(1, buffers[1]->GetBuffer(), GetVertexBufferSize(),
-                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+                              VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(1, buffers[0]->GetBuffer(), GetVertexBufferSize(),
+                              VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(2, mBuffers[1]->GetBuffer(), indicesBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(3, mBuffers[2]->GetBuffer(), jointsBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(4, mBuffers[3]->GetBuffer(), weightsBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1654,6 +1649,23 @@ void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevic
     mDs->BindDescriptorBuffer(6, mUniformBuffers[0]->GetBuffer(), uniformSize, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     mDs->BindDescriptorBuffer(7, mBuffers[5]->GetBuffer(), debugSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(8, mBuffers[6]->GetBuffer(), debugVSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+}
+
+/*
+ *
+ * animation dispatch compute entry function
+ */
+void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
+                                                AESemaphore *signalSemaphore, uint32_t animationNum)
+{
+    //command record for each joint
+    AECommand::BeginCommand(command);
+    AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
+    //update animation transforms
+    AnimationDispatchJoint(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), animationNum);
+    //update buffer
+    VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
+    mBuffers[4]->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
     AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline->GetPipelineLayout(),
                                   1, mDs->GetDescriptorSet());
     //dispatch
@@ -1698,16 +1710,14 @@ void AEDrawObjectBaseCollada::AnimationDispatch(android_app* app, AELogicalDevic
 /*
  * animation dispatch for each joint
  */
-void AEDrawObjectBaseCollada::AnimationDispatchJoint(AELogicalDevice* device, SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix,
-                                                     AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorSetLayout* layout,
-                                                     AEBufferBase* buffers[], AECommandBuffer* command)
+void AEDrawObjectBaseCollada::AnimationDispatchJoint(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t animationNum)
 {
     //create joint and weight buffer
     int jointnum = node->jointNo;
     int animnum = mSkinJointsArray[node->jointNo].animNo;
     if(jointnum >= 0 && animnum >= 0) {
         //compute matrices and put uniform buffer
-        parentAnimationMatrix = parentAnimationMatrix * glm::transpose(mAnimationMatrices[animnum].matrixList[0]);
+        parentAnimationMatrix = parentAnimationMatrix * glm::transpose(mAnimationMatrices[animnum].matrixList[animationNum]);
         parentBindPoseMatrix = parentBindPoseMatrix * glm::transpose(node->matrix);
         glm::mat4 inverseBindPose = glm::inverse(parentBindPoseMatrix);
         glm::mat4 finalTransform = parentAnimationMatrix * inverseBindPose;
@@ -1716,7 +1726,7 @@ void AEDrawObjectBaseCollada::AnimationDispatchJoint(AELogicalDevice* device, Sk
     //continue to child
     if(node->children.size() > 0) {
         for (auto &child: node->children)
-            AnimationDispatchJoint(device, child.get(), parentBindPoseMatrix, parentAnimationMatrix, queue, commandPool, layout, buffers, command);
+            AnimationDispatchJoint(child.get(), parentBindPoseMatrix, parentAnimationMatrix, animationNum);
     }
 }
 
