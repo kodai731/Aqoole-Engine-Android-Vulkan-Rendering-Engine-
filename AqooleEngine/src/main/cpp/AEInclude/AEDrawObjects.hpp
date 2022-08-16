@@ -299,7 +299,7 @@ public:
     void AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
                           AEBufferBase* buffers[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
     void AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
-                           AESemaphore *signalSemaphore, uint32_t animationNum);
+                           uint32_t animationNum);
     void AnimationDispatchJoint(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t animationNum);
     void RecordCommand(AELogicalDevice* device, AECommandBuffer* commandBuffer);
     AEBufferUtilOnGPU* GetBuffer(uint32_t index){return mBuffers[index].get();}

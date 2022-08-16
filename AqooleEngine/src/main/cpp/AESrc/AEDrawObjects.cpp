@@ -1656,7 +1656,7 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
  * animation dispatch compute entry function
  */
 void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
-                                                AESemaphore *signalSemaphore, uint32_t animationNum)
+                                                uint32_t animationNum)
 {
     //command record for each joint
     AECommand::BeginCommand(command);
@@ -1679,8 +1679,8 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
             .pWaitDstStageMask = 0,
             .commandBufferCount = 1,
             .pCommandBuffers = command->GetCommandBuffer(),
-            .signalSemaphoreCount = 1,
-            .pSignalSemaphores = signalSemaphore->GetSemaphore()};
+            .signalSemaphoreCount = 0,
+            .pSignalSemaphores = nullptr};
     vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
     //debug in CPU
 //    {

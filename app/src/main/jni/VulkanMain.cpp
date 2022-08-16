@@ -386,11 +386,10 @@ bool CreateBuffers(void) {
   //create source buffer
   AEBufferAS* buffers[] = {gvbWoman.get()};
   gComputeCommandBuffer = std::make_unique<AECommandBuffer>(gDevice, gCommandPool);
-  AESemaphore semaphore(gDevice);
   gWomanCollada->AnimationPrepare(androidAppCtx, gDevice, c, (AEBufferBase**)buffers,
                                   gQueue, gCommandPool, gDescriptorPool);
   gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(),
-                                   gQueue, gCommandPool, &semaphore, 0);
+                                   gQueue, gCommandPool, 0);
   vkDeviceWaitIdle(*gDevice->GetDevice());
   gWomanCollada->Debug(gQueue, gCommandPool);
 //  //test cpu only
@@ -833,7 +832,14 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
                                 &nextIndex));
   CALL_VK(vkResetFences(device.device_, 1, &render.fence_));
   RecordImguiCommand(nextIndex, touchPositions, isTouched);
-    VkPipelineStageFlags waitStageMask =
+  //animation dispatch
+  AESemaphore semaphore(gDevice);
+  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,
+                                   (int)floor(passedTime) % 4);
+  gWomanCollada->Debug(gQueue, gCommandPool);
+  gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
+  aslsWoman->Update(&modelview, gQueue, gCommandPool);
+  VkPipelineStageFlags waitStageMask =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};
   VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
