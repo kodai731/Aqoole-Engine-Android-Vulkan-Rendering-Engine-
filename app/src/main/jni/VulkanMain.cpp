@@ -190,6 +190,8 @@ std::unique_ptr<AEDescriptorSet> gComputeDescriptor;
 double lastTime;
 double startTime;
 double passedTime = 0.0;
+double animationTime[4] = {0.2083333, 0.4166666, 0.625, 0.8333333};
+uint32_t gAnimationIndex = 0;
 
 std::vector<AECube*> gCubes;
 bool isPaused = false;
@@ -833,12 +835,17 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   CALL_VK(vkResetFences(device.device_, 1, &render.fence_));
   RecordImguiCommand(nextIndex, touchPositions, isTouched);
   //animation dispatch
-  AESemaphore semaphore(gDevice);
-  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,
-                                   (int)floor(passedTime) % 4);
-  gWomanCollada->Debug(gQueue, gCommandPool);
-  gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
-  aslsWoman->Update(&modelview, gQueue, gCommandPool);
+  double intpart;
+  double fracpart = std::modf(passedTime, &intpart);
+  if(animationTime[gAnimationIndex] < fracpart || (gAnimationIndex == 4 && fracpart < animationTime[gAnimationIndex])) {
+    AESemaphore semaphore(gDevice);
+    gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex);
+    gWomanCollada->Debug(gQueue, gCommandPool);
+    gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
+                       gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
+    aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
+    gAnimationIndex = (gAnimationIndex + 1) % 5;
+  }
   VkPipelineStageFlags waitStageMask =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};
