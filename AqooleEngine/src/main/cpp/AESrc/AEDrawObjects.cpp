@@ -1150,47 +1150,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
             }
         }
-//            //create compute pipeline
-//    AEDescriptorSetLayout layout(device);
-//    layout.AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
-//                                         nullptr);
-//    layout.AddDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
-//                                         nullptr);
-//    layout.AddDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
-//                                             nullptr);
-//        layout.CreateDescriptorSetLayout();
-//    mComputePipeline = std::make_unique<AEComputePipeline>(device, shaderPaths, &layout, app);
-//        //create buffers to use in animation
-//        VkDeviceSize vbSize = sizeof(float) * 3 * mPositions[0].size();
-//        std::unique_ptr<AEBufferUtilOnGPU> vb(new AEBufferUtilOnGPU(device, vbSize ,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
-//        vb->CreateBuffer();
-//        vb->CopyData(mPositions[0].data(), 0, vbSize, queue, commandPool);
-//        std::unique_ptr<AEBufferUtilOnGPU> vbdst(new AEBufferUtilOnGPU(device, vbSize ,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
-//        vbdst->CreateBuffer();
-//        vbdst->CopyData(mPositions[0].data(), 0, vbSize, queue, commandPool);
-//        std::vector<VkDescriptorPoolSize> poolSize =
-//                {
-//                        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10000},
-//                        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10000}
-//                };
-//        AEDescriptorPool pool(device, poolSize.size(), poolSize.data());
-//        AEDescriptorSet ds(device, &layout, &pool);
-//        ds.BindDescriptorBuffer(0, vb->GetBuffer(), vbSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-//        AECommandBuffer command(device, commandPool);
-//        AECommand::BeginCommand(&command);
-//        AECommand::BindPipeline(&command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
-//        vkCmdDispatch(*command.GetCommandBuffer(), 100, 100, 100);
-//        AECommand::EndCommand(&command);
-//        VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-//                .pNext = nullptr,
-//                .waitSemaphoreCount = 0,
-//                .pWaitSemaphores = nullptr,
-//                .pWaitDstStageMask = 0,
-//                .commandBufferCount = 1,
-//                .pCommandBuffers = command.GetCommandBuffer(),
-//                .signalSemaphoreCount = 0,
-//                .pSignalSemaphores = nullptr,};
-//        vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
     }
 }
 
@@ -1248,43 +1207,68 @@ make vertices data
 */
 void AEDrawObjectBaseCollada::MakeVertices()
 {
-    //vertices
-    Vertex3DObj oneVertex;
-    for(uint32_t i = 0; i < mPositions.size(); i++)
-    {
-        uint32_t vertices = mPositions[i].size();
-        for(uint32_t j = 0; j < vertices; j++)
-        {
-            oneVertex.pos = mPositions[i][j];
-            oneVertex.normal = mNormals[i][mNormalsIndices[i][j]];
-            oneVertex.texcoord = mMaps[i * 3][mMapIndices[i][j]];
-            mVertices.emplace_back(oneVertex);
-        }
-    }
-    //indices
-    uint32_t offset = 0;
-    for(uint32_t i = 0; i < mPositionIndices.size(); i++)
-    {
-        for(uint32_t j = 0; j < mPositionIndices[i].size(); j++)
-        {
-            mIndices.emplace_back(offset + mPositionIndices[i][j]);
-        }
-        offset += mPositions[i].size();
-    }
-//    uint32_t index = 0;
+//    std::vector<std::vector<uint32_t>> p2n;
+//    std::vector<std::vector<uint32_t>> p2m;
+//    //initialize
+//    std::vector<uint32_t> tmp;
+//    for(uint32_t i = 0; i < mPositionIndices[0].size(); i++){
+//        p2n.emplace_back(tmp);
+//        p2m.emplace_back(tmp);
+//    }
+//    //corresponding index retrieve
+//    for(uint32_t i = 0; i < mPositionIndices[0].size(); i++) {
+//        p2n[mPositionIndices[0][i]].emplace_back(mNormalsIndices[0][i]);
+//        p2m[mPositionIndices[0][i]].emplace_back(mMapIndices[0][i]);
+//    }
+//    //vertices
 //    Vertex3DObj oneVertex;
+//    glm::vec3 aveN(0.0f);
+//    glm::vec2 aveM(0.0f);
+//    for(uint32_t i = 0; i < mPositions.size(); i++)
+//    {
+//        uint32_t vertices = mPositions[i].size();
+//        for(uint32_t j = 0; j < vertices; j++)
+//        {
+//            oneVertex.pos = mPositions[i][j];
+//            for(auto index : p2n[j]){
+//                aveN += mNormals[i][index];
+//            }
+//            aveN /= (float)p2n[j].size();
+//            oneVertex.normal = aveN;
+//            for(auto index : p2m[j]){
+//                aveM += mMaps[i][index];
+//            }
+//            aveM /= (float)p2m[j].size();
+//            oneVertex.texcoord = aveM;
+//            mVertices.emplace_back(oneVertex);
+//            aveN = glm::vec3(0.0f);
+//            aveM = glm::vec2(0.0f);
+//        }
+//    }
+//    //indices
+//    uint32_t offset = 0;
 //    for(uint32_t i = 0; i < mPositionIndices.size(); i++)
 //    {
 //        for(uint32_t j = 0; j < mPositionIndices[i].size(); j++)
 //        {
-//            oneVertex.pos = mPositions[i][mPositionIndices[i][j]];
-//            oneVertex.normal = mNormals[i][mNormalsIndices[i][j]];
-//            oneVertex.texcoord = mMaps[i * 3][mMapIndices[i][j]];
-//            mVertices.emplace_back(oneVertex);
-//            mIndices.emplace_back(index);
-//            index++;
+//            mIndices.emplace_back(offset + mPositionIndices[i][j]);
 //        }
+//        offset += mPositions[i].size();
 //    }
+    uint32_t index = 0;
+    Vertex3DObj oneVertex;
+    for(uint32_t i = 0; i < mPositionIndices.size(); i++)
+    {
+        for(uint32_t j = 0; j < mPositionIndices[i].size(); j++)
+        {
+            oneVertex.pos = mPositions[i][mPositionIndices[i][j]];
+            oneVertex.normal = mNormals[i][mNormalsIndices[i][j]];
+            oneVertex.texcoord = mMaps[i * 3][mMapIndices[i][j]];
+            mVertices.emplace_back(oneVertex);
+            mIndices.emplace_back(index);
+            index++;
+        }
+    }
 }
 
 /*
@@ -1759,9 +1743,20 @@ void AEDrawObjectBaseCollada::Debug(AEDeviceQueue* queue, AECommandPool* command
         mVertices[i].pos = glm::vec3(0.0f);
     }
     //calc by vertex
+//    for(uint32_t i = 0; i < mVerteces2.size(); i++){
+//        uint32_t index = mVerteces2[i];
+//        mVertices[index].pos += debugVData[i].pos;
+//    }
+    std::vector<glm::vec3> tmpPos;
+    for(uint32_t i = 0; i < mPositions[0].size(); i++){
+        tmpPos.emplace_back(glm::vec3(0.0f));
+    }
     for(uint32_t i = 0; i < mVerteces2.size(); i++){
         uint32_t index = mVerteces2[i];
-        mVertices[index].pos += debugVData[i].pos;
+        tmpPos[index] += debugVData[i].pos;
+    }
+    for(uint32_t i = 0; i < mPositionIndices[0].size(); i++){
+        mVertices[i].pos = tmpPos[mPositionIndices[0][i]];
     }
     //debug for animation matrix data
 //    std::vector<glm::mat4> debugMats;
