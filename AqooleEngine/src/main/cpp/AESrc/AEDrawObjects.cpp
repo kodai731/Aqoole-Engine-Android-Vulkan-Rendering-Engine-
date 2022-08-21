@@ -1557,6 +1557,10 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
                                      nullptr);
     cl.AddDescriptorSetLayoutBinding(8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
                                      nullptr);
+    cl.AddDescriptorSetLayoutBinding(9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
+    cl.AddDescriptorSetLayoutBinding(10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
     cl.CreateDescriptorSetLayout();
     mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
     //buffers for descriptor set
@@ -1587,6 +1591,7 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     //animation mats
     for(uint32_t i = 0; i < mSkinJointsArray.size(); i++){
         mAnimationTransforms.emplace_back(glm::mat4(1.0f));
+        mAnimationTransformsNext.emplace_back(glm::mat4(1.0f));
     }
     VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
     std::unique_ptr<AEBufferUtilOnGPU> matsBuffer = std::make_unique<AEBufferUtilOnGPU>(device, matBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -1620,6 +1625,18 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     debugVertexBuffer->CreateBuffer();
     debugVertexBuffer->CopyData((void*)tmpVs.data(), 0, debugVSize, queue, commandPool);
     mBuffers.emplace_back(std::move(debugVertexBuffer));
+    //animation next
+    std::unique_ptr<AEBufferUtilOnGPU> matsNextBuffer = std::make_unique<AEBufferUtilOnGPU>(device, matBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    matsNextBuffer->CreateBuffer();
+    matsNextBuffer->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
+    mBuffers.emplace_back(std::move(matsNextBuffer));
+    //time uniform
+    VkDeviceSize uniformTimeSize = sizeof(float);
+    std::unique_ptr<AEBufferUniform> timeBuffer = std::make_unique<AEBufferUniform>(device, uniformTimeSize);
+    timeBuffer->CreateBuffer();
+    float time = 0.0f;
+    timeBuffer->CopyData((void*)&time, uniformTimeSize);
+    mUniformBuffers.emplace_back(std::move(timeBuffer));
     //prepare descriptor set
     mDs = std::make_unique<AEDescriptorSet>(device, &cl, descriptorPool);
     mDs->BindDescriptorBuffer(0, mBuffers[0]->GetBuffer(), positionBufferSize,
@@ -1633,6 +1650,8 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     mDs->BindDescriptorBuffer(6, mUniformBuffers[0]->GetBuffer(), uniformSize, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     mDs->BindDescriptorBuffer(7, mBuffers[5]->GetBuffer(), debugSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(8, mBuffers[6]->GetBuffer(), debugVSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(9, mBuffers[7]->GetBuffer(), matBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(10, mUniformBuffers[1]->GetBuffer(), uniformTimeSize, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 }
 
 /*
@@ -1640,32 +1659,56 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
  * animation dispatch compute entry function
  */
 void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
-                                                uint32_t animationNum)
+                                                uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, double time)
 {
     //command record for each joint
     AECommand::BeginCommand(command);
     AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
     //update animation transforms
-    AnimationDispatchJoint(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), animationNum);
+    AnimationDispatchJoint(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), animationNum, mAnimationTransforms);
+    AnimationDispatchJoint(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), (animationNum + 1) % 5, mAnimationTransformsNext);
     //update buffer
     VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
     mBuffers[4]->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
+    mBuffers[7]->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
+    //uniform buffer
+    float timef = (float)time;
+    mUniformBuffers[1]->CopyData((void*)&timef, sizeof(float));
+    mUniformBuffers[0]->CopyData((void*)&animationNum, sizeof(uint32_t));
     AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline->GetPipelineLayout(),
                                   1, mDs->GetDescriptorSet());
     //dispatch
     vkCmdDispatch(*command->GetCommandBuffer(), 1024, 2, 1);
     AECommand::EndCommand(command);
     //submit
-    VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            .pNext = nullptr,
-            .waitSemaphoreCount = 0,
-            .pWaitSemaphores = nullptr,
-            .pWaitDstStageMask = 0,
-            .commandBufferCount = 1,
-            .pCommandBuffers = command->GetCommandBuffer(),
-            .signalSemaphoreCount = 0,
-            .pSignalSemaphores = nullptr};
-    vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
+    VkSubmitInfo submit_info = {};
+    if(waitSemaphore != nullptr) {
+        submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = waitSemaphore,
+                .pWaitDstStageMask = 0,
+                .commandBufferCount = 1,
+                .pCommandBuffers = command->GetCommandBuffer(),
+                .signalSemaphoreCount = 0,
+                .pSignalSemaphores = nullptr};
+    } else{
+        submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .waitSemaphoreCount = 0,
+                .pWaitSemaphores = nullptr,
+                .pWaitDstStageMask = 0,
+                .commandBufferCount = 1,
+                .pCommandBuffers = command->GetCommandBuffer(),
+                .signalSemaphoreCount = 0,
+                .pSignalSemaphores = nullptr};
+    }
+    if(fence != nullptr) {
+        vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, *fence->GetFence());
+    }
+    else{
+        vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
+    }
     //debug in CPU
 //    {
 //        std::vector<Vertex3DObj> tmp;
@@ -1694,7 +1737,8 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
 /*
  * animation dispatch for each joint
  */
-void AEDrawObjectBaseCollada::AnimationDispatchJoint(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t animationNum)
+void AEDrawObjectBaseCollada::AnimationDispatchJoint(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t animationNum,
+                                                     std::vector<glm::mat4> &targetTransform)
 {
     //create joint and weight buffer
     int jointnum = node->jointNo;
@@ -1705,12 +1749,12 @@ void AEDrawObjectBaseCollada::AnimationDispatchJoint(SkeletonNode* node, glm::ma
         parentBindPoseMatrix = parentBindPoseMatrix * glm::transpose(node->matrix);
         glm::mat4 inverseBindPose = glm::inverse(parentBindPoseMatrix);
         glm::mat4 finalTransform = parentAnimationMatrix * inverseBindPose;
-        mAnimationTransforms[jointnum] = finalTransform;
+        targetTransform[jointnum] = finalTransform;
     }
     //continue to child
     if(node->children.size() > 0) {
         for (auto &child: node->children)
-            AnimationDispatchJoint(child.get(), parentBindPoseMatrix, parentAnimationMatrix, animationNum);
+            AnimationDispatchJoint(child.get(), parentBindPoseMatrix, parentAnimationMatrix, animationNum, targetTransform);
     }
 }
 

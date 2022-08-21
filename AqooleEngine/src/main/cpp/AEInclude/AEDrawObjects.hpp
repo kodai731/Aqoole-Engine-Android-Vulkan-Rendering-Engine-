@@ -20,6 +20,9 @@
 #define _AE_DRAW_OBJECT
 
 #define _USE_MATH_DEFINES
+#ifdef __ANDROID__
+#include <vulkan_wrapper.h>
+#endif
 #include "glm/glm.hpp"
 #include <vector>
 #include <array>
@@ -61,6 +64,7 @@ class AEDescriptorSet;
 class AEBufferUtilOnGPU;
 class AEBufferUniform;
 class AESemaphore;
+class AEFence;
 
 namespace AEDrawObject
 {
@@ -250,6 +254,7 @@ protected:
     glm::mat4 mGlobalInverseMatrix;
     std::unique_ptr<AEComputePipeline> mComputePipeline;
     std::vector<glm::mat4> mAnimationTransforms;
+    std::vector<glm::mat4> mAnimationTransformsNext;
     std::vector<uint32_t> mVerteces2;
     std::vector<uint32_t> mJoints;
     std::vector<float> mWeights;
@@ -299,8 +304,9 @@ public:
     void AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
                           AEBufferBase* buffers[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
     void AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
-                           uint32_t animationNum);
-    void AnimationDispatchJoint(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t animationNum);
+                           uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, double time);
+    void AnimationDispatchJoint(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t animationNum,
+                                std::vector<glm::mat4> &targetTransform);
     void RecordCommand(AELogicalDevice* device, AECommandBuffer* commandBuffer);
     AEBufferUtilOnGPU* GetBuffer(uint32_t index){return mBuffers[index].get();}
     void Debug(AEDeviceQueue* queue, AECommandPool* commandPool);

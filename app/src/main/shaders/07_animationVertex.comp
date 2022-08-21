@@ -6,20 +6,23 @@
 
 //layout(local_size_x = 1024, local_size_y = 2, local_size_z = 1) in;
 
+float KeyFrames[5] = {0.0000, 0.2083333, 0.4166666, 0.625, 0.8333333};
+
 layout(binding = 0, set = 0, scalar) buffer Verticesobj {vec3 vobj[];} verticesobj[];
 layout(binding = 1, set = 0, scalar) buffer VerticesobjDst {Vertex3DObj vobjDst[];} verticesobjDst[];
 layout(binding = 2, set = 0, scalar) buffer Indices {uint i[];} indices[];
 layout(binding = 3, set = 0, scalar) buffer Joints {uint j[];} joints[];
 layout(binding = 4, set = 0, scalar) buffer Weights {float f[];} weights[];
 layout(binding = 5, set = 0, scalar) buffer Mats{mat4 m[];} mats[];
-layout(binding = 6, set = 0) uniform Size{uint s;} size;
+layout(binding = 6, set = 0) uniform AnimNum{uint a;} animNum;
 layout(binding = 7, set = 0, scalar) buffer Debug {uint d[];} debug[];
 layout(binding = 8, set = 0, scalar) buffer DebugVertex {Vertex3DObj dv[];} debugV[];
+layout(binding = 9, set = 0, scalar) buffer MatsNext{mat4 m[];} matsNext[];
+layout(binding = 10, set = 0) uniform Time{float t;} time;
 
 void main()
 {
   uint ii = gl_WorkGroupID.y * 1024 + gl_WorkGroupID.x;
-  if(ii < size.s){
     uint index = indices[0].i[ii];
     float w = weights[0].f[ii];
     vec3 v0 = verticesobj[0].vobj[index];
@@ -49,10 +52,16 @@ void main()
 //    memoryBarrierBuffer();
     uint jj = joints[0].j[ii];
     vec3 v1 = w * (mats[0].m[jj] * vec4(v0, 1.0)).xyz;
+    vec3 v2 = w * (matsNext[0].m[jj] * vec4(v0, 1.0)).xyz;
+  vec3 v3;
+    if(animNum.a == 4){
+      v3 = v1 + ((v2 - v1) * (1.0 - time.t));
+    } else {
+      v3 = v1 + ((v2 - v1) * (time.t - KeyFrames[animNum.a]));
+    }
     //v0 = w * v0;
     //  verticesobjDst.vobjDst[index].pos += v0;
     //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
     debug[0].d[ii] = joints[0].j[ii];
-    debugV[0].dv[ii].pos = v1;
-  }
+    debugV[0].dv[ii].pos = v3;
 }
