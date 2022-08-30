@@ -1072,6 +1072,9 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 {
                     JointWeight oneJointWeight;
                     uint32_t influenceCount = std::stoi(influenceCounts[i]);
+                    if(totalVCount < 1024 && totalVCount + influenceCount > 1024){
+                        mComputeLocalSize = totalVCount;
+                    }
                     totalVCount += influenceCount;
                     for(uint32_t j = 0; j < influenceCount; j++)
                     {
@@ -1535,7 +1538,7 @@ void AEDrawObjectBaseCollada::SkeletonAnimation(SkeletonNode* node, glm::mat4 pa
  * animation compute pipeline
  */
 void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
-                                               AEBufferBase* buffers[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool)
+                                               AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool)
 {
     //compute pipeline
     AEDescriptorSetLayout cl(device);
@@ -1561,6 +1564,8 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
                                      nullptr);
     cl.AddDescriptorSetLayoutBinding(10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
                                      nullptr);
+    cl.AddDescriptorSetLayoutBinding(11, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
     cl.CreateDescriptorSetLayout();
     mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
     //buffers for descriptor set
@@ -1573,6 +1578,11 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     positionBuffer->CreateBuffer();
     positionBuffer->CopyData((void*)mPositions[0].data(), 0, positionBufferSize, queue, commandPool);
     mBuffers.emplace_back(std::move(positionBuffer));
+    //animation result positions
+    std::unique_ptr<AEBufferUtilOnGPU> positionResultBuffer = std::make_unique<AEBufferUtilOnGPU>(device, positionBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    positionResultBuffer->CreateBuffer();
+    positionResultBuffer->CopyData((void*)mPositions[0].data(), 0, positionBufferSize, queue, commandPool);
+    mBuffers.emplace_back(std::move(positionResultBuffer));
     //indices
     std::unique_ptr<AEBufferUtilOnGPU> indicesBuffer = std::make_unique<AEBufferUtilOnGPU>(device, indicesBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     indicesBuffer->CreateBuffer();
@@ -1637,21 +1647,31 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     float time = 0.0f;
     timeBuffer->CopyData((void*)&time, uniformTimeSize);
     mUniformBuffers.emplace_back(std::move(timeBuffer));
+    //dispatch num
+    VkDeviceSize dispatchNumSize = sizeof(uint32_t);
+    std::unique_ptr<AEBufferUniform> dnBuffer = std::make_unique<AEBufferUniform>(device, dispatchNumSize);
+    dnBuffer->CreateBuffer();
+    uint32_t dispatchNum = 0;
+    dnBuffer->CopyData((void*)&dispatchNum, dispatchNumSize);
+    mUniformBuffers.emplace_back(std::move(dnBuffer));
     //prepare descriptor set
     mDs = std::make_unique<AEDescriptorSet>(device, &cl, descriptorPool);
-    mDs->BindDescriptorBuffer(0, mBuffers[0]->GetBuffer(), positionBufferSize,
-                              VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    mDs->BindDescriptorBuffer(1, buffers[0]->GetBuffer(), GetVertexBufferSize(),
-                              VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    mDs->BindDescriptorBuffer(2, mBuffers[1]->GetBuffer(), indicesBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    mDs->BindDescriptorBuffer(3, mBuffers[2]->GetBuffer(), jointsBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    mDs->BindDescriptorBuffer(4, mBuffers[3]->GetBuffer(), weightsBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    mDs->BindDescriptorBuffer(5, mBuffers[4]->GetBuffer(), matBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(0, mBuffers[0]->GetBuffer(), positionBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(1, mBuffers[1]->GetBuffer(), positionBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(2, mBuffers[2]->GetBuffer(), indicesBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(3, mBuffers[3]->GetBuffer(), jointsBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(4, mBuffers[4]->GetBuffer(), weightsBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(5, mBuffers[5]->GetBuffer(), matBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(6, mUniformBuffers[0]->GetBuffer(), uniformSize, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    mDs->BindDescriptorBuffer(7, mBuffers[5]->GetBuffer(), debugSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    mDs->BindDescriptorBuffer(8, mBuffers[6]->GetBuffer(), debugVSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    mDs->BindDescriptorBuffer(9, mBuffers[7]->GetBuffer(), matBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(7, mBuffers[6]->GetBuffer(), debugSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(8, mBuffers[7]->GetBuffer(), debugVSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(9, mBuffers[8]->GetBuffer(), matBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(10, mUniformBuffers[1]->GetBuffer(), uniformTimeSize, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    mDs->BindDescriptorBuffer(11, mUniformBuffers[2]->GetBuffer(), dispatchNumSize, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    //zero data
+    for(uint32_t i = 0; i < mPositions[0].size(); i++){
+        mZeroData.emplace_back(glm::vec3(0.0f));
+    }
 }
 
 /*
@@ -1659,8 +1679,11 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
  * animation dispatch compute entry function
  */
 void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
-                                                uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, double time)
+                                                uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore,
+                                                double time)
 {
+    //clear data of buffer 1
+    mBuffers[1]->CopyData((void*)mZeroData.data(), 0, mPositions[0].size() * sizeof(glm::vec3), queue, commandPool);
     //command record for each joint
     AECommand::BeginCommand(command);
     AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
@@ -1675,10 +1698,19 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     float timef = (float)time;
     mUniformBuffers[1]->CopyData((void*)&timef, sizeof(float));
     mUniformBuffers[0]->CopyData((void*)&animationNum, sizeof(uint32_t));
+    uint32_t dispatchNum = 0;
+    mUniformBuffers[2]->CopyData((void*)&dispatchNum, sizeof(uint32_t));
     AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline->GetPipelineLayout(),
                                   1, mDs->GetDescriptorSet());
     //dispatch
-    vkCmdDispatch(*command->GetCommandBuffer(), 1024, 2, 1);
+    //each work groups
+    //vkCmdDispatch(*command->GetCommandBuffer(), 1024, 2, 1);
+    //each local thread
+    vkCmdDispatch(*command->GetCommandBuffer(), 2, 1, 1);
+    //update dispatch
+//    dispatchNum = 1;
+//    mUniformBuffers[2]->CopyData((void*)&dispatchNum, sizeof(uint32_t));
+//    vkCmdDispatch(*command->GetCommandBuffer(), 1, 1, 1);
     AECommand::EndCommand(command);
     //submit
     VkSubmitInfo submit_info = {};
@@ -1692,7 +1724,17 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
                 .pCommandBuffers = command->GetCommandBuffer(),
                 .signalSemaphoreCount = 0,
                 .pSignalSemaphores = nullptr};
-    } else{
+    } else if(signalSemaphore != nullptr){
+        submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = waitSemaphore,
+                .pWaitDstStageMask = 0,
+                .commandBufferCount = 1,
+                .pCommandBuffers = command->GetCommandBuffer(),
+                .signalSemaphoreCount = 1,
+                .pSignalSemaphores = signalSemaphore};
+    }else{
         submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                 .pNext = nullptr,
                 .waitSemaphoreCount = 0,
@@ -1767,21 +1809,25 @@ void AEDrawObjectBaseCollada::Debug(AEDeviceQueue* queue, AECommandPool* command
     std::vector<uint32_t> debugData;
     for(uint32_t i = 0; i < mJoints.size(); i++)
         debugData.emplace_back(0);
-    mBuffers[2]->BackData(debugData.data(), 0, debugSize, queue, commandPool);
+    mBuffers[3]->BackData(debugData.data(), 0, debugSize, queue, commandPool);
     //compare buffer and data
     for(uint32_t i = 0; i < mJoints.size(); i++){
         if(mJoints[i] != debugData[i])
             __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("data not equal index = ") + std::to_string(i) +
             std::string("data, buffer = ") + std::to_string(mJoints[i]) + std::to_string(debugData[i])).c_str(), 0);
     }
-    int breakpoint = 0;
-    //calc data
-    VkDeviceSize debugVSize = mVerteces2.size() * sizeof(Vertex3DObj);
-    std::vector<Vertex3DObj> debugVData;
-    Vertex3DObj tmp = {};
+    //debug data
+    VkDeviceSize debugVSize = mVerteces2.size() * sizeof(int);
+    std::vector<int> debugVData;
     for(uint32_t i = 0; i < mVerteces2.size(); i++)
-        debugVData.emplace_back(tmp);
+        debugVData.emplace_back(-1);
     mBuffers[6]->BackData(debugVData.data(), 0, debugVSize, queue, commandPool);
+    //calc position
+    VkDeviceSize positionSize = mPositions[0].size() * sizeof(glm::vec3);
+    std::vector<glm::vec3> debugPData;
+    for(uint32_t i = 0; i < mPositions[0].size(); i++)
+        debugPData.emplace_back(glm::vec3(0.0f));
+    mBuffers[1]->BackData(debugPData.data(), 0, positionSize, queue, commandPool);
     //clear pos
     for(uint32_t i = 0; i < mVertices.size(); i++){
         mVertices[i].pos = glm::vec3(0.0f);
@@ -1791,16 +1837,19 @@ void AEDrawObjectBaseCollada::Debug(AEDeviceQueue* queue, AECommandPool* command
 //        uint32_t index = mVerteces2[i];
 //        mVertices[index].pos += debugVData[i].pos;
 //    }
-    std::vector<glm::vec3> tmpPos;
-    for(uint32_t i = 0; i < mPositions[0].size(); i++){
-        tmpPos.emplace_back(glm::vec3(0.0f));
-    }
-    for(uint32_t i = 0; i < mVerteces2.size(); i++){
-        uint32_t index = mVerteces2[i];
-        tmpPos[index] += debugVData[i].pos;
-    }
+//    std::vector<glm::vec3> tmpPos;
+//    for(uint32_t i = 0; i < mPositions[0].size(); i++){
+//        tmpPos.emplace_back(glm::vec3(0.0f));
+//    }
+//    for(uint32_t i = 0; i < mVerteces2.size(); i++){
+//        uint32_t index = mVerteces2[i];
+//        tmpPos[index] += debugPData[i];
+//    }
+//    for(uint32_t i = 0; i < mPositionIndices[0].size(); i++){
+//        mVertices[i].pos = tmpPos[mPositionIndices[0][i]];
+//    }
     for(uint32_t i = 0; i < mPositionIndices[0].size(); i++){
-        mVertices[i].pos = tmpPos[mPositionIndices[0][i]];
+        mVertices[i].pos = debugPData[mPositionIndices[0][i]];
     }
     //debug for animation matrix data
 //    std::vector<glm::mat4> debugMats;
@@ -1814,6 +1863,7 @@ void AEDrawObjectBaseCollada::Debug(AEDeviceQueue* queue, AECommandPool* command
 //            __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("animation matrix not equal") + std::to_string(i)).c_str(), 0);
 //        }
 //    }
+    int breakpoint = 0;
 }
 
 //=====================================================================

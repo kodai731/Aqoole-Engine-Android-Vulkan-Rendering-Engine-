@@ -256,12 +256,14 @@ protected:
     std::vector<glm::mat4> mAnimationTransforms;
     std::vector<glm::mat4> mAnimationTransformsNext;
     std::vector<uint32_t> mVerteces2;
+    uint32_t mComputeLocalSize;
     std::vector<uint32_t> mJoints;
     std::vector<float> mWeights;
     std::unique_ptr<AEDescriptorSet> mDs;
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBuffers;
     std::vector<std::unique_ptr<AEBufferUniform>> mUniformBuffers;
     std::vector<glm::vec3> mAnimationPositionDebug;
+    std::vector<glm::vec3> mZeroData;
     //functions
     void ProcessGeometry(std::ifstream &file);
     void MakeVertices();
@@ -302,9 +304,10 @@ public:
     //animation
     void Animation();
     void AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
-                          AEBufferBase* buffers[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
+                          AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
     void AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
-                           uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, double time);
+                           uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore,
+                           double time);
     void AnimationDispatchJoint(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t animationNum,
                                 std::vector<glm::mat4> &targetTransform);
     void RecordCommand(AELogicalDevice* device, AECommandBuffer* commandBuffer);

@@ -187,6 +187,7 @@ std::unique_ptr<AETextureImage> gTmpImage;
 std::unique_ptr<AECommandBuffer> gComputeCommandBuffer;
 std::unique_ptr<AEDescriptorSet> gComputeDescriptor;
 std::unique_ptr<AEFence> gAnimationFence;
+std::vector<Vertex3DObj> gZeroData;
 
 double lastTime;
 double startTime;
@@ -371,7 +372,6 @@ bool CreateBuffers(void) {
   gvbWoman = std::make_unique<AEBufferAS>(gDevice, gWomanCollada->GetVertexBufferSize(),
                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gvbWoman->CreateBuffer();
-  std::vector<Vertex3DObj> tmpData;
   Vertex3DObj v = {};
   v.pos = glm::vec3(0.0f);
   v.vertexTangent = glm::vec4(0.0f);
@@ -379,23 +379,21 @@ bool CreateBuffers(void) {
   {
     v.normal = gWomanCollada->GetVertexAddress()[i].normal;
     v.texcoord = gWomanCollada->GetVertexAddress()[i].texcoord;
-    tmpData.emplace_back(v);
+    gZeroData.emplace_back(v);
   }
-  gvbWoman->CopyData((void *) tmpData.data(), 0,
-                     gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
+//  gvbWoman->CopyData((void *) gZeroData.data(), 0,
+//                     gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   //compute pipeline shader
   std::vector<const char*> c;
   c.emplace_back(computeShaderPath.c_str());
   //create source buffer
-  AEBufferAS* buffers[] = {gvbWoman.get()};
   gComputeCommandBuffer = std::make_unique<AECommandBuffer>(gDevice, gCommandPool);
-  gWomanCollada->AnimationPrepare(androidAppCtx, gDevice, c, (AEBufferBase**)buffers,
+  gWomanCollada->AnimationPrepare(androidAppCtx, gDevice, c,
                                   gQueue, gCommandPool, gDescriptorPool);
-  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(),
-                                   gQueue, gCommandPool, 0, nullptr, nullptr, 0.0);
-  vkDeviceWaitIdle(*gDevice->GetDevice());
-  gWomanCollada->Debug(gQueue, gCommandPool);
-//  //test cpu only
+//  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(),
+//                                   gQueue, gCommandPool, 0, nullptr, nullptr, nullptr, 0.0);
+//  gWomanCollada->Debug(gQueue, gCommandPool);
+////  //test cpu only
   gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   //index buffer
   for(uint32_t i = 0; i < 1; i++)
@@ -566,7 +564,7 @@ bool InitVulkan(android_app* app) {
   c.emplace_back(computeShaderPath.c_str());
   gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(fuse1Collada.c_str(), app, gDevice, c, gCommandPool, gQueue);
   gWomanCollada->MakeAnimation();
-  gWomanCollada->Scale(0.5f);
+  //gWomanCollada->Scale(0.5f);
   //woman texture
   for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
   {
@@ -842,14 +840,16 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   double intpart;
   double fracpart = std::modf(passedTime, &intpart);
   if(animationTime[gAnimationIndex] < fracpart || (gAnimationIndex == 4 && fracpart < animationTime[gAnimationIndex])) {
+//    gvbWoman->CopyData((void *) gZeroData.data(), 0,
+//                       gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
     gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
-                                     gAnimationFence.get(), nullptr, fracpart);
+                                     gAnimationFence.get(), nullptr, nullptr, fracpart);
+    vkWaitForFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence(), VK_TRUE, 1000000);
     gWomanCollada->Debug(gQueue, gCommandPool);
     gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
                        gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
     aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
     gAnimationIndex = (gAnimationIndex + 1) % 5;
-    vkWaitForFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence(), VK_TRUE, 1000000);
   }
   VkPipelineStageFlags waitStageMask =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
