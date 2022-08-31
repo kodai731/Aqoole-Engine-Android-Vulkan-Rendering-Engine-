@@ -1068,10 +1068,13 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 AEDrawObject::Split(jointWeightList, vString, ' ');
                 uint32_t nowPointing = 0;
                 uint32_t vertexIndex = 0;
+                uint32_t jointOffset = 0;
                 for(uint32_t i = 0; i < influenceCounts.size(); i++)
                 {
                     JointWeight oneJointWeight;
                     uint32_t influenceCount = std::stoi(influenceCounts[i]);
+                    mInfluenceCountList.emplace_back(influenceCount);
+                    mJointOffsetList.emplace_back(totalVCount);
                     if(totalVCount < 1024 && totalVCount + influenceCount > 1024){
                         mComputeLocalSize = totalVCount;
                     }
@@ -1564,7 +1567,7 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
                                      nullptr);
     cl.AddDescriptorSetLayoutBinding(10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
                                      nullptr);
-    cl.AddDescriptorSetLayoutBinding(11, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
+    cl.AddDescriptorSetLayoutBinding(11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1,
                                      nullptr);
     cl.CreateDescriptorSetLayout();
     mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
@@ -1584,10 +1587,16 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     positionResultBuffer->CopyData((void*)mPositions[0].data(), 0, positionBufferSize, queue, commandPool);
     mBuffers.emplace_back(std::move(positionResultBuffer));
     //indices
-    std::unique_ptr<AEBufferUtilOnGPU> indicesBuffer = std::make_unique<AEBufferUtilOnGPU>(device, indicesBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    indicesBuffer->CreateBuffer();
-    indicesBuffer->CopyData((void*)mVerteces2.data(), 0, indicesBufferSize, queue, commandPool);
-    mBuffers.emplace_back(std::move(indicesBuffer));
+//    std::unique_ptr<AEBufferUtilOnGPU> indicesBuffer = std::make_unique<AEBufferUtilOnGPU>(device, indicesBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+//    indicesBuffer->CreateBuffer();
+//    indicesBuffer->CopyData((void*)mVerteces2.data(), 0, indicesBufferSize, queue, commandPool);
+//    mBuffers.emplace_back(std::move(indicesBuffer));
+    //influence count buffer
+    VkDeviceSize influenceCountListBufferSize = mInfluenceCountList.size() * sizeof(uint32_t);
+    std::unique_ptr<AEBufferUtilOnGPU> influenceCountListBuffer = std::make_unique<AEBufferUtilOnGPU>(device, influenceCountListBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    influenceCountListBuffer->CreateBuffer();
+    influenceCountListBuffer->CopyData((void*)mInfluenceCountList.data(), 0, influenceCountListBufferSize, queue, commandPool);
+    mBuffers.emplace_back(std::move(influenceCountListBuffer));
     //joints
     std::unique_ptr<AEBufferUtilOnGPU> jointBuffer = std::make_unique<AEBufferUtilOnGPU>(device, jointsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     jointBuffer->CreateBuffer();
@@ -1648,17 +1657,23 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     timeBuffer->CopyData((void*)&time, uniformTimeSize);
     mUniformBuffers.emplace_back(std::move(timeBuffer));
     //dispatch num
-    VkDeviceSize dispatchNumSize = sizeof(uint32_t);
-    std::unique_ptr<AEBufferUniform> dnBuffer = std::make_unique<AEBufferUniform>(device, dispatchNumSize);
-    dnBuffer->CreateBuffer();
-    uint32_t dispatchNum = 0;
-    dnBuffer->CopyData((void*)&dispatchNum, dispatchNumSize);
-    mUniformBuffers.emplace_back(std::move(dnBuffer));
+//    VkDeviceSize dispatchNumSize = sizeof(uint32_t);
+//    std::unique_ptr<AEBufferUniform> dnBuffer = std::make_unique<AEBufferUniform>(device, dispatchNumSize);
+//    dnBuffer->CreateBuffer();
+//    uint32_t dispatchNum = 0;
+//    dnBuffer->CopyData((void*)&dispatchNum, dispatchNumSize);
+//    mUniformBuffers.emplace_back(std::move(dnBuffer));
+    //joint offset buffer
+    VkDeviceSize jointOffsetSize = mJointOffsetList.size() * sizeof(uint32_t);
+    std::unique_ptr<AEBufferUtilOnGPU> jointOffsetBuffer = std::make_unique<AEBufferUtilOnGPU>(device, jointOffsetSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    jointOffsetBuffer->CreateBuffer();
+    jointOffsetBuffer->CopyData((void*)mJointOffsetList.data(), 0, jointOffsetSize, queue, commandPool);
+    mBuffers.emplace_back(std::move(jointOffsetBuffer));
     //prepare descriptor set
     mDs = std::make_unique<AEDescriptorSet>(device, &cl, descriptorPool);
     mDs->BindDescriptorBuffer(0, mBuffers[0]->GetBuffer(), positionBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(1, mBuffers[1]->GetBuffer(), positionBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    mDs->BindDescriptorBuffer(2, mBuffers[2]->GetBuffer(), indicesBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(2, mBuffers[2]->GetBuffer(), influenceCountListBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(3, mBuffers[3]->GetBuffer(), jointsBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(4, mBuffers[4]->GetBuffer(), weightsBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(5, mBuffers[5]->GetBuffer(), matBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1667,7 +1682,7 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     mDs->BindDescriptorBuffer(8, mBuffers[7]->GetBuffer(), debugVSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(9, mBuffers[8]->GetBuffer(), matBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(10, mUniformBuffers[1]->GetBuffer(), uniformTimeSize, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    mDs->BindDescriptorBuffer(11, mUniformBuffers[2]->GetBuffer(), dispatchNumSize, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    mDs->BindDescriptorBuffer(11, mBuffers[9]->GetBuffer(), jointOffsetSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     //zero data
     for(uint32_t i = 0; i < mPositions[0].size(); i++){
         mZeroData.emplace_back(glm::vec3(0.0f));
@@ -1698,19 +1713,13 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     float timef = (float)time;
     mUniformBuffers[1]->CopyData((void*)&timef, sizeof(float));
     mUniformBuffers[0]->CopyData((void*)&animationNum, sizeof(uint32_t));
-    uint32_t dispatchNum = 0;
-    mUniformBuffers[2]->CopyData((void*)&dispatchNum, sizeof(uint32_t));
     AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline->GetPipelineLayout(),
                                   1, mDs->GetDescriptorSet());
     //dispatch
     //each work groups
     //vkCmdDispatch(*command->GetCommandBuffer(), 1024, 2, 1);
     //each local thread
-    vkCmdDispatch(*command->GetCommandBuffer(), 2, 1, 1);
-    //update dispatch
-//    dispatchNum = 1;
-//    mUniformBuffers[2]->CopyData((void*)&dispatchNum, sizeof(uint32_t));
-//    vkCmdDispatch(*command->GetCommandBuffer(), 1, 1, 1);
+    vkCmdDispatch(*command->GetCommandBuffer(), 1, 1, 1);
     AECommand::EndCommand(command);
     //submit
     VkSubmitInfo submit_info = {};
