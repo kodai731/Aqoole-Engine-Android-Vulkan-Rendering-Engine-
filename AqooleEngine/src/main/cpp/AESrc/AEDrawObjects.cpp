@@ -1719,10 +1719,13 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     //each work groups
     //vkCmdDispatch(*command->GetCommandBuffer(), 1024, 2, 1);
     //each local thread
-    vkCmdDispatch(*command->GetCommandBuffer(), 1, 1, 1);
+    vkCmdDispatch(*command->GetCommandBuffer(), 740, 1, 1);
+    vkCmdPipelineBarrier(*command->GetCommandBuffer(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
     AECommand::EndCommand(command);
     //submit
     VkSubmitInfo submit_info = {};
+    VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
     if(waitSemaphore != nullptr) {
         submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                 .pNext = nullptr,
@@ -1858,7 +1861,18 @@ void AEDrawObjectBaseCollada::Debug(AEDeviceQueue* queue, AECommandPool* command
 //        mVertices[i].pos = tmpPos[mPositionIndices[0][i]];
 //    }
     for(uint32_t i = 0; i < mPositionIndices[0].size(); i++){
+        uint index = mPositionIndices[0][i];
         mVertices[i].pos = debugPData[mPositionIndices[0][i]];
+        if(index == 149){
+            mVertices[i].pos = debugPData[mPositionIndices[0][i]] * 0.1f;
+        }
+    }
+    //debug
+    for(uint32_t i = 0; i < mPositions[0].size(); i++){
+        //debug
+        if(glm::distance(mVertices[i].pos, debugPData[i]) > 20.0f){
+            DebugPosition(i, debugPData);
+        }
     }
     //debug for animation matrix data
 //    std::vector<glm::mat4> debugMats;
@@ -1873,6 +1887,24 @@ void AEDrawObjectBaseCollada::Debug(AEDeviceQueue* queue, AECommandPool* command
 //        }
 //    }
     int breakpoint = 0;
+}
+
+/*
+ * debug position
+ */
+void AEDrawObjectBaseCollada::DebugPosition(uint32_t index, std::vector<glm::vec3> const& debug)
+{
+    std::string log("position not equal at ");
+    std::string space(" ");
+    std::string endl("\n");
+    log += (std::to_string(index) + space + endl);
+    log += std::string("data:x = ") + std::to_string(mVertices[index].pos.x) + space +
+            std::string("y = ") + std::to_string(mVertices[index].pos.y) + space +
+            std::string("z = ") + std::to_string(mVertices[index].pos.z) + space + endl;
+    log += std::string("debug:x = ") + std::to_string(debug[index].x) + space +
+           std::string("y = ") + std::to_string(debug[index].y) + space +
+           std::string("z = ") + std::to_string(debug[index].z) + space;
+    __android_log_print(ANDROID_LOG_DEBUG, "animation", log.c_str(), 0);
 }
 
 //=====================================================================

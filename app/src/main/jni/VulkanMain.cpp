@@ -188,6 +188,7 @@ std::unique_ptr<AECommandBuffer> gComputeCommandBuffer;
 std::unique_ptr<AEDescriptorSet> gComputeDescriptor;
 std::unique_ptr<AEFence> gAnimationFence;
 std::vector<Vertex3DObj> gZeroData;
+std::unique_ptr<AESemaphore> gComputeSemaphore;
 
 double lastTime;
 double startTime;
@@ -697,6 +698,24 @@ bool InitVulkan(android_app* app) {
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
     AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
+    //animation dispatch
+    double intpart;
+    double fracpart = std::modf(passedTime, &intpart);
+    if(animationTime[gAnimationIndex] < fracpart || (gAnimationIndex == 4 && fracpart < animationTime[gAnimationIndex])) {
+//  gvbWoman->CopyData((void *) gZeroData.data(), 0,
+//                     gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
+        gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
+                                         gAnimationFence.get(), nullptr, nullptr, fracpart);
+        //vkWaitForFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence(), VK_TRUE, 10000000);
+        gWomanCollada->Debug(gQueue, gCommandPool);
+        gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
+                           gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
+        aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
+        gAnimationIndex = (gAnimationIndex + 1) % 5;
+    }
+    vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                       (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
+    //dispatch ray tracing command
     AECommand::CommandTraceRays(gCommandBuffers[bufferIndex], gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gSbts,
                                 gPipelineRT.get(), gDescriptorSets, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
                                 gQueue, gCommandPool);
@@ -728,6 +747,7 @@ bool InitVulkan(android_app* app) {
   startTime = lastTime;
   //animation semaphore
   gAnimationFence = std::make_unique<AEFence>(gDevice);
+  gComputeSemaphore = std::make_unique<AESemaphore>(gDevice);
   //imgui font adjust
 //  {
 //    ImGuiIO &io = ImGui::GetIO();
@@ -830,35 +850,23 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
 //  astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
-  CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
+  VkResult resNextImage = vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
                                 UINT64_MAX, render.semaphore_, VK_NULL_HANDLE,
-                                &nextIndex));
+                                &nextIndex);
+  if(resNextImage != VK_SUCCESS){
+    __android_log_print(ANDROID_LOG_ERROR, "Aqoole", (std::string("failed at vkAcquireNextImageKHR code = ") + std::to_string(resNextImage)).c_str(), 0);
+  }
   CALL_VK(vkResetFences(device.device_, 1, &render.fence_));
   vkResetFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence());
   RecordImguiCommand(nextIndex, touchPositions, isTouched);
-  //animation dispatch
-  double intpart;
-  double fracpart = std::modf(passedTime, &intpart);
-  if(animationTime[gAnimationIndex] < fracpart || (gAnimationIndex == 4 && fracpart < animationTime[gAnimationIndex])) {
-//    gvbWoman->CopyData((void *) gZeroData.data(), 0,
-//                       gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
-    gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
-                                     gAnimationFence.get(), nullptr, nullptr, fracpart);
-    vkWaitForFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence(), VK_TRUE, 1000000);
-    gWomanCollada->Debug(gQueue, gCommandPool);
-    gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
-                       gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
-    aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
-    gAnimationIndex = (gAnimationIndex + 1) % 5;
-  }
-  VkPipelineStageFlags waitStageMask =
-      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  VkSemaphore waitSemaphores = render.semaphore_;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};
   VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                               .pNext = nullptr,
                               .waitSemaphoreCount = 1,
-                              .pWaitSemaphores = &render.semaphore_,
-                              .pWaitDstStageMask = &waitStageMask,
+                              .pWaitSemaphores = &waitSemaphores,
+                              .pWaitDstStageMask = &waitStageMasks,
                               .commandBufferCount = 2,
                               .pCommandBuffers = cmdBuffers,
                               .signalSemaphoreCount = 1,

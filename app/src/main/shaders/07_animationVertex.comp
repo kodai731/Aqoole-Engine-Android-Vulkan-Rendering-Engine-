@@ -5,7 +5,7 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #include "07_raycommon.glsl"
 
-layout(local_size_x = 740, local_size_y = 1, local_size_z = 1) in;
+//layout(local_size_x = 740, local_size_y = 1, local_size_z = 1) in;
 
 float KeyFrames[5] = {0.0000, 0.2083333, 0.4166666, 0.625, 0.8333333};
 
@@ -25,33 +25,16 @@ layout(binding = 11, set = 0, scalar) buffer JointOffset{uint o[];} jointOffset[
 void main()
 {
   //uint ii = gl_WorkGroupID.y * 1024 + gl_WorkGroupID.x;
-  uint index = gl_LocalInvocationIndex;
+  //uint index = gl_LocalInvocationIndex;
+  uint index = gl_WorkGroupID.x;
   uint influence = influenceCount[0].i[index];
+  vec3 v3 = vec3(0.0);
+  vec3 v4 = vec3(0.0);
+  vec3 v0 = verticesobj[0].vobj[index];
+  uint offset = jointOffset[0].o[index];
   if( index < 740){
     for(int k = 0; k < influence; k++){
-      uint offset = jointOffset[0].o[index];
       float w = weights[0].f[offset + k];
-      vec3 v0 = verticesobj[0].vobj[index];
-      /*
-  const float PI       = 3.14159265;
-  const float signY    = (v0.pos.y >= 0 ? 1 : -1);
-  const float radius   = length(v0.pos.xz);
-  const float argument = pushc.iTime * 4 + radius * PI;
-  const float s        = sin(argument);
-  v0.pos.y             = signY * abs(s) * 0.5;
-
-  if(radius == 0.0f)
-  {
-    v0.nrm = vec3(0.0f, signY, 0.0f);
-  }
-  else
-  {
-    const float c        = cos(argument);
-    const float xzFactor = -PI * s * c;
-    const float yFactor  = 2.0f * signY * radius * abs(s);
-    v0.nrm               = normalize(vec3(v0.pos.x * xzFactor, yFactor, v0.pos.z * xzFactor));
-  }
-*/
       //    memoryBarrierShared();
       //    barrier();
       //verticesobjDst[0].vobjDst[index].pos += w * v0;
@@ -59,18 +42,18 @@ void main()
       uint jj = joints[0].j[offset + k];
       vec3 v1 = w * (mats[0].m[jj] * vec4(v0, 1.0)).xyz;
       vec3 v2 = w * (matsNext[0].m[jj] * vec4(v0, 1.0)).xyz;
-      vec3 v3;
       if (animNum.a == 4){
-        v3 = v1 + ((v2 - v1) * (1.0 - time.t));
+        v3 += v1 + ((v2 - v1) * (1.0 - time.t));
       } else {
-        v3 = v1 + ((v2 - v1) * (time.t - KeyFrames[animNum.a]));
+        v3 += v1 + ((v2 - v1) * (time.t - KeyFrames[animNum.a]));
       }
-      //v0 = w * v0;
       barrier();
-      verticesobjDst[0].vobjDst[index] = v0;
-      //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
-      debug[0].d[offset + k] = index;
+      v4 += w * v0;
+      //v0 = w * v0;
       debugV[0].dv[offset + k].pos = v3;
     }
   }
+  debug[0].d[index] = index;
+  verticesobjDst[0].vobjDst[index] = v4;
+  //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
 }

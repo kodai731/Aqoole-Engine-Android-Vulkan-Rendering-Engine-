@@ -276,6 +276,7 @@ protected:
     void ReadAnimation(const boost::property_tree::ptree::value_type& node);
     void SkeletonJointNo(SkeletonNode* node);
     void SkeletonAnimation(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions);
+    void DebugPosition(uint32_t index, std::vector<glm::vec3> const& debug);
 public:
     AEDrawObjectBaseCollada(const char* filePath, android_app* app, AELogicalDevice* device, std::vector<const char*> &shaderPaths,
                             AECommandPool* commandPool, AEDeviceQueue* queue);

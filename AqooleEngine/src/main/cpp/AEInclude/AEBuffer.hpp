@@ -89,6 +89,9 @@ namespace AEBuffer
         AECommandPool* commandPool);
     void BackData(AELogicalDevice const* device, VkDeviceMemory bufferMemory,
                   VkDeviceSize bufferSize, void *data);
+    void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize bufferSize,
+                    AELogicalDevice* device, AEDeviceQueue* queue,
+                    AECommandPool* commandPool, AECommandBuffer* commandBuffer);
 #ifdef __RAY_TRACING__
     VkDeviceAddress GetBufferDeviceAddress(AELogicalDevice const* device, VkBuffer buffer);
 #endif

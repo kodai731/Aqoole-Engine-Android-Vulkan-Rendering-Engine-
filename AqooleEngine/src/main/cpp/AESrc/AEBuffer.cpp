@@ -310,6 +310,23 @@ void AEBuffer::CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize b
     return;
 }
 
+void AEBuffer::CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize bufferSize,
+                          AELogicalDevice* device, AEDeviceQueue* queue,
+                          AECommandPool* commandPool, AECommandBuffer* commandBuffer)
+{
+    //command begin
+    AECommand::BeginCommand(commandBuffer);
+    //copy buffer
+    VkBufferCopy copyRange = {};
+    copyRange.srcOffset = 0;
+    copyRange.dstOffset = 0;
+    copyRange.size = bufferSize;
+    vkCmdCopyBuffer(*commandBuffer->GetCommandBuffer(), srcBuffer, dstBuffer, 1, &copyRange);
+    //end command
+    AECommand::EndCommand(commandBuffer);
+    return;
+}
+
 /*
  * back vulkan memory data to data
  */

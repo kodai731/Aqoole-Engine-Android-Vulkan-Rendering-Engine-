@@ -35,7 +35,7 @@ class AESemaphore
     AESemaphore(AELogicalDevice const* device);
     ~AESemaphore();
     //iterator
-    VkSemaphore const* GetSemaphore()const{return &mSemaphore;}
+    VkSemaphore* GetSemaphore(){return &mSemaphore;}
 };
 
 class AEFence
