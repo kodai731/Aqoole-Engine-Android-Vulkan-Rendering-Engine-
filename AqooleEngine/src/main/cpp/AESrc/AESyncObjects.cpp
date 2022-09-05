@@ -64,3 +64,23 @@ AEFence::~AEFence()
 {
     vkDestroyFence(*mDevice->GetDevice(), mFence, nullptr);
 }
+
+//=====================================================================
+//AE Event
+//=====================================================================
+/*
+ * constructor
+ */
+AEEvent::AEEvent(AELogicalDevice* device)
+{
+    mDevice = device;
+    VkEventCreateInfo createInfo = {
+            .sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = (VkEventCreateFlagBits)0
+    };
+    auto res = vkCreateEvent(*mDevice->GetDevice(), &createInfo, nullptr, &mEvent);
+    if(res != VK_SUCCESS){
+        __android_log_print(ANDROID_LOG_DEBUG, "create event", (std::string("failed to create event code = ") + std::to_string(res)).c_str(), 0);
+    }
+}

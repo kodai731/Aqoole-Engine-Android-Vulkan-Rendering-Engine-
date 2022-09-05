@@ -50,4 +50,14 @@ class AEFence
     VkFence const* GetFence()const{return &mFence;}
 };
 
+class AEEvent
+{
+private:
+    AELogicalDevice* mDevice;
+    VkEvent mEvent;
+public:
+    AEEvent(AELogicalDevice* device);
+    VkEvent* GetEvent(){return &mEvent;}
+};
+
 #endif

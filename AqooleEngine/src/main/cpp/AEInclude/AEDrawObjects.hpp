@@ -65,6 +65,7 @@ class AEBufferUtilOnGPU;
 class AEBufferUniform;
 class AESemaphore;
 class AEFence;
+class AEEvent;
 
 namespace AEDrawObject
 {
@@ -266,6 +267,7 @@ protected:
     std::vector<glm::vec3> mZeroData;
     std::vector<uint32_t> mInfluenceCountList;
     std::vector<uint32_t> mJointOffsetList;
+    std::vector<uint32_t> mSerialPositionIndices;
     //functions
     void ProcessGeometry(std::ifstream &file);
     void MakeVertices();
@@ -277,6 +279,7 @@ protected:
     void SkeletonJointNo(SkeletonNode* node);
     void SkeletonAnimation(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions);
     void DebugPosition(uint32_t index, std::vector<glm::vec3> const& debug);
+    void DebugPositionObj(uint32_t index, std::vector<Vertex3DObj> const& debug);
 public:
     AEDrawObjectBaseCollada(const char* filePath, android_app* app, AELogicalDevice* device, std::vector<const char*> &shaderPaths,
                             AECommandPool* commandPool, AEDeviceQueue* queue);
@@ -307,10 +310,10 @@ public:
     //animation
     void Animation();
     void AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
-                          AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
+                          AEBufferBase* buffer[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
     void AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
                            uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore,
-                           double time);
+                           double time, AEEvent* event);
     void AnimationDispatchJoint(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t animationNum,
                                 std::vector<glm::mat4> &targetTransform);
     void RecordCommand(AELogicalDevice* device, AECommandBuffer* commandBuffer);
