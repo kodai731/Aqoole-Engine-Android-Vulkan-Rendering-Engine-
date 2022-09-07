@@ -1739,7 +1739,6 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     AECommand::BeginCommand(command);
     //prepare event
     vkCmdResetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    vkCmdSetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
     //update animation transforms
     AnimationDispatchJoint(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), animationNum, mAnimationTransforms);
@@ -1758,11 +1757,12 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     //each work groups
     vkCmdPipelineBarrier(*command->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, (VkDependencyFlagBits)0,
                          0, nullptr, 0, nullptr, 0, nullptr);
-    vkCmdDispatch(*command->GetCommandBuffer(), 1024, 4, 1);
+    vkCmdDispatch(*command->GetCommandBuffer(), 1024, 5, 1);
+    vkCmdSetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     vkCmdPipelineBarrier(*command->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, (VkDependencyFlagBits)0,
                          0, nullptr, 0, nullptr, 0, nullptr);
-    vkCmdWaitEvents(*command->GetCommandBuffer(), 1, event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                    0, nullptr, 0, nullptr, 0, nullptr);
+//    vkCmdWaitEvents(*command->GetCommandBuffer(), 1, event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+//                    0, nullptr, 0, nullptr, 0, nullptr);
     //each local thread
     //vkCmdDispatch(*command->GetCommandBuffer(), 740, 1, 1);
     AECommand::EndCommand(command);
@@ -1885,7 +1885,7 @@ void AEDrawObjectBaseCollada::Debug(AEDeviceQueue* queue, AECommandPool* command
         debugPData.emplace_back(obj);
     mBuffers[1]->BackData(debugPData.data(), 0, positionSize, queue, commandPool);
     for(uint32_t i = 0; i < mVertices.size(); i++) {
-        if(glm::length(mVertices[i].pos - debugPData[i].pos) > 1.8f)
+        if(glm::length(mVertices[i].pos - debugPData[i].pos) < 0.001f)
             DebugPositionObj(i, debugPData);
     }
 //    //clear pos

@@ -35,28 +35,26 @@ void main()
     vec3 v4 = vec3(0.0);
     vec3 v0 = verticesobj[0].vobj[index];
     uint offset = jointOffset[0].o[index];
-    if (index < 740){
-      for (int k = 0; k < influence; k++){
-        float w = weights[0].f[offset + k];
-        //    memoryBarrierShared();
-        //    barrier();
-        //verticesobjDst[0].vobjDst[index].pos += w * v0;
-        //    memoryBarrierBuffer();
-        uint jj = joints[0].j[offset + k];
-        vec3 v1 = w * (mats[0].m[jj] * vec4(v0, 1.0)).xyz;
-        vec3 v2 = w * (matsNext[0].m[jj] * vec4(v0, 1.0)).xyz;
-        if (animNum.a == 4){
-          v3 += v1 + ((v2 - v1) * (1.0 - time.t));
-        } else {
-          v3 += v1 + ((v2 - v1) * (time.t - KeyFrames[animNum.a]));
-        }
-        v4 += w * v0;
-        //v0 = w * v0;
-        debugV[0].dv[offset + k].pos = v3;
+    for (int k = 0; k < influence; k++){
+      float w = weights[0].f[offset + k];
+      //    memoryBarrierShared();
+      //    barrier();
+      //verticesobjDst[0].vobjDst[index].pos += w * v0;
+      //    memoryBarrierBuffer();
+      uint jj = joints[0].j[offset + k];
+      vec3 v1 = w * (mats[0].m[jj] * vec4(v0, 1.0)).xyz;
+      vec3 v2 = w * (matsNext[0].m[jj] * vec4(v0, 1.0)).xyz;
+      if (animNum.a == 4){
+        v3 += v1 + ((v2 - v1) * (1.0 - time.t));
+      } else {
+        v3 += v1 + ((v2 - v1) * (time.t - KeyFrames[animNum.a]));
       }
+      v4 += w * v0;
+      //v0 = w * v0;
+      //debugV[0].dv[offset + k].pos = v3;
     }
     debug[0].d[ii] = index;
-    verticesobjDst[0].vobjDst[ii].pos = 0.8 * v0;
+    verticesobjDst[0].vobjDst[ii].pos = 0.7 * v0;
     //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
   }
 }

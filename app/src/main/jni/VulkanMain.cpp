@@ -696,12 +696,16 @@ bool InitVulkan(android_app* app) {
   //init imgui
   gImgui = new MyImgui(app->window, gInstance, gDevice, gSwapchain, gQueue, gQueue, gSurface, &gFrameBuffers,
                        &gDepthImages, gSwapchainImageView, gRenderPass);
+  //create event
+  gComputeEvent = std::make_unique<AEEvent>(gDevice);
   //register commands
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
     AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
     vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
                        (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
+    vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1, gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                    0, nullptr, 0, nullptr, 0, nullptr);
     //dispatch ray tracing command
     AECommand::CommandTraceRays(gCommandBuffers[bufferIndex], gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gSbts,
                                 gPipelineRT.get(), gDescriptorSets, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
@@ -734,8 +738,6 @@ bool InitVulkan(android_app* app) {
   //animation semaphore
   gAnimationFence = std::make_unique<AEFence>(gDevice);
   gComputeSemaphore = std::make_unique<AESemaphore>(gDevice);
-  //create event
-  gComputeEvent = std::make_unique<AEEvent>(gDevice);
   //imgui font adjust
 //  {
 //    ImGuiIO &io = ImGui::GetIO();
