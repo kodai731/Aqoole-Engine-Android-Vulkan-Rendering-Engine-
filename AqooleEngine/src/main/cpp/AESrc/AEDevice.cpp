@@ -618,7 +618,24 @@ void AELogicalDevice::CreateDevice(const std::vector<const char*> &extensions, A
 	}
 	else
 		createInfo.enabledLayerCount = 0;
-	if (vkCreateDevice(*mPhysicalDevice->GetPhysicalDevice(mPhysicalIndex), &createInfo, nullptr, &mDevice) != VK_SUCCESS)
+    //enable ScalarBlockLayoutFeaturesEXT
+    VkPhysicalDeviceFeatures features = {};
+	VkPhysicalDeviceScalarBlockLayoutFeaturesEXT featuresExt = {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES,
+			.pNext = nullptr,
+			.scalarBlockLayout = false,
+	};
+    VkPhysicalDeviceFeatures2 features2 = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+            .pNext = &featuresExt,
+            .features = features
+    };
+    PFN_vkGetPhysicalDeviceFeatures2 pfnGetPhysicalDeviceFeatures2 = reinterpret_cast<PFN_vkGetPhysicalDeviceFeatures2>
+    (vkGetInstanceProcAddr(*mPhysicalDevice->GetInstance()->GetInstance(), "vkGetPhysicalDeviceFeatures2"));
+    pfnGetPhysicalDeviceFeatures2(*GetPhysicalDevice(), &features2);
+    //enable features
+    createInfo.pNext = &features2;
+    if (vkCreateDevice(*mPhysicalDevice->GetPhysicalDevice(mPhysicalIndex), &createInfo, nullptr, &mDevice) != VK_SUCCESS)
 		throw std::runtime_error("failed create logical device");
 	//delete
 	if(layerCount > 0)

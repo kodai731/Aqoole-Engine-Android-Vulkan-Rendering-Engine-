@@ -49,12 +49,12 @@ void main()
       } else {
         v3 += v1 + ((v2 - v1) * (time.t - KeyFrames[animNum.a]));
       }
-      v4 += w * v0;
+      v4 += (1.0f / float(influence)) * v0;
       //v0 = w * v0;
       //debugV[0].dv[offset + k].pos = v3;
     }
     debug[0].d[ii] = index;
-    verticesobjDst[0].vobjDst[ii].pos = 0.7 * v0;
+    verticesobjDst[0].vobjDst[ii].pos = v4;
     //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
   }
 }

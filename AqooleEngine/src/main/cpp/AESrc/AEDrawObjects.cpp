@@ -1276,6 +1276,20 @@ void AEDrawObjectBaseCollada::MakeVertices()
             index++;
         }
     }
+    //check joints and weights
+    for(uint32_t i = 0; i < mVertices.size(); i++){
+        uint32_t index2 = mPositionIndices[0][i];
+        uint32_t influence = mInfluenceCountList[index2];
+        glm::vec3 v4(0.0f);
+        uint32_t offset = mJointOffsetList[index2];
+        for(uint32_t j = 0; j < influence; j++){
+            float w = mWeights[offset + j];
+            v4 += w * mPositions[0][index2];
+        }
+        if(glm::length(v4 - mVertices[i].pos) > 0.01f){
+            __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("postion not equal geometry at ") + std::to_string(index2)).c_str(), 0);
+        }
+    }
 }
 
 /*
@@ -1629,7 +1643,10 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     //weights
     std::unique_ptr<AEBufferUtilOnGPU> weightBuffer = std::make_unique<AEBufferUtilOnGPU>(device, weightsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     weightBuffer->CreateBuffer();
-    weightBuffer->CopyData((void*)mWeights.data(), 0, weightsBufferSize, queue, commandPool);
+    std::unique_ptr<float[]> weightData = std::make_unique<float[]>(mWeights.size());
+    for(uint32_t i = 0; i < mWeights.size(); i++)
+        weightData[i] = mWeights[i];
+    weightBuffer->CopyData((void*)weightData.get(), 0, weightsBufferSize, queue, commandPool);
     mBuffers.emplace_back(std::move(weightBuffer));
     //animation mats
     for(uint32_t i = 0; i < mSkinJointsArray.size(); i++){
@@ -1885,9 +1902,10 @@ void AEDrawObjectBaseCollada::Debug(AEDeviceQueue* queue, AECommandPool* command
         debugPData.emplace_back(obj);
     mBuffers[1]->BackData(debugPData.data(), 0, positionSize, queue, commandPool);
     for(uint32_t i = 0; i < mVertices.size(); i++) {
-        if(glm::length(mVertices[i].pos - debugPData[i].pos) < 0.001f)
+        if(glm::length(mVertices[i].pos - debugPData[i].pos) > 18.0f)
             DebugPositionObj(i, debugPData);
     }
+    DebugWeights(queue, commandPool);
 //    //clear pos
 //    for(uint32_t i = 0; i < mVertices.size(); i++){
 //        mVertices[i].pos = glm::vec3(0.0f);
@@ -1973,6 +1991,30 @@ void AEDrawObjectBaseCollada::DebugPositionObj(uint32_t index, std::vector<Verte
            std::string("y = ") + std::to_string(debug[index].pos.y) + space +
            std::string("z = ") + std::to_string(debug[index].pos.z) + space;
     __android_log_print(ANDROID_LOG_DEBUG, "animation", log.c_str(), 0);
+}
+
+/*
+ * debug weights
+ */
+void AEDrawObjectBaseCollada::DebugWeights(AEDeviceQueue* queue, AECommandPool* commandPool)
+{
+    std::vector<float> tmpW;
+    for(uint32_t i = 0; i < mWeights.size(); i++)
+        tmpW.emplace_back(0.0f);
+    mBuffers[4]->BackData((void*)tmpW.data(), 0, sizeof(float) * mWeights.size(), queue, commandPool);
+    //compare
+    std::string endl("\n");
+    std::string space(" ");
+    for(uint32_t i = 0; i < mWeights.size(); i++){
+        if(mWeights[i] != tmpW[i]){
+            std::string log("weight not equal at ");
+            log += std::to_string(i);
+            log += endl;
+            log += (std::string("data : ") + std::to_string(mWeights[i]) + endl);
+            log += (std::string("debug : ") + std::to_string(tmpW[i]));
+            __android_log_print(ANDROID_LOG_DEBUG, "animation debug", log.c_str(), 0);
+        }
+    }
 }
 
 

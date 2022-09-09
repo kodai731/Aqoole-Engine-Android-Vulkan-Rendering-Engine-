@@ -252,6 +252,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   device_extensions.push_back("VK_KHR_spirv_1_4");
   device_extensions.push_back("VK_EXT_descriptor_indexing");
   device_extensions.push_back("VK_KHR_deferred_host_operations");
+  device_extensions.push_back(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
 
   // **********************************************************
   // Create the Vulkan instance
