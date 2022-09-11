@@ -13,7 +13,7 @@ layout(binding = 0, set = 0, scalar) buffer Verticesobj {vec3 vobj[];} verticeso
 layout(binding = 1, set = 0, scalar) buffer VerticesobjDst {Vertex3DObj vobjDst[];} verticesobjDst[];
 layout(binding = 2, set = 0, scalar) buffer InfluenceCount {uint i[];} influenceCount[];
 layout(binding = 3, set = 0, scalar) buffer Joints {uint j[];} joints[];
-layout(binding = 4, set = 0, scalar) buffer Weights {float f[];} weights[];
+layout(binding = 4, set = 0, std430) buffer Weights {float f[];} weights[];
 layout(binding = 5, set = 0, scalar) buffer Mats{mat4 m[];} mats[];
 layout(binding = 6, set = 0) uniform AnimNum{uint a;} animNum;
 layout(binding = 7, set = 0, scalar) buffer Debug {uint d[];} debug[];
@@ -49,7 +49,8 @@ void main()
       } else {
         v3 += v1 + ((v2 - v1) * (time.t - KeyFrames[animNum.a]));
       }
-      v4 += (1.0f / float(influence)) * v0;
+      //v4 += (1.0f / float(influence)) * v0;
+      v4 += (w * v0);
       //v0 = w * v0;
       //debugV[0].dv[offset + k].pos = v3;
     }

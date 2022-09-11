@@ -1643,10 +1643,7 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     //weights
     std::unique_ptr<AEBufferUtilOnGPU> weightBuffer = std::make_unique<AEBufferUtilOnGPU>(device, weightsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     weightBuffer->CreateBuffer();
-    std::unique_ptr<float[]> weightData = std::make_unique<float[]>(mWeights.size());
-    for(uint32_t i = 0; i < mWeights.size(); i++)
-        weightData[i] = mWeights[i];
-    weightBuffer->CopyData((void*)weightData.get(), 0, weightsBufferSize, queue, commandPool);
+    weightBuffer->CopyData((void*)mWeights.data(), 0, weightsBufferSize, queue, commandPool);
     mBuffers.emplace_back(std::move(weightBuffer));
     //animation mats
     for(uint32_t i = 0; i < mSkinJointsArray.size(); i++){
@@ -1736,6 +1733,20 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     mDs->BindDescriptorBuffer(10, mUniformBuffers[1]->GetBuffer(), uniformTimeSize, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     mDs->BindDescriptorBuffer(11, mBuffers[9]->GetBuffer(), jointOffsetSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(12, mBuffers[10]->GetBuffer(), indicesListSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    //check buffer data
+    std::vector<float> weightData;
+    for(uint32_t i = 0; i < mWeights.size(); i++)
+        weightData.emplace_back(0.0f);
+    mBuffers[4]->BackData((void*)weightData.data(), 0, weightsBufferSize, queue, commandPool);
+    for(uint32_t i = 0; i < mWeights.size(); i++){
+        if(mWeights[i] != weightData[i]){
+            std::string log("weight data not equal at ");
+            log += (std::to_string(i) + std::string("\n"));
+            log += (std::string("data = ") + std::to_string(mWeights[i]) + std::string("\n"));
+            log += (std::string("debug = ") + std::to_string(weightData[i]) + std::string("\n"));
+            __android_log_print(ANDROID_LOG_DEBUG, "animation", log.c_str(), 0);
+        }
+    }
     //zero data
     for(uint32_t i = 0; i < mPositions[0].size(); i++){
         mZeroData.emplace_back(glm::vec3(0.0f));
@@ -1762,8 +1773,8 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     AnimationDispatchJoint(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), (animationNum + 1) % 5, mAnimationTransformsNext);
     //update buffer
     VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
-    mBuffers[4]->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
-    mBuffers[7]->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
+    mBuffers[5]->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
+    mBuffers[8]->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
     //uniform buffer
     float timef = (float)time;
     mUniformBuffers[1]->CopyData((void*)&timef, sizeof(float));

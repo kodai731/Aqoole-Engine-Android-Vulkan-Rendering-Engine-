@@ -739,6 +739,7 @@ bool InitVulkan(android_app* app) {
   //animation semaphore
   gAnimationFence = std::make_unique<AEFence>(gDevice);
   gComputeSemaphore = std::make_unique<AESemaphore>(gDevice);
+  gWomanCollada->DebugWeights(gQueue, gCommandPool);
   //imgui font adjust
 //  {
 //    ImGuiIO &io = ImGui::GetIO();
@@ -856,8 +857,9 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   if(animationTime[gAnimationIndex] < fracpart || (gAnimationIndex == 4 && fracpart < animationTime[gAnimationIndex])) {
 //  gvbWoman->CopyData((void *) gZeroData.data(), 0,
 //                     gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
+    gWomanCollada->DebugWeights(gQueue, gCommandPool);
     gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
-                                     gAnimationFence.get(), nullptr, nullptr, fracpart, gComputeEvent.get());
+                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
     //vkWaitForFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence(), VK_TRUE, 10000000);
     gWomanCollada->Debug(gQueue, gCommandPool);
 //    gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,

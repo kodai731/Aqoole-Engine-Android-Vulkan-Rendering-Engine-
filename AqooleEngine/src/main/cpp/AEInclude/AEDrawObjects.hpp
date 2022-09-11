@@ -280,7 +280,6 @@ protected:
     void SkeletonAnimation(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions);
     void DebugPosition(uint32_t index, std::vector<glm::vec3> const& debug);
     void DebugPositionObj(uint32_t index, std::vector<Vertex3DObj> const& debug);
-    void DebugWeights(AEDeviceQueue* queue, AECommandPool* commandPool);
 public:
     AEDrawObjectBaseCollada(const char* filePath, android_app* app, AELogicalDevice* device, std::vector<const char*> &shaderPaths,
                             AECommandPool* commandPool, AEDeviceQueue* queue);
@@ -320,6 +319,7 @@ public:
     void RecordCommand(AELogicalDevice* device, AECommandBuffer* commandBuffer);
     AEBufferUtilOnGPU* GetBuffer(uint32_t index){return mBuffers[index].get();}
     void Debug(AEDeviceQueue* queue, AECommandPool* commandPool);
+    void DebugWeights(AEDeviceQueue* queue, AECommandPool* commandPool);
 };
 
 /*
