@@ -55,7 +55,7 @@ void main()
       //debugV[0].dv[offset + k].pos = v3;
     }
     debug[0].d[ii] = index;
-    verticesobjDst[0].vobjDst[ii].pos = v4;
+    verticesobjDst[0].vobjDst[ii].pos = v3;
     //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
   }
 }

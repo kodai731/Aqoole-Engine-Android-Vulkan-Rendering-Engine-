@@ -1783,12 +1783,8 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
                                   1, mDs->GetDescriptorSet());
     //dispatch
     //each work groups
-    vkCmdPipelineBarrier(*command->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, (VkDependencyFlagBits)0,
-                         0, nullptr, 0, nullptr, 0, nullptr);
     vkCmdDispatch(*command->GetCommandBuffer(), 1024, 5, 1);
     vkCmdSetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    vkCmdPipelineBarrier(*command->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, (VkDependencyFlagBits)0,
-                         0, nullptr, 0, nullptr, 0, nullptr);
 //    vkCmdWaitEvents(*command->GetCommandBuffer(), 1, event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
 //                    0, nullptr, 0, nullptr, 0, nullptr);
     //each local thread

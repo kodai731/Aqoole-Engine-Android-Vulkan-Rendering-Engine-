@@ -138,11 +138,11 @@ uniform
 glm::vec3 gLookAtPoint(0.0f, 0.01f, 0.0f);
 //ModelView modelView;
 //glm::vec3 cameraPos(0.0f, -1.0f, -1.0f);
-const glm::vec3 firstCameraPos(0.0f, -5.0f, 10.0f);
+const glm::vec3 firstCameraPos(0.0f, -5.0f, -10.0f);
 glm::vec3 cameraPos = firstCameraPos;
 glm::vec3 cameraDirection = glm::normalize(cameraPos - gLookAtPoint);
 //glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(0.0f, 0.0f, -1.0f)));
-const glm::vec3 firstCameraBasis(-1.0f, 0.0f, 0.0f);
+const glm::vec3 firstCameraBasis(1.0f, 0.0f, 0.0f);
 glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, firstCameraBasis));
 //glm::vec3 cameraUp = glm::vec3(0.0f, -1.0f, 0.0f);
 AEBufferUniform* gModelViewBuffer;
@@ -703,10 +703,10 @@ bool InitVulkan(android_app* app) {
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
     AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
-    vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                       (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
     vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1, gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
                     0, nullptr, 0, nullptr, 0, nullptr);
+    vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                         (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
     //dispatch ray tracing command
     AECommand::CommandTraceRays(gCommandBuffers[bufferIndex], gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gSbts,
                                 gPipelineRT.get(), gDescriptorSets, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
@@ -857,11 +857,10 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   if(animationTime[gAnimationIndex] < fracpart || (gAnimationIndex == 4 && fracpart < animationTime[gAnimationIndex])) {
 //  gvbWoman->CopyData((void *) gZeroData.data(), 0,
 //                     gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
-    gWomanCollada->DebugWeights(gQueue, gCommandPool);
     gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
                                      nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
     //vkWaitForFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence(), VK_TRUE, 10000000);
-    gWomanCollada->Debug(gQueue, gCommandPool);
+    //gWomanCollada->Debug(gQueue, gCommandPool);
 //    gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
 //                       gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
     aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
@@ -1056,7 +1055,7 @@ void Look(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* to
     glm::mat3 rotate(1.0f);
     AEMatrix::Rodrigues(rotate, cos(theta), sin(theta), base);
     cameraDirection = rotate * cameraDirection;
-    cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(1.0f, 0.0f, 0.0f)));
+    cameraUp = glm::normalize(glm::cross(cameraDirection, firstCameraBasis));
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
 //    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
 
@@ -1087,11 +1086,11 @@ void LookByGravity(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm:
     glm::mat3 rotateY(1.0f);
     glm::mat3 rotateZ(1.0f);
     *gravityData *= 0.15f;
-    AEMatrix::Rodrigues(rotateX, cos(gravityData->x), sin(gravityData->x), glm::vec3(-1.0f, 0.0f, 0.0f));
+    AEMatrix::Rodrigues(rotateX, cos(gravityData->x), sin(gravityData->x), glm::vec3(1.0f, 0.0f, 0.0f));
     AEMatrix::Rodrigues(rotateY, cos(gravityData->y), sin(gravityData->y), glm::vec3(0.0f, -1.0f, 0.0f));
-    AEMatrix::Rodrigues(rotateZ, cos(gravityData->z), sin(gravityData->z), glm::vec3(0.0f, 0.0f, -1.0f));
+    AEMatrix::Rodrigues(rotateZ, cos(gravityData->z), sin(gravityData->z), glm::vec3(0.0f, 0.0f, 1.0f));
     cameraDirection = (rotateX * rotateY * rotateZ) * cameraDirection;
-    cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(-1.0f, 0.0f, 0.0f)));
+    cameraUp = glm::normalize(glm::cross(cameraDirection, firstCameraBasis));
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
 //    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
 }
