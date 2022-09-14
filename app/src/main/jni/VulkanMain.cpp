@@ -219,6 +219,7 @@ void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image, VkImageAspectFlags
                     VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
                     VkPipelineStageFlags srcStages,
                     VkPipelineStageFlags destStages);
+uint32_t SelectKeyframe(double frac);
 
 // Create vulkan device
 void CreateVulkanDevice(ANativeWindow* platformWindow,
@@ -854,18 +855,20 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   //animation dispatch
   double intpart;
   double fracpart = std::modf(passedTime, &intpart);
-  if(animationTime[gAnimationIndex] < fracpart || (gAnimationIndex == 4 && fracpart < animationTime[gAnimationIndex])) {
 //  gvbWoman->CopyData((void *) gZeroData.data(), 0,
 //                     gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
-    gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
+  gAnimationIndex = SelectKeyframe(fracpart);
+  __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("passed time = ") + std::to_string(passedTime)).c_str(), 0);
+  __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("int time = ") + std::to_string(intpart)).c_str(), 0);
+  __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("frac time = ") + std::to_string(fracpart)).c_str(), 0);
+  __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("key frame = ") + std::to_string(gAnimationIndex)).c_str(), 0);
+  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
                                      nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
     //vkWaitForFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence(), VK_TRUE, 10000000);
     //gWomanCollada->Debug(gQueue, gCommandPool);
 //    gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
 //                       gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
-    aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
-    gAnimationIndex = (gAnimationIndex + 1) % 5;
-  }
+  aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSemaphore waitSemaphores = render.semaphore_;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};
@@ -1108,7 +1111,7 @@ double GetTime()
 {
   timespec res;
   clock_gettime(CLOCK_REALTIME, &res);
-  return 1000.0 * res.tv_sec + res.tv_nsec / 1e6;
+  return res.tv_sec + res.tv_nsec / 1e9;
 }
 
 void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTouched)
@@ -1183,4 +1186,13 @@ bool isTouchButton(glm::vec2* touchPos, ImVec2 buttonPos, ImVec2 buttonRegion)
     if(buttonPos.y < touchPos[0].y && touchPos[0].y < buttonPos.y + buttonRegion.y)
       return true;
   return false;
+}
+
+uint32_t SelectKeyframe(double frac)
+{
+    for(uint32_t i = 0; i < 4; i++){
+        if(frac < animationTime[i + 1])
+            return i;
+    }
+    return 4;
 }

@@ -44,11 +44,7 @@ void main()
       uint jj = joints[0].j[offset + k];
       vec3 v1 = w * (mats[0].m[jj] * vec4(v0, 1.0)).xyz;
       vec3 v2 = w * (matsNext[0].m[jj] * vec4(v0, 1.0)).xyz;
-      if (animNum.a == 4){
-        v3 += v1 + ((v2 - v1) * (1.0 - time.t));
-      } else {
-        v3 += v1 + ((v2 - v1) * (time.t - KeyFrames[animNum.a]));
-      }
+      v3 += v1 + ((v2 - v1) * ((time.t - KeyFrames[animNum.a]) * 4.807));
       //v4 += (1.0f / float(influence)) * v0;
       v4 += (w * v0);
       //v0 = w * v0;
