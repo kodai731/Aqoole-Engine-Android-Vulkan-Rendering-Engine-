@@ -179,8 +179,8 @@ AEDescriptorSet* gWomanTextureSets;
 std::unique_ptr<AEBufferAS> gWomanOffset;
 std::string fuse1ObjPath("fuse-woman-1/source/woman.obj");
 std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
-//std::string fuse1Collada("phoenix-bird/phoenix-bird2.dae");
-std::string fuse1Collada("cowboy/cowboy.dae");
+std::string cowboyPath("cowboy/cowboy.dae");
+std::string phoenixPath("phoenix-bird/phoenix-bird2.dae");
 std::string computeShaderPath("shaders/07_animationComp.spv");
 std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
@@ -190,7 +190,9 @@ std::unique_ptr<AEFence> gAnimationFence;
 std::vector<Vertex3DObj> gZeroData;
 std::unique_ptr<AESemaphore> gComputeSemaphore;
 std::unique_ptr<AEEvent> gComputeEvent;
+std::unique_ptr<AEBufferUtilOnGPU> gGeometryIndices;
 
+std::string gTargetModelPath = phoenixPath;
 double lastTime;
 double startTime;
 double passedTime = 0.0;
@@ -563,18 +565,18 @@ bool InitVulkan(android_app* app) {
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, 0.0f, top), glm::vec3(left, 0.0f, bottom),
                                        glm::vec3(right, 0.0f, bottom), glm::vec3(right, 0.0f, top), glm::vec3(0.0f, 0.2f, 0.0f));
   //woman
-  gWoman = std::make_unique<AEDrawObjectBaseObjFile>(fuse1ObjPath.c_str(), app, true);
-  gWoman->Scale(0.01f);
+//  gWoman = std::make_unique<AEDrawObjectBaseObjFile>(fuse1ObjPath.c_str(), app, true);
+//  gWoman->Scale(0.01f);
   std::vector<const char*> c;
   c.emplace_back(computeShaderPath.c_str());
-  gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(fuse1Collada.c_str(), app, gDevice, c, gCommandPool, gQueue);
+  gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(gTargetModelPath.c_str(), app, gDevice, c, gCommandPool, gQueue);
   gWomanCollada->MakeAnimation();
-  //gWomanCollada->Scale(0.5f);
+  gWomanCollada->Scale(0.02f);
   //woman texture
   for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
   {
-      std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, (std::string("cowboy/") + gWomanCollada->GetTexturePath(i)).c_str(),
-                                                                 gCommandPool, gQueue, app));
+      std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, (AEDrawObject::GetRootDirName(phoenixPath) +
+      gWomanCollada->GetTexturePath(i)).c_str(), gCommandPool, gQueue, app));
       texture->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
       gWomanTextures.push_back(std::move(texture));
   }
@@ -623,6 +625,12 @@ bool InitVulkan(android_app* app) {
   gUboRTBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(UBORT));
   gUboRTBuffer->CreateBuffer();
   gUboRTBuffer->CopyData((void*)&uboRT, sizeof(UBORT));
+  //geometry indices
+  gGeometryIndices = std::make_unique<AEBufferUtilOnGPU>(gDevice, sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gGeometryIndices->CreateBuffer();
+  std::vector<uint32_t> geometries;
+  gWomanCollada->SetGeometrySize(geometries);
+  gGeometryIndices->CopyData((void*)geometries.data(), 0, sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), gQueue, gCommandPool);
   //create map buffer
 //  gmapVbWoman = std::make_unique<AEBufferAS>(gDevice, sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(),
 //                                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -652,8 +660,7 @@ bool InitVulkan(android_app* app) {
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(), gWomanCollada->GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(6, gibWomans[0]->GetBuffer(), gWomanCollada->GetIndexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-//  gDescriptorSet->BindDescriptorBuffer(7, gmapVbWoman->GetBuffer(), sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(),
-//                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(7, gGeometryIndices->GetBuffer(), sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 //  gDescriptorSet->BindDescriptorBuffer(8, gmapIbWoman->GetBuffer(), sizeof(uint32_t) * totalMapIndices,
 //                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
@@ -704,8 +711,8 @@ bool InitVulkan(android_app* app) {
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
     AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
-    vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1, gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-                    0, nullptr, 0, nullptr, 0, nullptr);
+//    vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1, gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+//                    0, nullptr, 0, nullptr, 0, nullptr);
     vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
                          (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
     //dispatch ray tracing command
@@ -862,8 +869,8 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("int time = ") + std::to_string(intpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("frac time = ") + std::to_string(fracpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("key frame = ") + std::to_string(gAnimationIndex)).c_str(), 0);
-  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
-                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
+//  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
+//                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
     //vkWaitForFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence(), VK_TRUE, 10000000);
     //gWomanCollada->Debug(gQueue, gCommandPool);
 //    gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
@@ -1157,7 +1164,7 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
     gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
   }
-  ImGui::Text("time = %.3f", passedTime * 0.001);
+  ImGui::Text("time = %.3f", passedTime);
   ImGui::SameLine();
   ImGui::End();
   ImVec2 pauseButtonPos(380, gSwapchain->GetExtents()[0].height - 150);

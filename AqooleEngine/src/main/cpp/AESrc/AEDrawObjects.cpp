@@ -81,6 +81,17 @@ void AEDrawObject::GetInAngleBrackets(std::string &output, std::string const& on
         output = oneLine.substr(begin + 1, end - begin - 1);
 }
 
+/*
+ * get root dir name
+ */
+std::string AEDrawObject::GetRootDirName(std::string &modelPath)
+{
+    std::vector<std::string> fields;
+    Split(fields, modelPath, '/');
+    return fields[0] + std::string("/");
+}
+
+
 //=====================================================================
 //Torus
 //=====================================================================
@@ -884,13 +895,10 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                                 oneVec3.z = std::stof(fields[i * 3 + 2]);
                                 if(std::regex_search(floatArrayStr.c_str(), std::regex("position", std::regex::icase)))
                                 {
-                                    //one3DObj.pos = oneVec3;
-                                    //mVertices.push_back(one3DObj);
                                     mPositions[targetIndex].push_back(oneVec3);
                                 }
                                 else if(std::regex_search(floatArrayStr.c_str(), std::regex("normal", std::regex::icase)))
                                 {
-                                    //mVertices[i].normal = oneVec3;
                                     mNormals[targetIndex].push_back(oneVec3);
                                 }
                             }
@@ -908,7 +916,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                             {
                                 oneVec2.x = std::stof(fields[i * 2]);
                                 oneVec2.y = 1.0f - std::stof(fields[i * 2 + 1]);
-                                //mVertices[i].texcoord = oneVec2;
                                 mMaps[targetIndex].emplace_back(oneVec2);
                             }
                         }
@@ -1069,12 +1076,18 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 uint32_t nowPointing = 0;
                 uint32_t vertexIndex = 0;
                 uint32_t jointOffset = 0;
+                std::vector<uint32_t> influenceCountList;
+                std::vector<uint32_t> jointOffsetList;
+                mInfluenceCountList.emplace_back(influenceCountList);
+                mJointOffsetList.emplace_back(jointOffsetList);
+                uint32_t ilistIndex = mInfluenceCountList.size() - 1;
+                uint32_t jlistIndex = mJointOffsetList.size() - 1;
                 for(uint32_t i = 0; i < influenceCounts.size(); i++)
                 {
                     JointWeight oneJointWeight;
                     uint32_t influenceCount = std::stoi(influenceCounts[i]);
-                    mInfluenceCountList.emplace_back(influenceCount);
-                    mJointOffsetList.emplace_back(totalVCount);
+                    mInfluenceCountList[ilistIndex].emplace_back(influenceCount);
+                    mJointOffsetList[jlistIndex].emplace_back(totalVCount);
                     if(totalVCount < 1024 && totalVCount + influenceCount > 1024){
                         mComputeLocalSize = totalVCount;
                     }
@@ -1168,37 +1181,6 @@ AEDrawObjectBaseCollada::~AEDrawObjectBaseCollada()
 }
 
 /*
-process geometry part
-*/
-void AEDrawObjectBaseCollada::ProcessGeometry(std::ifstream &file)
-{
-    // std::string oneLine;
-    // std::vector<std::string> fields;
-    // while(std::getline(file, oneLine))
-    // {
-    //     //geometry end
-    //     if(oneLine.find("</library_geometries>"))
-    //         break;
-    //     //geometry header
-    //     if(oneLine.find("<geometry"))
-    //     {
-    //         AEDrawObject::GetInAngleBrackets(oneLine, oneLine);
-    //         AEDrawObject::Split(fields, oneLine, ' ');
-    //         //get ID
-    //         mGeometryID.push_back(fields[1].substr(4, fields[1].size() - 1));
-    //         //read source
-    //         while(std::getline(file, oneLine))
-    //         {
-    //             if(oneLine.find("<source"))
-    //             {
-
-    //             }
-    //         }
-    //     }
-    // }
-}
-
-/*
 scale
 */
 void AEDrawObjectBaseCollada::Scale(float scale)
@@ -1277,19 +1259,7 @@ void AEDrawObjectBaseCollada::MakeVertices()
         }
     }
     //check joints and weights
-    for(uint32_t i = 0; i < mVertices.size(); i++){
-        uint32_t index2 = mPositionIndices[0][i];
-        uint32_t influence = mInfluenceCountList[index2];
-        glm::vec3 v4(0.0f);
-        uint32_t offset = mJointOffsetList[index2];
-        for(uint32_t j = 0; j < influence; j++){
-            float w = mWeights[offset + j];
-            v4 += w * mPositions[0][index2];
-        }
-        if(glm::length(v4 - mVertices[i].pos) > 0.01f){
-            __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("postion not equal geometry at ") + std::to_string(index2)).c_str(), 0);
-        }
-    }
+    CheckJointAndWeight();
 }
 
 /*
@@ -1471,15 +1441,6 @@ void AEDrawObjectBaseCollada::Animation()
         __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("weight in joint = ") + weight).c_str(), 0);
         i++;
     }
-    //calc animation position
-//    std::vector<glm::vec3> tmpPositions = mPositions[0];
-//    for(auto& p : tmpPositions)
-//        p = glm::vec3(0.0f);
-//    __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "start animation calclation %u", 0);
-//    SkeletonAnimation(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f), tmpPositions);
-//    for(uint32_t i = 0; i < mPositions[0].size(); i++) {
-//        mAnimationPositionDebug.emplace_back(tmpPositions[i]);
-//    }
 }
 
 /*
@@ -1624,11 +1585,6 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     } else {
         mBuffers.emplace_back((AEBufferUtilOnGPU*)buffer[0]);
     }
-    //indices
-//    std::unique_ptr<AEBufferUtilOnGPU> indicesBuffer = std::make_unique<AEBufferUtilOnGPU>(device, indicesBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-//    indicesBuffer->CreateBuffer();
-//    indicesBuffer->CopyData((void*)mVerteces2.data(), 0, indicesBufferSize, queue, commandPool);
-//    mBuffers.emplace_back(std::move(indicesBuffer));
     //influence count buffer
     VkDeviceSize influenceCountListBufferSize = mInfluenceCountList.size() * sizeof(uint32_t);
     std::unique_ptr<AEBufferUtilOnGPU> influenceCountListBuffer = std::make_unique<AEBufferUtilOnGPU>(device, influenceCountListBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -1694,13 +1650,6 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     float time = 0.0f;
     timeBuffer->CopyData((void*)&time, uniformTimeSize);
     mUniformBuffers.emplace_back(std::move(timeBuffer));
-    //dispatch num
-//    VkDeviceSize dispatchNumSize = sizeof(uint32_t);
-//    std::unique_ptr<AEBufferUniform> dnBuffer = std::make_unique<AEBufferUniform>(device, dispatchNumSize);
-//    dnBuffer->CreateBuffer();
-//    uint32_t dispatchNum = 0;
-//    dnBuffer->CopyData((void*)&dispatchNum, dispatchNumSize);
-//    mUniformBuffers.emplace_back(std::move(dnBuffer));
     //joint offset buffer
     VkDeviceSize jointOffsetSize = mJointOffsetList.size() * sizeof(uint32_t);
     std::unique_ptr<AEBufferUtilOnGPU> jointOffsetBuffer = std::make_unique<AEBufferUtilOnGPU>(device, jointOffsetSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -1761,8 +1710,6 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
                                                 uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore,
                                                 double time, AEEvent* event)
 {
-    //clear data of buffer 1
-    //mBuffers[1]->CopyData((void*)mZeroData.data(), 0, mPositions[0].size() * sizeof(glm::vec3), queue, commandPool);
     //command record for each joint
     AECommand::BeginCommand(command);
     //prepare event
@@ -1785,8 +1732,6 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     //each work groups
     vkCmdDispatch(*command->GetCommandBuffer(), 1024, 5, 1);
     vkCmdSetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-//    vkCmdWaitEvents(*command->GetCommandBuffer(), 1, event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-//                    0, nullptr, 0, nullptr, 0, nullptr);
     //each local thread
     //vkCmdDispatch(*command->GetCommandBuffer(), 740, 1, 1);
     AECommand::EndCommand(command);
@@ -1830,29 +1775,6 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     else{
         vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
     }
-    //debug in CPU
-//    {
-//        std::vector<Vertex3DObj> tmp;
-//        Vertex3DObj tmpV3d;
-//        tmpV3d.pos = glm::vec3(0.0f);
-//        //prepare zero data
-//        for (uint32_t i = 0; i < mVertices.size(); i++) {
-//            tmpV3d.texcoord = mVertices[i].texcoord;
-//            tmpV3d.normal = mVertices[i].normal;
-//            tmp.emplace_back(tmpV3d);
-//        }
-//        //calc animation
-//        for (uint32_t i = 0; i < mVerteces2.size(); i++) {
-//            uint32_t index = mVerteces2[i];
-//            float f = mWeights[i];
-//            glm::vec3 pos = mPositions[0][index];
-//            uint32_t j = mJoints[i];
-//            pos = f * glm::vec3(mAnimationTransforms[j] * glm::vec4(pos, 1.0f));
-//            tmp[index].pos += pos;
-//            //mAnimationPositionDebug.emplace_back(pos);
-//        }
-//        mVertices = tmp;
-//    }
 }
 
 /*
@@ -2020,6 +1942,29 @@ void AEDrawObjectBaseCollada::DebugWeights(AEDeviceQueue* queue, AECommandPool* 
             log += (std::string("data : ") + std::to_string(mWeights[i]) + endl);
             log += (std::string("debug : ") + std::to_string(tmpW[i]));
             __android_log_print(ANDROID_LOG_DEBUG, "animation debug", log.c_str(), 0);
+        }
+    }
+}
+
+/*
+ * check joint and weight
+ */
+void AEDrawObjectBaseCollada::CheckJointAndWeight()
+{
+    for(uint32_t i = 0; i < mInfluenceCountList.size(); i++){
+        for(uint32_t j = 0; j < mInfluenceCountList[i].size(); j++) {
+            uint32_t influence = mInfluenceCountList[i][j];
+            glm::vec3 v4(0.0f);
+            uint32_t offset = mJointOffsetList[i][j];
+            for (uint32_t k = 0; k < influence; k++) {
+                float w = mWeights[offset + k];
+                v4 += w * mPositions[i][j];
+            }
+            if (glm::length(v4 - mVertices[i].pos) > 0.01f) {
+                __android_log_print(ANDROID_LOG_DEBUG, "animation",
+                                    (std::string("postion not equal geometry at ") +
+                                     std::to_string(i) + std::string(" ") + std::to_string(j)).c_str(), 0);
+            }
         }
     }
 }

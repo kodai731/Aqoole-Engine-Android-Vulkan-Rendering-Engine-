@@ -27,7 +27,7 @@
 #include <vector>
 #include <array>
 #include <cmath>
-#include "string"
+#include <string>
 #include <sstream>
 #include <fstream>
 #include <random>
@@ -74,6 +74,7 @@ namespace AEDrawObject
     //for private
     void Split(std::vector<std::string> &fields, std::string& oneLine, const char delimiter);
     void GetInAngleBrackets(std::string &output, std::string const& oneLine);
+    std::string GetRootDirName(std::string &modelPath);
 }
 
 class AETorus
@@ -265,11 +266,10 @@ protected:
     std::vector<std::unique_ptr<AEBufferUniform>> mUniformBuffers;
     std::vector<glm::vec3> mAnimationPositionDebug;
     std::vector<glm::vec3> mZeroData;
-    std::vector<uint32_t> mInfluenceCountList;
-    std::vector<uint32_t> mJointOffsetList;
+    std::vector<std::vector<uint32_t>> mInfluenceCountList;
+    std::vector<std::vector<uint32_t>> mJointOffsetList;
     std::vector<uint32_t> mSerialPositionIndices;
     //functions
-    void ProcessGeometry(std::ifstream &file);
     void MakeVertices();
     void ReadSkeletonNode(boost::property_tree::ptree::const_iterator nowNode,
         std::unique_ptr<AEDrawObjectBaseCollada::SkeletonNode>& skeletonNode);
@@ -280,6 +280,7 @@ protected:
     void SkeletonAnimation(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions);
     void DebugPosition(uint32_t index, std::vector<glm::vec3> const& debug);
     void DebugPositionObj(uint32_t index, std::vector<Vertex3DObj> const& debug);
+    void CheckJointAndWeight();
 public:
     AEDrawObjectBaseCollada(const char* filePath, android_app* app, AELogicalDevice* device, std::vector<const char*> &shaderPaths,
                             AECommandPool* commandPool, AEDeviceQueue* queue);
@@ -299,7 +300,15 @@ public:
     std::vector<uint32_t>const& GetEachMapIndices(uint32_t index)const{return mMapIndices[index];}
     std::vector<std::vector<uint32_t>>const& GetMapIndices()const{return mMapIndices;}
     std::vector<glm::vec3>const& GetPositions(uint32_t index)const{return mPositions[index];}
+    uint32_t GetGeometrySize(){return mPositions.size();}
     uint32_t GetMaterialSize(){return mPositionIndices.size();}
+    void SetGeometrySize(std::vector<uint32_t> &geometries){
+        uint32_t offset = 0;
+        for(uint32_t i = 0; i < mPositions.size(); i++){
+            offset += mPositionIndices[i].size();
+            geometries.emplace_back(offset);
+        }
+    }
     void MakeAnimation()
     {
         Animation();
