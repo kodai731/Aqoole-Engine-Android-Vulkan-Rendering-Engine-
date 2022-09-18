@@ -377,7 +377,7 @@ void main()
     Vertex3DObj v2 = verticesobj[0].vobj[ind.z];
     uint offset = 3 * gl_PrimitiveID;
     if(offset < geometryIndices[0].gi[0])
-      color = texture(texSampler1, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
+      color = texture(texSampler0, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
       //color = vec3(0, 0, 0);
     else
       color = texture(texSampler0, v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;

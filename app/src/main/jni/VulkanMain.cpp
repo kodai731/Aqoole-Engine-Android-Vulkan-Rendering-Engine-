@@ -192,11 +192,10 @@ std::unique_ptr<AESemaphore> gComputeSemaphore;
 std::unique_ptr<AEEvent> gComputeEvent;
 std::unique_ptr<AEBufferUtilOnGPU> gGeometryIndices;
 
-std::string gTargetModelPath = phoenixPath;
+std::string gTargetModelPath = cowboyPath;
 double lastTime;
 double startTime;
 double passedTime = 0.0;
-double animationTime[5] = {0.0000, 0.2083333, 0.4166666, 0.625, 0.8333333};
 uint32_t gAnimationIndex = 0;
 
 std::vector<AECube*> gCubes;
@@ -571,11 +570,11 @@ bool InitVulkan(android_app* app) {
   c.emplace_back(computeShaderPath.c_str());
   gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(gTargetModelPath.c_str(), app, gDevice, c, gCommandPool, gQueue);
   gWomanCollada->MakeAnimation();
-  gWomanCollada->Scale(0.02f);
+  //gWomanCollada->Scale(0.02f);
   //woman texture
   for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
   {
-      std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, (AEDrawObject::GetRootDirName(phoenixPath) +
+      std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, (AEDrawObject::GetRootDirName(gTargetModelPath) +
       gWomanCollada->GetTexturePath(i)).c_str(), gCommandPool, gQueue, app));
       texture->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
       gWomanTextures.push_back(std::move(texture));
@@ -631,21 +630,6 @@ bool InitVulkan(android_app* app) {
   std::vector<uint32_t> geometries;
   gWomanCollada->SetGeometrySize(geometries);
   gGeometryIndices->CopyData((void*)geometries.data(), 0, sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), gQueue, gCommandPool);
-  //create map buffer
-//  gmapVbWoman = std::make_unique<AEBufferAS>(gDevice, sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(),
-//                                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-//  gmapVbWoman->CreateBuffer();
-//  gmapVbWoman->CopyData((void*)gWomanCollada->GetMapsAddress().data(), 0,
-//                        sizeof(float) * 2 * gWomanCollada->GetMapsAddress().size(), gQueue, gCommandPool);
-//  VkDeviceSize totalMapIndices = 0;
-//  for(auto mapIndex : gWomanCollada->GetMapIndices())
-//    totalMapIndices += mapIndex.size();
-//  gmapIbWoman = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * totalMapIndices, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-//  gmapIbWoman->CreateBuffer();
-//  gmapIbWoman->CopyData((void*)gWomanCollada->GetEachMapIndices(0).data(), 0,
-//                        sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(0).size(), gQueue, gCommandPool);
-//  gmapIbWoman->CopyData((void*)gWomanCollada->GetEachMapIndices(1).data(), sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(0).size(),
-//                        sizeof(uint32_t) * gWomanCollada->GetEachMapIndices(1).size(), gQueue, gCommandPool);
   //descriptor set
   gDescriptorSet = new AEDescriptorSet(gDevice, gLayouts[0], gDescriptorPool);
   gDescriptorSet->BindAccelerationStructure(0, astop.get());
@@ -713,8 +697,8 @@ bool InitVulkan(android_app* app) {
     AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
 //    vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1, gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
 //                    0, nullptr, 0, nullptr, 0, nullptr);
-    vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                         (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
+//    vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+//                         (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
     //dispatch ray tracing command
     AECommand::CommandTraceRays(gCommandBuffers[bufferIndex], gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gSbts,
                                 gPipelineRT.get(), gDescriptorSets, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
@@ -862,19 +846,14 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   //animation dispatch
   double intpart;
   double fracpart = std::modf(passedTime, &intpart);
-//  gvbWoman->CopyData((void *) gZeroData.data(), 0,
-//                     gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   gAnimationIndex = SelectKeyframe(fracpart);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("passed time = ") + std::to_string(passedTime)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("int time = ") + std::to_string(intpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("frac time = ") + std::to_string(fracpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("key frame = ") + std::to_string(gAnimationIndex)).c_str(), 0);
-//  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
-//                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
-    //vkWaitForFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence(), VK_TRUE, 10000000);
+  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
+                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
     //gWomanCollada->Debug(gQueue, gCommandPool);
-//    gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
-//                       gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSemaphore waitSemaphores = render.semaphore_;
@@ -1197,9 +1176,10 @@ bool isTouchButton(glm::vec2* touchPos, ImVec2 buttonPos, ImVec2 buttonRegion)
 
 uint32_t SelectKeyframe(double frac)
 {
-    for(uint32_t i = 0; i < 4; i++){
-        if(frac < animationTime[i + 1])
+  uint32_t keyFrameSize = gWomanCollada->GetKeyFrames().size();
+    for(uint32_t i = 0; i < keyFrameSize - 1; i++){
+        if(frac < gWomanCollada->GetKeyFrames()[i + 1])
             return i;
     }
-    return 4;
+    return keyFrameSize - 1;
 }

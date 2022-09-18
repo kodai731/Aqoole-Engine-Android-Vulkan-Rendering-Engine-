@@ -224,7 +224,6 @@ protected:
     struct AnimationMatrix
     {
         std::string id;
-        std::vector<float> timeList;
         std::vector<glm::mat4> matrixList;
         std::string target;
     };
@@ -269,6 +268,7 @@ protected:
     std::vector<std::vector<uint32_t>> mInfluenceCountList;
     std::vector<std::vector<uint32_t>> mJointOffsetList;
     std::vector<uint32_t> mSerialPositionIndices;
+    std::vector<float> mAnimationTime;
     //functions
     void MakeVertices();
     void ReadSkeletonNode(boost::property_tree::ptree::const_iterator nowNode,
@@ -302,6 +302,7 @@ public:
     std::vector<glm::vec3>const& GetPositions(uint32_t index)const{return mPositions[index];}
     uint32_t GetGeometrySize(){return mPositions.size();}
     uint32_t GetMaterialSize(){return mPositionIndices.size();}
+    std::vector<float>const& GetKeyFrames()const{return mAnimationTime;}
     void SetGeometrySize(std::vector<uint32_t> &geometries){
         uint32_t offset = 0;
         for(uint32_t i = 0; i < mPositions.size(); i++){

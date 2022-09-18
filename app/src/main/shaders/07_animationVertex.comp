@@ -7,7 +7,7 @@
 
 //layout(local_size_x = 740, local_size_y = 1, local_size_z = 1) in;
 
-float KeyFrames[5] = {0.0000, 0.2083333, 0.4166666, 0.625, 0.8333333};
+float LocalKeyFrames[5] = {0.0000, 0.2083333, 0.4166666, 0.625, 0.8333333};
 
 layout(binding = 0, set = 0, scalar) buffer Verticesobj {vec3 vobj[];} verticesobj[];
 layout(binding = 1, set = 0, scalar) buffer VerticesobjDst {Vertex3DObj vobjDst[];} verticesobjDst[];
@@ -22,6 +22,7 @@ layout(binding = 9, set = 0, scalar) buffer MatsNext{mat4 m[];} matsNext[];
 layout(binding = 10, set = 0) uniform Time{float t;} time;
 layout(binding = 11, set = 0, scalar) buffer JointOffset{uint o[];} jointOffset[];
 layout(binding = 12, set = 0, scalar) buffer Indices{uint i[];} indices[];
+layout(binding = 13, set = 0, scalar) buffer KeyFrames{float kf[];} keyFrames;
 
 void main()
 {
@@ -44,7 +45,7 @@ void main()
       uint jj = joints[0].j[offset + k];
       vec3 v1 = w * (mats[0].m[jj] * vec4(v0, 1.0)).xyz;
       vec3 v2 = w * (matsNext[0].m[jj] * vec4(v0, 1.0)).xyz;
-      v3 += v1 + ((v2 - v1) * ((time.t - KeyFrames[animNum.a]) * 4.807));
+      v3 += v1 + ((v2 - v1) * ((time.t - LocalKeyFrames[animNum.a]) * 4.807));
       //v4 += (1.0f / float(influence)) * v0;
       v4 += (w * v0);
       //v0 = w * v0;

@@ -165,8 +165,6 @@ void android_main(struct android_app* app) {
               laData.x = tempSensorEvent->vector.x;
               laData.y = tempSensorEvent->vector.y;
               laData.z = tempSensorEvent->vector.z;
-              __android_log_print(ANDROID_LOG_DEBUG, "LA :  ", (std::to_string(laData.x) + " " + std::to_string(laData.y) +
-                                                                     " " + std::to_string(laData.z)).c_str(), 10);
           }
       }
     }

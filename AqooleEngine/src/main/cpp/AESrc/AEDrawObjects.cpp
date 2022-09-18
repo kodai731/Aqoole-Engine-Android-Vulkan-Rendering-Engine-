@@ -1340,14 +1340,14 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
         if(strcmp(childId, "source") == 0)
         {
             auto floatId = source.second.get_optional<std::string>("<xmlattr>.id")->c_str();
-            if (std::regex_search(source.second.get_optional<std::string>("<xmlattr>.id")->c_str(), std::regex("input")))
+            if (mAnimationTime.size() == 0 && std::regex_search(source.second.get_optional<std::string>("<xmlattr>.id")->c_str(), std::regex("input")))
             {
                 std::string timeListS = source.second.get<std::string>("float_array");
                 std::vector<std::string> timeList;
                 AEDrawObject::Split(timeList, timeListS, ' ');
                 for (uint32_t i = 0; i < timeList.size(); i++) {
                     float time = std::stof(timeList[i]);
-                    a.timeList.emplace_back(time);
+                    mAnimationTime.emplace_back(time);
                 }
             }
             else if(std::regex_search(source.second.get_optional<std::string>("<xmlattr>.id")->c_str(), std::regex("output")))
@@ -1559,6 +1559,9 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     cl.AddDescriptorSetLayoutBinding(12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                      VK_SHADER_STAGE_COMPUTE_BIT, 1,
                                      nullptr);
+    cl.AddDescriptorSetLayoutBinding(13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                     VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
     cl.CreateDescriptorSetLayout();
     mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
     //buffers for descriptor set
@@ -1662,6 +1665,12 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     indicesList->CreateBuffer();
     indicesList->CopyData((void*)mSerialPositionIndices.data(), 0, indicesListSize, queue, commandPool);
     mBuffers.emplace_back(std::move(indicesList));
+    //animation key frame time
+    VkDeviceSize keyFrameSize = sizeof(float) * mAnimationTime.size();
+    std::unique_ptr<AEBufferUtilOnGPU> keyFrameBuffer = std::make_unique<AEBufferUtilOnGPU>(device, keyFrameSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    keyFrameBuffer->CreateBuffer();
+    keyFrameBuffer->CopyData((void*)mAnimationTime.data(), 0, keyFrameSize, queue, commandPool);
+    mBuffers.emplace_back(std::move(keyFrameBuffer));
     //prepare descriptor set
     mDs = std::make_unique<AEDescriptorSet>(device, &cl, descriptorPool);
     mDs->BindDescriptorBuffer(0, mBuffers[0]->GetBuffer(), positionBufferSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1682,6 +1691,7 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     mDs->BindDescriptorBuffer(10, mUniformBuffers[1]->GetBuffer(), uniformTimeSize, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     mDs->BindDescriptorBuffer(11, mBuffers[9]->GetBuffer(), jointOffsetSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     mDs->BindDescriptorBuffer(12, mBuffers[10]->GetBuffer(), indicesListSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    mDs->BindDescriptorBuffer(13, mBuffers[11]->GetBuffer(), keyFrameSize, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     //check buffer data
     std::vector<float> weightData;
     for(uint32_t i = 0; i < mWeights.size(); i++)
@@ -1713,7 +1723,7 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     //command record for each joint
     AECommand::BeginCommand(command);
     //prepare event
-    vkCmdResetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+//    vkCmdResetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
     //update animation transforms
     AnimationDispatchJoint(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), animationNum, mAnimationTransforms);
@@ -1731,7 +1741,7 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     //dispatch
     //each work groups
     vkCmdDispatch(*command->GetCommandBuffer(), 1024, 5, 1);
-    vkCmdSetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+//    vkCmdSetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     //each local thread
     //vkCmdDispatch(*command->GetCommandBuffer(), 740, 1, 1);
     AECommand::EndCommand(command);
