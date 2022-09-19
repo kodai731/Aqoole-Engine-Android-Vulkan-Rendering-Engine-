@@ -264,7 +264,6 @@ protected:
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBuffers;
     std::vector<std::unique_ptr<AEBufferUniform>> mUniformBuffers;
     std::vector<glm::vec3> mAnimationPositionDebug;
-    std::vector<glm::vec3> mZeroData;
     std::vector<std::vector<uint32_t>> mInfluenceCountList;
     std::vector<std::vector<uint32_t>> mJointOffsetList;
     std::vector<uint32_t> mSerialPositionIndices;

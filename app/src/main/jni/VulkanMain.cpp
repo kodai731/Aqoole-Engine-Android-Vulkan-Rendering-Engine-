@@ -377,6 +377,7 @@ bool CreateBuffers(void) {
   gvbWoman = std::make_unique<AEBufferAS>(gDevice, gWomanCollada->GetVertexBufferSize(),
                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gvbWoman->CreateBuffer();
+  gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   //index buffer
   for(uint32_t i = 0; i < 1; i++)
   {
@@ -406,11 +407,6 @@ bool CreateBuffers(void) {
   AEBufferBase* registerBuffers[1] = {gvbWoman.get()};
   gWomanCollada->AnimationPrepare(androidAppCtx, gDevice, c, registerBuffers,
                                   gQueue, gCommandPool, gDescriptorPool);
-//  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(),
-//                                   gQueue, gCommandPool, 0, nullptr, nullptr, nullptr, 0.0);
-//  gWomanCollada->Debug(gQueue, gCommandPool);
-////  //test cpu only
-  gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   //offset
 //  gWomanOffset = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 //  gWomanOffset->CreateBuffer();
@@ -695,10 +691,10 @@ bool InitVulkan(android_app* app) {
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
     AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
-//    vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1, gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-//                    0, nullptr, 0, nullptr, 0, nullptr);
-//    vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-//                         (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
+    vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1, gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                    0, nullptr, 0, nullptr, 0, nullptr);
+    vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                         (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
     //dispatch ray tracing command
     AECommand::CommandTraceRays(gCommandBuffers[bufferIndex], gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gSbts,
                                 gPipelineRT.get(), gDescriptorSets, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),

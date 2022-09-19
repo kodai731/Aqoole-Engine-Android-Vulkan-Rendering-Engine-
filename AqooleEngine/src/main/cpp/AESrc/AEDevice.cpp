@@ -995,9 +995,10 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, std::vector<
 	pfnCmdBuildAccelerationStructuresKHR(*commandBuffer.GetCommandBuffer(), 1, &mBuildCommandGeometryInfo, buildRangeInfos.data());
 	AECommand::EndSingleTimeCommands(&commandBuffer, commandQueue);
 	//get bottom AS handle
-	VkAccelerationStructureDeviceAddressInfoKHR deviceAddressInfo;
+	VkAccelerationStructureDeviceAddressInfoKHR deviceAddressInfo = {};
 	deviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
 	deviceAddressInfo.accelerationStructure = mAS;
+	deviceAddressInfo.pNext = nullptr;
 	mDeviceAddress = pfnGetAccelerationStructureDeviceAddressKHR(*mDevice->GetDevice(), &deviceAddressInfo);
 }
 
