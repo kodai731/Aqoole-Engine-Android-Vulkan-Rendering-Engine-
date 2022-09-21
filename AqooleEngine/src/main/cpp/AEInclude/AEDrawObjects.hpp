@@ -260,12 +260,14 @@ protected:
     uint32_t mComputeLocalSize;
     std::vector<uint32_t> mJoints;
     std::vector<float> mWeights;
-    std::unique_ptr<AEDescriptorSet> mDs;
+    std::vector<std::unique_ptr<AEDescriptorSet>> mDSs;
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBuffers;
     std::vector<std::unique_ptr<AEBufferUniform>> mUniformBuffers;
     std::vector<glm::vec3> mAnimationPositionDebug;
     std::vector<std::vector<uint32_t>> mInfluenceCountList;
+    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mInfluenceCountBuffers;
     std::vector<std::vector<uint32_t>> mJointOffsetList;
+    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mJointOffsetBuffers;
     std::vector<uint32_t> mSerialPositionIndices;
     std::vector<float> mAnimationTime;
     //functions
