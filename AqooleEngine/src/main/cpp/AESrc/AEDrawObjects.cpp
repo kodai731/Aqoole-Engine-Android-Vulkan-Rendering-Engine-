@@ -1755,7 +1755,7 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
                                       1, mDSs[i]->GetDescriptorSet());
         //dispatch
         //each work groups
-        vkCmdDispatch(*command->GetCommandBuffer(), 1024, 5, 1);
+        vkCmdDispatch(*command->GetCommandBuffer(), 5, 1, 1);
     }
     vkCmdSetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     //each local thread

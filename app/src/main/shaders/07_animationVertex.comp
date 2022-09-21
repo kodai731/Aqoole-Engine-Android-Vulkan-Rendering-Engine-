@@ -5,7 +5,7 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #include "07_raycommon.glsl"
 
-//layout(local_size_x = 740, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 
 //float LocalKeyFrames[5] = {0.0000, 0.2083333, 0.4166666, 0.625, 0.8333333};
 
@@ -26,8 +26,8 @@ layout(binding = 13, set = 0, scalar) buffer KeyFrames{float kf[];} keyFrames;
 
 void main()
 {
-  uint ii = gl_WorkGroupID.y * 1024 + gl_WorkGroupID.x;
-  //uint index = gl_LocalInvocationIndex;
+  //uint ii = gl_WorkGroupID.y * 1024 + gl_WorkGroupID.x;
+  uint ii = gl_WorkGroupID.x * 1024 + gl_LocalInvocationIndex;
   //uint index = gl_WorkGroupID.x;
   if(ii < 4260){
     uint index = indices[0].i[ii];
