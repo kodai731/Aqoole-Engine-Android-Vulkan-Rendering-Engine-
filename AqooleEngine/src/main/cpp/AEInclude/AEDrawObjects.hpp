@@ -238,13 +238,18 @@ protected:
     struct TextureMap
     {
         std::string textureImage;
-        uint32_t mapIndex;
+        std::string texcoord;
+    };
+    struct TextureImage
+    {
+        std::string imageId;
+        std::string fileName;
     };
     std::vector<Vertex3DObj> mVertices;
     std::vector<std::string> mMaterials;
     std::vector<uint32_t> mOffsets;
     std::string mMatFileName;
-    std::vector<std::string> mTextureFiles;
+    std::vector<TextureImage> mTextureFiles;
     std::vector<Geometry> mGeometries;
     std::vector<std::vector<glm::vec3>> mPositions;
     std::vector<std::vector<glm::vec3>> mNormals;
@@ -276,6 +281,7 @@ protected:
     std::vector<uint32_t> mSerialPositionIndices;
     std::vector<float> mAnimationTime;
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBasePositionBuffers;
+    std::vector<TextureMap> mTextureMap;
     //functions
     void MakeVertices();
     void ReadSkeletonNode(boost::property_tree::ptree::const_iterator nowNode,
@@ -300,7 +306,15 @@ public:
     std::vector<uint32_t>& GetIndexAddress(){return mIndices;}
     uint32_t GetVertexBufferSize();
     uint32_t GetTextureCount(){return mTextureFiles.size();}
-    std::string& GetTexturePath(uint32_t index){return mTextureFiles[index];}
+    std::string& GetTexturePath(uint32_t index){
+        for(uint32_t i = 0; i < mTextureMap.size(); i++){
+            for(uint32_t j = 0; j < mTextureFiles.size(); j++){
+                if(mTextureMap[i].textureImage == mTextureFiles[j].imageId){
+                    return mTextureFiles[j].fileName;
+                }
+            }
+        }
+        return mTextureFiles[index].fileName;}
     uint32_t GetOffset(uint32_t index){return mOffsets[index];}
     std::vector<uint32_t>const& GetOffsetAll(){return mOffsets;}
     std::vector<uint32_t>const& GetMapIndexAddress(uint32_t index)const{return mMapIndices[index];}

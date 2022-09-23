@@ -845,6 +845,8 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
         {
             if (boost::optional<std::string> imageId = images.second.get_optional<std::string>("<xmlattr>.id"))
             {
+                TextureImage ti;
+                ti.imageId = imageId.get();
                 auto imageChild = images.second.get_child("init_from");
                 std::string imageName(imageChild.data());
                 while(imageName.find("\\") != std::string::npos)
@@ -853,7 +855,8 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 }
                 if(!std::regex_search(imageName.c_str(), std::regex("\\.png")))
                     imageName += std::string(".png");
-                mTextureFiles.emplace_back(imageName);
+                ti.fileName = imageName;
+                mTextureFiles.emplace_back(ti);
             }
         }
         //read geometry
@@ -1393,22 +1396,40 @@ void AEDrawObjectBaseCollada::ReadEffect(const boost::property_tree::ptree::valu
     if(node.second.get_optional<std::string>("<xmlattr>.id") == boost::none)
         return;
     std::string effectId = node.second.get_optional<std::string>("<xmlattr>.id").get();
+    TextureMap t = {};
     BOOST_FOREACH(const auto& profile, node.second.get_child("")){
          auto profileId = profile.first.data();
          if(std::regex_search(profileId, std::regex("<xmlattr>", std::regex::icase)))
              continue;
+         //profile_COMMON
          if(std::regex_search(profileId, std::regex("profile", std::regex::icase))){
-             BOOST_FOREACH(const auto& newparam, profile.second.get_child("")){
-                auto newparamId = newparam.second.get<std::string>("<xmlattr>.sid");
-                if(newparam.second.get_optional<std::string>("surface") != boost::none) {
-                    const auto& surface = newparam.second.get_child("surface");
-                    if (surface.get_optional<std::string>("<xmlattr>.type") != boost::none) {
-                        auto textureName = surface.get<std::string>("init_from");
+             BOOST_FOREACH(const auto& child, profile.second.get_child("")){
+                //newparam
+                if(std::regex_search(child.first.data(), std::regex("newparam", std::regex::icase))) {
+                    if (child.second.get_optional<std::string>("surface") != boost::none) {
+                        const auto &surface = child.second.get_child("surface");
+                        if (surface.get_optional<std::string>("<xmlattr>.type") != boost::none) {
+                            auto textureName = surface.get<std::string>("init_from");
+                            t.textureImage = textureName;
+                        }
+                    }
+                }
+                //technique
+                if(std::regex_search(child.first.data(), std::regex("technique", std::regex::icase))) {
+                    BOOST_FOREACH(const auto& techChild, child.second.get_child("")) {
+                        if (techChild.second.get_optional<std::string>("diffuse") !=
+                            boost::none) {
+                            BOOST_FOREACH(const auto& diffuse, techChild.second.get_child("diffuse")) {
+                                auto texcoord = diffuse.second.get_optional<std::string>("<xmlattr>.texcoord").get();
+                                t.texcoord = texcoord;
+                            }
+                        }
                     }
                 }
              }
          }
-     }
+    }
+    mTextureMap.emplace_back(t);
 }
 
 /*
