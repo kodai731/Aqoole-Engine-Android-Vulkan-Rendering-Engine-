@@ -235,6 +235,11 @@ protected:
         std::vector<std::pair<uint32_t, float>> indexWeight;
         glm::mat4 controllerMatrix;
     };
+    struct TextureMap
+    {
+        std::string textureImage;
+        uint32_t mapIndex;
+    };
     std::vector<Vertex3DObj> mVertices;
     std::vector<std::string> mMaterials;
     std::vector<uint32_t> mOffsets;
@@ -278,6 +283,7 @@ protected:
     void DebugRootNode();
     void GetVertexWeights(std::vector<float> &vertexWeights, std::string& weightString);
     void ReadAnimation(const boost::property_tree::ptree::value_type& node);
+    void ReadEffect(const boost::property_tree::ptree::value_type& node);
     void SkeletonJointNo(SkeletonNode* node);
     void SkeletonAnimation(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions);
     void DebugPosition(uint32_t index, std::vector<glm::vec3> const& debug);

@@ -836,6 +836,10 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
         glm::vec2 oneVec2;
         std::vector<std::string> fields;
         std::vector<std::string> vertexWeights;
+        //read effects
+        BOOST_FOREACH(const auto& effect, tree.get_child("COLLADA.library_effects")){
+                        ReadEffect(effect);
+        }
         //read images
         for(const ptree::value_type& images : tree.get_child("COLLADA.library_images"))
         {
@@ -1377,6 +1381,34 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
         }
     }
     mAnimationMatrices.emplace_back(a);
+}
+
+/*
+ * read effects
+ */
+void AEDrawObjectBaseCollada::ReadEffect(const boost::property_tree::ptree::value_type& node)
+{
+    using namespace boost::property_tree;
+    std::string first = node.first.data();
+    if(node.second.get_optional<std::string>("<xmlattr>.id") == boost::none)
+        return;
+    std::string effectId = node.second.get_optional<std::string>("<xmlattr>.id").get();
+    BOOST_FOREACH(const auto& profile, node.second.get_child("")){
+         auto profileId = profile.first.data();
+         if(std::regex_search(profileId, std::regex("<xmlattr>", std::regex::icase)))
+             continue;
+         if(std::regex_search(profileId, std::regex("profile", std::regex::icase))){
+             BOOST_FOREACH(const auto& newparam, profile.second.get_child("")){
+                auto newparamId = newparam.second.get<std::string>("<xmlattr>.sid");
+                if(newparam.second.get_optional<std::string>("surface") != boost::none) {
+                    const auto& surface = newparam.second.get_child("surface");
+                    if (surface.get_optional<std::string>("<xmlattr>.type") != boost::none) {
+                        auto textureName = surface.get<std::string>("init_from");
+                    }
+                }
+             }
+         }
+     }
 }
 
 /*
