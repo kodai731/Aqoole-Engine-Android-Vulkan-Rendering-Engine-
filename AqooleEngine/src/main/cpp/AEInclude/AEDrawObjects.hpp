@@ -270,6 +270,7 @@ protected:
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mJointOffsetBuffers;
     std::vector<uint32_t> mSerialPositionIndices;
     std::vector<float> mAnimationTime;
+    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBasePositionBuffers;
     //functions
     void MakeVertices();
     void ReadSkeletonNode(boost::property_tree::ptree::const_iterator nowNode,

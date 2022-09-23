@@ -7,8 +7,6 @@
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 
-//float LocalKeyFrames[5] = {0.0000, 0.2083333, 0.4166666, 0.625, 0.8333333};
-
 layout(binding = 0, set = 0, scalar) buffer Verticesobj {vec3 vobj[];} verticesobj[];
 layout(binding = 1, set = 0, scalar) buffer VerticesobjDst {Vertex3DObj vobjDst[];} verticesobjDst[];
 layout(binding = 2, set = 0, scalar) buffer InfluenceCount {uint i[];} influenceCount[];
@@ -28,7 +26,6 @@ void main()
 {
   //uint ii = gl_WorkGroupID.y * 1024 + gl_WorkGroupID.x;
   uint ii = gl_WorkGroupID.x * 1024 + gl_LocalInvocationIndex;
-  //uint index = gl_WorkGroupID.x;
   if(ii < 4260){
     uint index = indices[0].i[ii];
     uint influence = influenceCount[0].i[index];

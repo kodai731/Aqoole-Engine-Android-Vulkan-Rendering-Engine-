@@ -1565,32 +1565,24 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     cl.CreateDescriptorSetLayout();
     mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
     //buffers for descriptor set
-    VkDeviceSize positionBufferSize = mPositions[0].size() * sizeof(glm::vec3);
     VkDeviceSize indicesBufferSize = mVerteces2.size() * sizeof(uint32_t);
     VkDeviceSize jointsBufferSize = mJoints.size() * sizeof(uint32_t);
     VkDeviceSize weightsBufferSize = mWeights.size() * sizeof(float);
-    //positions
-    std::unique_ptr<AEBufferUtilOnGPU> positionBuffer = std::make_unique<AEBufferUtilOnGPU>(device,
-                                                                                            positionBufferSize,
-                                                                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    positionBuffer->CreateBuffer();
-    positionBuffer->CopyData((void *) mPositions[0].data(), 0, positionBufferSize, queue,
-                             commandPool);
-    mBuffers.emplace_back(std::move(positionBuffer));
-    //animation result positions
-    if (buffer == nullptr) {
-        std::unique_ptr<AEBufferUtilOnGPU> positionResultBuffer = std::make_unique<AEBufferUtilOnGPU>(
-                device, positionBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        positionResultBuffer->CreateBuffer();
-        positionResultBuffer->CopyData((void *) mPositions[0].data(), 0, positionBufferSize, queue,
-                                       commandPool);
-        mBuffers.emplace_back(std::move(positionResultBuffer));
-    } else {
-        mBuffers.emplace_back((AEBufferUtilOnGPU*)buffer[0]);
-    }
-    //influence count buffer
+    //buffer sizes
+    std::vector<VkDeviceSize> positionBufferSizes;
     std::vector<VkDeviceSize> influenceCountSizes;
+    std::vector<VkDeviceSize> jointOffsetSizes;
     for(uint32_t i = 0; i < mPositionIndices.size(); i++) {
+        //base position buffer
+        positionBufferSizes.emplace_back(mPositions[i].size() * sizeof(glm::vec3));
+        std::unique_ptr<AEBufferUtilOnGPU> positionBuffer = std::make_unique<AEBufferUtilOnGPU>(device,
+                                                                                                positionBufferSizes[i],
+                                                                                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        positionBuffer->CreateBuffer();
+        positionBuffer->CopyData((void *) mPositions[0].data(), 0, positionBufferSizes[i], queue,
+                                 commandPool);
+        mBasePositionBuffers.emplace_back(std::move(positionBuffer));
+        //influence count buffer
         VkDeviceSize influenceCountListBufferSize =
                 mInfluenceCountList[i].size() * sizeof(uint32_t);
         influenceCountSizes.emplace_back(influenceCountListBufferSize);
@@ -1600,6 +1592,26 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
         influenceCountListBuffer->CopyData((void *) mInfluenceCountList[i].data(), 0,
                                            influenceCountListBufferSize, queue, commandPool);
         mInfluenceCountBuffers.emplace_back(std::move(influenceCountListBuffer));
+        //joint offset buffer
+        VkDeviceSize jointOffsetSize = mJointOffsetList[i].size() * sizeof(uint32_t);
+        jointOffsetSizes.emplace_back(jointOffsetSize);
+        std::unique_ptr<AEBufferUtilOnGPU> jointOffsetBuffer = std::make_unique<AEBufferUtilOnGPU>(
+                device, jointOffsetSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        jointOffsetBuffer->CreateBuffer();
+        jointOffsetBuffer->CopyData((void *) mJointOffsetList[i].data(), 0, jointOffsetSize, queue,
+                                    commandPool);
+        mJointOffsetBuffers.emplace_back(std::move(jointOffsetBuffer));
+    }
+    //animation result positions
+    if (buffer == nullptr) {
+        std::unique_ptr<AEBufferUtilOnGPU> positionResultBuffer = std::make_unique<AEBufferUtilOnGPU>(
+                device, positionBufferSizes[0], VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        positionResultBuffer->CreateBuffer();
+        positionResultBuffer->CopyData((void *) mPositions[0].data(), 0, positionBufferSizes[0], queue,
+                                       commandPool);
+        mBuffers.emplace_back(std::move(positionResultBuffer));
+    } else {
+        mBuffers.emplace_back((AEBufferUtilOnGPU*)buffer[0]);
     }
     //joints
     std::unique_ptr<AEBufferUtilOnGPU> jointBuffer = std::make_unique<AEBufferUtilOnGPU>(device, jointsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -1660,18 +1672,6 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     float time = 0.0f;
     timeBuffer->CopyData((void*)&time, uniformTimeSize);
     mUniformBuffers.emplace_back(std::move(timeBuffer));
-    //joint offset buffer
-    std::vector<VkDeviceSize> jointOffsetSizes;
-    for(uint32_t i = 0; i < mPositionIndices.size(); i++) {
-        VkDeviceSize jointOffsetSize = mJointOffsetList[i].size() * sizeof(uint32_t);
-        jointOffsetSizes.emplace_back(jointOffsetSize);
-        std::unique_ptr<AEBufferUtilOnGPU> jointOffsetBuffer = std::make_unique<AEBufferUtilOnGPU>(
-                device, jointOffsetSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        jointOffsetBuffer->CreateBuffer();
-        jointOffsetBuffer->CopyData((void *) mJointOffsetList[i].data(), 0, jointOffsetSize, queue,
-                                    commandPool);
-        mJointOffsetBuffers.emplace_back(std::move(jointOffsetBuffer));
-    }
     //index buffer
     VkDeviceSize indicesListSize = sizeof(uint32_t) * mSerialPositionIndices.size();
     std::unique_ptr<AEBufferUtilOnGPU> indicesList = std::make_unique<AEBufferUtilOnGPU>(device, indicesListSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -1687,39 +1687,39 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     //prepare descriptor set
     for(uint32_t i = 0; i < mPositionIndices.size(); i++) {
         std::unique_ptr<AEDescriptorSet> ds = std::make_unique<AEDescriptorSet>(device, &cl, descriptorPool);
-        ds->BindDescriptorBuffer(0, mBuffers[0]->GetBuffer(), positionBufferSize,
+        ds->BindDescriptorBuffer(0, mBasePositionBuffers[i]->GetBuffer(), positionBufferSizes[i],
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         if (buffer == nullptr) {
-            ds->BindDescriptorBuffer(1, mBuffers[1]->GetBuffer(), positionBufferSize,
+            ds->BindDescriptorBuffer(1, mBuffers[0]->GetBuffer(), positionBufferSizes[0],
                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         } else {
-            ds->BindDescriptorBuffer(1, mBuffers[1]->GetBuffer(),
+            ds->BindDescriptorBuffer(1, mBuffers[0]->GetBuffer(),
                                       sizeof(Vertex3DObj) * mVertices.size(),
                                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         }
         ds->BindDescriptorBuffer(2, mInfluenceCountBuffers[i]->GetBuffer(), influenceCountSizes[i],
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(3, mBuffers[2]->GetBuffer(), jointsBufferSize,
+        ds->BindDescriptorBuffer(3, mBuffers[1]->GetBuffer(), jointsBufferSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(4, mBuffers[3]->GetBuffer(), weightsBufferSize,
+        ds->BindDescriptorBuffer(4, mBuffers[2]->GetBuffer(), weightsBufferSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(5, mBuffers[4]->GetBuffer(), matBufferSize,
+        ds->BindDescriptorBuffer(5, mBuffers[3]->GetBuffer(), matBufferSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         ds->BindDescriptorBuffer(6, mUniformBuffers[0]->GetBuffer(), uniformSize,
                                   VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        ds->BindDescriptorBuffer(7, mBuffers[5]->GetBuffer(), debugSize,
+        ds->BindDescriptorBuffer(7, mBuffers[4]->GetBuffer(), debugSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(8, mBuffers[6]->GetBuffer(), debugVSize,
+        ds->BindDescriptorBuffer(8, mBuffers[5]->GetBuffer(), debugVSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(9, mBuffers[7]->GetBuffer(), matBufferSize,
+        ds->BindDescriptorBuffer(9, mBuffers[6]->GetBuffer(), matBufferSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         ds->BindDescriptorBuffer(10, mUniformBuffers[1]->GetBuffer(), uniformTimeSize,
                                   VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         ds->BindDescriptorBuffer(11, mJointOffsetBuffers[i]->GetBuffer(), jointOffsetSizes[i],
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(12, mBuffers[8]->GetBuffer(), indicesListSize,
+        ds->BindDescriptorBuffer(12, mBuffers[7]->GetBuffer(), indicesListSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(13, mBuffers[9]->GetBuffer(), keyFrameSize,
+        ds->BindDescriptorBuffer(13, mBuffers[8]->GetBuffer(), keyFrameSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         mDSs.emplace_back(std::move(ds));
     }
@@ -1743,8 +1743,8 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     AnimationDispatchJoint(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), (animationNum + 1) % 5, mAnimationTransformsNext);
     //update buffer
     VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
-    mBuffers[4]->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
-    mBuffers[7]->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
+    mBuffers[3]->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
+    mBuffers[6]->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
     //uniform buffer
     float timef = (float)time;
     mUniformBuffers[1]->CopyData((void*)&timef, sizeof(float));
@@ -1836,7 +1836,7 @@ void AEDrawObjectBaseCollada::Debug(AEDeviceQueue* queue, AECommandPool* command
     std::vector<uint32_t> debugData;
     for(uint32_t i = 0; i < mJoints.size(); i++)
         debugData.emplace_back(0);
-    mBuffers[2]->BackData(debugData.data(), 0, debugSize, queue, commandPool);
+    mBuffers[1]->BackData(debugData.data(), 0, debugSize, queue, commandPool);
     //compare buffer and data
     for(uint32_t i = 0; i < mJoints.size(); i++){
         if(mJoints[i] != debugData[i])
@@ -1848,14 +1848,14 @@ void AEDrawObjectBaseCollada::Debug(AEDeviceQueue* queue, AECommandPool* command
     std::vector<int> debugVData;
     for(uint32_t i = 0; i < mVertices.size(); i++)
         debugVData.emplace_back(-1);
-    mBuffers[5]->BackData(debugVData.data(), 0, debugVSize, queue, commandPool);
+    mBuffers[4]->BackData(debugVData.data(), 0, debugVSize, queue, commandPool);
     //calc position
     VkDeviceSize positionSize = mVertices.size() * sizeof(Vertex3DObj);
     std::vector<Vertex3DObj> debugPData;
     Vertex3DObj obj = {};
     for(uint32_t i = 0; i < mPositions[0].size(); i++)
         debugPData.emplace_back(obj);
-    mBuffers[1]->BackData(debugPData.data(), 0, positionSize, queue, commandPool);
+    mBuffers[0]->BackData(debugPData.data(), 0, positionSize, queue, commandPool);
     for(uint32_t i = 0; i < mVertices.size(); i++) {
         if(glm::length(mVertices[i].pos - debugPData[i].pos) > 18.0f)
             DebugPositionObj(i, debugPData);
@@ -1956,7 +1956,7 @@ void AEDrawObjectBaseCollada::DebugWeights(AEDeviceQueue* queue, AECommandPool* 
     std::vector<float> tmpW;
     for(uint32_t i = 0; i < mWeights.size(); i++)
         tmpW.emplace_back(0.0f);
-    mBuffers[3]->BackData((void*)tmpW.data(), 0, sizeof(float) * mWeights.size(), queue, commandPool);
+    mBuffers[2]->BackData((void*)tmpW.data(), 0, sizeof(float) * mWeights.size(), queue, commandPool);
     //compare
     std::string endl("\n");
     std::string space(" ");
