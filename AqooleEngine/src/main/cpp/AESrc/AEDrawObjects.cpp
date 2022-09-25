@@ -835,7 +835,6 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
         glm::vec3 oneVec3; 
         glm::vec2 oneVec2;
         std::vector<std::string> fields;
-        std::vector<std::string> vertexWeights;
         //read effects
         BOOST_FOREACH(const auto& effect, tree.get_child("COLLADA.library_effects")){
                         ReadEffect(effect);
@@ -989,195 +988,13 @@ AEDrawObjectBaseCollada::AEDrawObjectBaseCollada(const char* filePath, android_a
                 ReadSkeletonNode(obj, mRoot);
             }
         }
-        //read skinning information
-        //bind_shape_matrix
-        ptree skinNodes = tree.get_child("COLLADA.library_controllers.controller.skin");
-        //for loop to "source"
-        for(ptree::const_iterator obj = skinNodes.begin(); obj != skinNodes.end(); ++obj)
-        {            
-            if(strncmp(obj->first.data(), "<xmlattr>", 10) == 0)
-                continue;
-            //bind_shape_matrix
-            if(strncmp(obj->first.data(), "bind_shape_matrix", 18) == 0)
-            {
-            }
-            //source id = skin-joints
-            if(strncmp(obj->first.data(), "source", 7) == 0)
-            {
-                if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("joint", std::regex::icase)))
-                {
-                    for(boost::property_tree::ptree::const_iterator child = obj->second.begin();
-                        child != obj->second.end(); ++child)
-                    {
-                        //find Name_array
-                        if(strncmp(child->first.data(), "Name_array", 11) != 0)
-                            continue;
-                        std::string nameArrayString = child->second.get_value_optional<std::string>().get();
-                        AEDrawObject::Split(fields, nameArrayString, ' ');
-                        for(auto f : fields)
-                        {
-                            JointMapper j;
-                            j.jointName = f;
-                            j.animNo = -1;
-                            mSkinJointsArray.emplace_back(j);
-                        }
-                    }
-                }
-            }
-            //source id = matrices
-            if(strncmp(obj->first.data(), "source", 7) == 0)
-            {
-                if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("matrices", std::regex::icase)))
-                {
-                    for(boost::property_tree::ptree::const_iterator child = obj->second.begin();
-                        child != obj->second.end(); ++child)
-                    {
-                        //find Name_array
-                        if(strncmp(child->first.data(), "float_array", 11) != 0)
-                            continue;
-                        std::string matricesString = child->second.get_value_optional<std::string>().get();
-                        AEDrawObject::Split(fields, matricesString, ' ');
-                        uint32_t index = 0;
-                        for(uint32_t i = 0; i < fields.size(); i = i + 16)
-                        {
-                            glm::mat4 m;
-                            for (uint32_t j = 0; j < 4; j++)
-                            {
-                                for (uint32_t k = 0; k < 4; k++)
-                                {
-                                    m[j][k] = std::stof(fields[i + j * 4 + k]);
-                                }
-                            }
-                            mSkinJointsArray[index].controllerMatrix = m;
-                            index++;
-                        }
-                    }
-                }
-            }
-            //source id = skin-weights
-            if(strncmp(obj->first.data(), "source", 7) == 0)
-            {
-                if(std::regex_search(obj->second.get_optional<std::string>("<xmlattr>.id").get(), std::regex("skin-weights", std::regex::icase)))
-                {
-                    for(boost::property_tree::ptree::const_iterator child = obj->second.begin();
-                        child != obj->second.end(); ++child)
-                    {
-                        //find float_array
-                        if(strncmp(child->first.data(), "float_array", 11) != 0)
-                            continue;
-                        std::string weightString = child->second.get_value_optional<std::string>().get();
-                        AEDrawObject::Split(vertexWeights, weightString, ' ');
-                    }
-                }
-            }
-            //vertex_weights
-            if(std::regex_search(obj->first.data(), std::regex("vertex_weights", std::regex::icase)))
-            {
-                uint32_t totalVCount = 0;
-                auto vcountString = obj->second.get_optional<std::string>("vcount").get();
-                std::vector<std::string> influenceCounts;
-                AEDrawObject::Split(influenceCounts, vcountString, ' ');
-                auto vString = obj->second.get_optional<std::string>("v").get();
-                std::vector<std::string> jointWeightList;
-                AEDrawObject::Split(jointWeightList, vString, ' ');
-                uint32_t nowPointing = 0;
-                uint32_t vertexIndex = 0;
-                uint32_t jointOffset = 0;
-                std::vector<uint32_t> influenceCountList;
-                std::vector<uint32_t> jointOffsetList;
-                mInfluenceCountList.emplace_back(influenceCountList);
-                mJointOffsetList.emplace_back(jointOffsetList);
-                uint32_t ilistIndex = mInfluenceCountList.size() - 1;
-                uint32_t jlistIndex = mJointOffsetList.size() - 1;
-                for(uint32_t i = 0; i < influenceCounts.size(); i++)
-                {
-                    JointWeight oneJointWeight;
-                    uint32_t influenceCount = std::stoi(influenceCounts[i]);
-                    mInfluenceCountList[ilistIndex].emplace_back(influenceCount);
-                    mJointOffsetList[jlistIndex].emplace_back(totalVCount);
-                    if(totalVCount < 1024 && totalVCount + influenceCount > 1024){
-                        mComputeLocalSize = totalVCount;
-                    }
-                    totalVCount += influenceCount;
-                    for(uint32_t j = 0; j < influenceCount; j++)
-                    {
-                        int joint = std::stoi(jointWeightList[nowPointing]);
-                        oneJointWeight.jointIndices.push_back(joint);
-                        mJoints.emplace_back(joint);
-                        nowPointing++;
-                        float f = std::stof(vertexWeights[std::stoi(jointWeightList[nowPointing])]);
-                        oneJointWeight.weights.push_back(f);
-                        mWeights.emplace_back(f);
-                        nowPointing++;
-                        mVerteces2.emplace_back(vertexIndex);
-                    }
-                    //check total weight
-                    float total = 0.0f;
-                    for(uint32_t j = 0; j < influenceCount; j++)
-                        total += oneJointWeight.weights[j];
-                    if( !(0.99f < total && total < 1.01f))
-                        __android_log_print(ANDROID_LOG_DEBUG, "animation", "total weight is not 1.0f", 0);
-                    mJointWeights.push_back(oneJointWeight);
-                    //mapping each positon to influenced joints
-                    for(uint32_t k = 0; k < influenceCount; k++) {
-                        std::pair<uint32_t, float> p;
-                        p = {vertexIndex, oneJointWeight.weights[k]};
-                        mSkinJointsArray[oneJointWeight.jointIndices[k]].indexWeight.emplace_back(p);
-                    }
-                    vertexIndex++;
-                }
-                //check values
-                if(totalVCount != mVerteces2.size()){
-                    __android_log_print(ANDROID_LOG_DEBUG, "animation", "vcount not equal to VList", 0);
-                }
-            }
-            //inverse matrices
-            if(strncmp(obj->first.data(), "joints", 7) == 0)
-            {
-                //get inverse matrices id
-                std::string inverseMatricesId;
-                for(boost::property_tree::ptree::const_iterator child = obj->second.begin(); 
-                    child != obj->second.end(); ++child)
-                {
-                    //find Name_array
-                    if(strncmp(child->first.data(), "input", 6) != 0)
-                        continue;
-                    if(strncmp(child->second.get_optional<std::string>("<xmlattr>.semantic").get().c_str(),
-                        "INV_BIND_MATRIX", 16) == 0)
-                        inverseMatricesId = child->second.get_optional<std::string>("<xmlattr>.source").get();
-                }
-                //begin from start to find inverse matrices
-                for(ptree::const_iterator innerObj = skinNodes.begin(); innerObj != skinNodes.end(); ++innerObj)
-                {
-                    if(std::strncmp(innerObj->first.data(), "source", 7) == 0)
-                    {
-                        auto sourceId = innerObj->second.get_optional<std::string>("<xmlattr>.id").get();
-                        if(sourceId.find(inverseMatricesId.c_str()) != std::string::npos ||
-                            inverseMatricesId.find(sourceId.c_str()) != std::string::npos)
-                        {
-                            for(auto child = innerObj->second.begin(); child != innerObj->second.end(); ++child)
-                            {
-                                //find float_array
-                                if(strncmp(child->first.data(), "float_array", 11) != 0)
-                                    continue;
-                                std::string inverseString = child->second.get_value_optional<std::string>().get();
-                                AEDrawObject::Split(fields, inverseString, ' ');
-                                glm::mat4 oneMatrix;
-                                for(uint32_t i = 0; i * 16 < fields.size(); i++)
-                                {
-                                    for(uint32_t j = 0; j < 4; j++)
-                                        for(uint32_t k = 0; k < 4; k++)
-                                            oneMatrix[j][k] = std::stof(fields[16 * i + 4 * j + k]);
-                                    mInverseMatrices.push_back(oneMatrix);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        //read controllers
+        BOOST_FOREACH(const auto& controller, tree.get_child("COLLADA.library_controllers")) {
+            ReadController(controller);
         }
     }
 }
+
 
 /*
 destructor
@@ -1338,6 +1155,27 @@ void AEDrawObjectBaseCollada::ReadAnimation(const boost::property_tree::ptree::v
     std::string first = node.first.data();
     if(node.second.get_optional<std::string>("<xmlattr>.id") == boost::none)
         return;
+    if(node.second.get_optional<std::string>("animation") != boost::none){
+        BOOST_FOREACH(const auto& animation, node.second.get_child("")){
+                        if(node.second.get_optional<std::string>("<xmlattr>.id") == boost::none)
+                            continue;
+                        ReadAnimationNode(animation);
+        }
+    } else {
+        ReadAnimationNode(node);
+    }
+}
+
+/*
+ * read animation each node
+ */
+void AEDrawObjectBaseCollada::ReadAnimationNode(const boost::property_tree::ptree::value_type& node)
+{
+    using namespace boost::property_tree;
+    AnimationMatrix a{};
+    std::string first = node.first.data();
+    if(node.second.get_optional<std::string>("<xmlattr>.id") == boost::none)
+        return;
     a.id = node.second.get_optional<std::string>("<xmlattr>.id").get();
     BOOST_FOREACH(const auto& source, node.second.get_child(""))
     {
@@ -1433,12 +1271,188 @@ void AEDrawObjectBaseCollada::ReadEffect(const boost::property_tree::ptree::valu
 }
 
 /*
-debug root node
-*/
-void AEDrawObjectBaseCollada::DebugRootNode()
+ * read collada controller
+ */
+void AEDrawObjectBaseCollada::ReadController(const boost::property_tree::ptree::value_type& node)
 {
-
+    using namespace boost::property_tree;
+    std::vector<std::string> fields;
+    std::vector<std::string> vertexWeights;
+    BOOST_FOREACH(const auto& skinNodes, node.second.get_child("skin")) {
+        auto firstId = skinNodes.first.data();
+        //source id = skin-joints
+        if (strncmp(skinNodes.first.data(), "source", 7) == 0) {
+            if (std::regex_search(
+                    skinNodes.second.get_optional<std::string>("<xmlattr>.id").get(),
+                    std::regex("joint", std::regex::icase))) {
+                auto sourceId = skinNodes.second.get_optional<std::string>(
+                        "<xmlattr>.id").get();
+                for (boost::property_tree::ptree::const_iterator child = skinNodes.second.begin();
+                     child != skinNodes.second.end(); ++child) {
+                    //find Name_array
+                    if (strncmp(child->first.data(), "Name_array", 11) != 0)
+                        continue;
+                    std::string nameArrayString = child->second.get_value_optional<std::string>().get();
+                    AEDrawObject::Split(fields, nameArrayString, ' ');
+                    for (auto f: fields) {
+                        JointMapper j;
+                        j.jointName = f;
+                        j.animNo = -1;
+                        mSkinJointsArray.emplace_back(j);
+                    }
+                }
+            }
+        }
+        //source id = matrices
+        if (strncmp(skinNodes.first.data(), "source", 7) == 0) {
+            if (std::regex_search(
+                    skinNodes.second.get_optional<std::string>("<xmlattr>.id").get(),
+                    std::regex("matrices", std::regex::icase))) {
+                for (boost::property_tree::ptree::const_iterator child = skinNodes.second.begin();
+                     child != skinNodes.second.end(); ++child) {
+                    //find Name_array
+                    if (strncmp(child->first.data(), "float_array", 11) != 0)
+                        continue;
+                    std::string matricesString = child->second.get_value_optional<std::string>().get();
+                    AEDrawObject::Split(fields, matricesString, ' ');
+                    uint32_t index = 0;
+                    for (uint32_t i = 0; i < fields.size(); i = i + 16) {
+                        glm::mat4 m;
+                        for (uint32_t j = 0; j < 4; j++) {
+                            for (uint32_t k = 0; k < 4; k++) {
+                                m[j][k] = std::stof(fields[i + j * 4 + k]);
+                            }
+                        }
+                        mSkinJointsArray[index].controllerMatrix = m;
+                        index++;
+                    }
+                }
+            }
+        }
+        //source id = skin-weights
+        if (strncmp(skinNodes.first.data(), "source", 7) == 0) {
+            if (std::regex_search(
+                    skinNodes.second.get_optional<std::string>("<xmlattr>.id").get(),
+                    std::regex("skin-weights", std::regex::icase))) {
+                for (boost::property_tree::ptree::const_iterator child = skinNodes.second.begin();
+                     child != skinNodes.second.end(); ++child) {
+                    //find float_array
+                    if (strncmp(child->first.data(), "float_array", 11) != 0)
+                        continue;
+                    std::string weightString = child->second.get_value_optional<std::string>().get();
+                    AEDrawObject::Split(vertexWeights, weightString, ' ');
+                }
+            }
+        }
+        //vertex_weights
+        if (std::regex_search(skinNodes.first.data(),
+                              std::regex("vertex_weights", std::regex::icase))) {
+            uint32_t totalVCount = 0;
+            auto vcountString = skinNodes.second.get_optional<std::string>("vcount").get();
+            std::vector<std::string> influenceCounts;
+            AEDrawObject::Split(influenceCounts, vcountString, ' ');
+            auto vString = skinNodes.second.get_optional<std::string>("v").get();
+            std::vector<std::string> jointWeightList;
+            AEDrawObject::Split(jointWeightList, vString, ' ');
+            uint32_t nowPointing = 0;
+            uint32_t vertexIndex = 0;
+            uint32_t jointOffset = 0;
+            std::vector<uint32_t> influenceCountList;
+            std::vector<uint32_t> jointOffsetList;
+            mInfluenceCountList.emplace_back(influenceCountList);
+            mJointOffsetList.emplace_back(jointOffsetList);
+            uint32_t ilistIndex = mInfluenceCountList.size() - 1;
+            uint32_t jlistIndex = mJointOffsetList.size() - 1;
+            for (uint32_t i = 0; i < influenceCounts.size(); i++) {
+                JointWeight oneJointWeight;
+                uint32_t influenceCount = std::stoi(influenceCounts[i]);
+                mInfluenceCountList[ilistIndex].emplace_back(influenceCount);
+                mJointOffsetList[jlistIndex].emplace_back(totalVCount);
+                if (totalVCount < 1024 && totalVCount + influenceCount > 1024) {
+                    mComputeLocalSize = totalVCount;
+                }
+                totalVCount += influenceCount;
+                for (uint32_t j = 0; j < influenceCount; j++) {
+                    int joint = std::stoi(jointWeightList[nowPointing]);
+                    oneJointWeight.jointIndices.push_back(joint);
+                    mJoints.emplace_back(joint);
+                    nowPointing++;
+                    float f = std::stof(
+                            vertexWeights[std::stoi(jointWeightList[nowPointing])]);
+                    oneJointWeight.weights.push_back(f);
+                    mWeights.emplace_back(f);
+                    nowPointing++;
+                    mVerteces2.emplace_back(vertexIndex);
+                }
+                //check total weight
+                float total = 0.0f;
+                for (uint32_t j = 0; j < influenceCount; j++)
+                    total += oneJointWeight.weights[j];
+                if (!(0.99f < total && total < 1.01f))
+                    __android_log_print(ANDROID_LOG_DEBUG, "animation",
+                                        "total weight is not 1.0f", 0);
+                mJointWeights.push_back(oneJointWeight);
+                //mapping each positon to influenced joints
+                for (uint32_t k = 0; k < influenceCount; k++) {
+                    std::pair<uint32_t, float> p;
+                    p = {vertexIndex, oneJointWeight.weights[k]};
+                    mSkinJointsArray[oneJointWeight.jointIndices[k]].indexWeight.emplace_back(
+                            p);
+                }
+                vertexIndex++;
+            }
+            //check values
+            if (totalVCount != mVerteces2.size()) {
+                __android_log_print(ANDROID_LOG_DEBUG, "animation",
+                                    "vcount not equal to VList", 0);
+            }
+        }
+        //inverse matrices
+        if (strncmp(skinNodes.first.data(), "joints", 7) == 0) {
+            //get inverse matrices id
+            std::string inverseMatricesId;
+            for (boost::property_tree::ptree::const_iterator child = skinNodes.second.begin();
+                 child != skinNodes.second.end(); ++child) {
+                //find Name_array
+                if (strncmp(child->first.data(), "input", 6) != 0)
+                    continue;
+                if (strncmp(child->second.get_optional<std::string>(
+                                    "<xmlattr>.semantic").get().c_str(),
+                            "INV_BIND_MATRIX", 16) == 0)
+                    inverseMatricesId = child->second.get_optional<std::string>(
+                            "<xmlattr>.source").get();
+            }
+            //inverse matrices
+            BOOST_FOREACH(const auto& innerObj, node.second.get_child("skin")) {
+                auto innerObjId = innerObj.first.data();
+                if (std::strncmp(innerObj.first.data(), "source", 7) == 0) {
+                    auto sourceId = innerObj.second.get_optional<std::string>(
+                            "<xmlattr>.id").get();
+                    if (sourceId.find(inverseMatricesId.c_str()) != std::string::npos ||
+                        inverseMatricesId.find(sourceId.c_str()) != std::string::npos) {
+                        for (auto child = innerObj.second.begin();
+                             child != innerObj.second.end(); ++child) {
+                            //find float_array
+                            if (strncmp(child->first.data(), "float_array", 11) != 0)
+                                continue;
+                            std::string inverseString = child->second.get_value_optional<std::string>().get();
+                            AEDrawObject::Split(fields, inverseString, ' ');
+                            glm::mat4 oneMatrix;
+                            for (uint32_t i = 0; i * 16 < fields.size(); i++) {
+                                for (uint32_t j = 0; j < 4; j++)
+                                    for (uint32_t k = 0; k < 4; k++)
+                                        oneMatrix[j][k] = std::stof(
+                                                fields[16 * i + 4 * j + k]);
+                                mInverseMatrices.push_back(oneMatrix);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
+
 
 /*
 get vertex weights

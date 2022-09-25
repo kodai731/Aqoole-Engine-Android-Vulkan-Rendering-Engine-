@@ -286,10 +286,11 @@ protected:
     void MakeVertices();
     void ReadSkeletonNode(boost::property_tree::ptree::const_iterator nowNode,
         std::unique_ptr<AEDrawObjectBaseCollada::SkeletonNode>& skeletonNode);
-    void DebugRootNode();
     void GetVertexWeights(std::vector<float> &vertexWeights, std::string& weightString);
     void ReadAnimation(const boost::property_tree::ptree::value_type& node);
     void ReadEffect(const boost::property_tree::ptree::value_type& node);
+    void ReadController(const boost::property_tree::ptree::value_type& node);
+    void ReadAnimationNode(const boost::property_tree::ptree::value_type& node);
     void SkeletonJointNo(SkeletonNode* node);
     void SkeletonAnimation(SkeletonNode* node, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, glm::mat4 ibp, std::vector<glm::vec3>& tmpPositions);
     void DebugPosition(uint32_t index, std::vector<glm::vec3> const& debug);
@@ -308,13 +309,12 @@ public:
     uint32_t GetTextureCount(){return mTextureFiles.size();}
     std::string& GetTexturePath(uint32_t index){
         for(uint32_t i = 0; i < mTextureMap.size(); i++){
-            for(uint32_t j = 0; j < mTextureFiles.size(); j++){
-                if(mTextureMap[i].textureImage == mTextureFiles[j].imageId){
-                    return mTextureFiles[j].fileName;
-                }
+            if(mTextureMap[index].textureImage == mTextureFiles[i].imageId){
+                return mTextureFiles[i].fileName;
             }
         }
-        return mTextureFiles[index].fileName;}
+        return mTextureFiles[index].fileName;
+    }
     uint32_t GetOffset(uint32_t index){return mOffsets[index];}
     std::vector<uint32_t>const& GetOffsetAll(){return mOffsets;}
     std::vector<uint32_t>const& GetMapIndexAddress(uint32_t index)const{return mMapIndices[index];}

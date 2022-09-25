@@ -193,6 +193,8 @@ std::unique_ptr<AEEvent> gComputeEvent;
 std::unique_ptr<AEBufferUtilOnGPU> gGeometryIndices;
 
 std::string gTargetModelPath = cowboyPath;
+bool isAnimation = false;
+
 double lastTime;
 double startTime;
 double passedTime = 0.0;
@@ -388,17 +390,6 @@ bool CreateBuffers(void) {
                  gWomanCollada->GetIndexBufferSize(), gQueue, gCommandPool);
     gibWomans.emplace_back(std::move(ib));
   }
-  Vertex3DObj v = {};
-  v.pos = glm::vec3(0.0f);
-  v.vertexTangent = glm::vec4(0.0f);
-  for(uint32_t i = 0; i < gWomanCollada->GetVertexAddress().size(); i++)
-  {
-    v.normal = gWomanCollada->GetVertexAddress()[i].normal;
-    v.texcoord = gWomanCollada->GetVertexAddress()[i].texcoord;
-    gZeroData.emplace_back(v);
-  }
-//  gvbWoman->CopyData((void *) gZeroData.data(), 0,
-//                     gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   //compute pipeline shader
   std::vector<const char*> c;
   c.emplace_back(computeShaderPath.c_str());
@@ -560,16 +551,16 @@ bool InitVulkan(android_app* app) {
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, 0.0f, top), glm::vec3(left, 0.0f, bottom),
                                        glm::vec3(right, 0.0f, bottom), glm::vec3(right, 0.0f, top), glm::vec3(0.0f, 0.2f, 0.0f));
   //woman
-//  gWoman = std::make_unique<AEDrawObjectBaseObjFile>(fuse1ObjPath.c_str(), app, true);
-//  gWoman->Scale(0.01f);
   std::vector<const char*> c;
   c.emplace_back(computeShaderPath.c_str());
   gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(gTargetModelPath.c_str(), app, gDevice, c, gCommandPool, gQueue);
   gWomanCollada->MakeAnimation();
-  //gWomanCollada->Scale(0.02f);
+  if(gTargetModelPath == phoenixPath)
+    gWomanCollada->Scale(0.02f);
   //woman texture
   for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
   {
+    auto texturePath = gWomanCollada->GetTexturePath(i);
       std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, (AEDrawObject::GetRootDirName(gTargetModelPath) +
       gWomanCollada->GetTexturePath(i)).c_str(), gCommandPool, gQueue, app));
       texture->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
@@ -689,10 +680,15 @@ bool InitVulkan(android_app* app) {
   for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
        bufferIndex++) {
     AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
-    vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1, gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-                    0, nullptr, 0, nullptr, 0, nullptr);
-    vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                         (VkDependencyFlagBits)0, 0, nullptr, 0, nullptr, 0, nullptr);
+    if(isAnimation) {
+      vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1,
+                      gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                      VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                      0, nullptr, 0, nullptr, 0, nullptr);
+      vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(),
+                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                           (VkDependencyFlagBits) 0, 0, nullptr, 0, nullptr, 0, nullptr);
+    }
     //dispatch ray tracing command
     AECommand::CommandTraceRays(gCommandBuffers[bufferIndex], gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gSbts,
                                 gPipelineRT.get(), gDescriptorSets, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
@@ -725,7 +721,6 @@ bool InitVulkan(android_app* app) {
   //animation semaphore
   gAnimationFence = std::make_unique<AEFence>(gDevice);
   gComputeSemaphore = std::make_unique<AESemaphore>(gDevice);
-  gWomanCollada->DebugWeights(gQueue, gCommandPool);
   //imgui font adjust
 //  {
 //    ImGuiIO &io = ImGui::GetIO();
@@ -845,9 +840,12 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("int time = ") + std::to_string(intpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("frac time = ") + std::to_string(fracpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("key frame = ") + std::to_string(gAnimationIndex)).c_str(), 0);
-  gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,gAnimationIndex,
+  if(isAnimation) {
+    gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,
+                                     gAnimationIndex,
                                      nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
     //gWomanCollada->Debug(gQueue, gCommandPool);
+  }
   aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSemaphore waitSemaphores = render.semaphore_;
