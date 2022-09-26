@@ -290,6 +290,32 @@ void AEDescriptorSet::BindDescriptorImage(uint32_t binding, VkDescriptorType des
 	vkUpdateDescriptorSets(*mDevice->GetDevice(), 1u, &descriptorWrite, 0, nullptr);
 }
 
+/*
+ * bind images
+ */
+void AEDescriptorSet::BindDescriptorImages(uint32_t binding, VkDescriptorType descriptorType, uint32_t size,
+                          std::vector<VkImageView> const& imageViews, std::vector<VkSampler> const& samplers)
+{
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    VkDescriptorImageInfo imageInfo = {};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    for(uint32_t i = 0; i < size; i++) {
+        imageInfo.imageView = imageViews[i];
+        imageInfo.sampler = samplers[i];
+        imageInfos.emplace_back(imageInfo);
+    }
+    //write infomation
+    VkWriteDescriptorSet descriptorWrite = {};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = mDescriptorSet;
+    descriptorWrite.dstBinding = binding;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = descriptorType;
+    descriptorWrite.descriptorCount = size;
+    descriptorWrite.pImageInfo = imageInfos.data();
+    vkUpdateDescriptorSets(*mDevice->GetDevice(), 1, &descriptorWrite, 0, nullptr);
+}
+
 #ifdef __RAY_TRACING__
 /*
 set up for acceleration structure

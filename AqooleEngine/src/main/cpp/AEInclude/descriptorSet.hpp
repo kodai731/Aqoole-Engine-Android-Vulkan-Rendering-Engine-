@@ -79,6 +79,8 @@ class AEDescriptorSet
     //bind and write image
     void BindDescriptorImage(uint32_t binding, VkDescriptorType descriptorType,
         VkImageView *imageView, VkSampler *sampler);
+    void BindDescriptorImages(uint32_t binding, VkDescriptorType descriptorType, uint32_t size,
+                             std::vector<VkImageView> const& imageViews, std::vector<VkSampler> const& samplers);
     //set up for acceleration structure
 #ifdef __RAY_TRACING__
     void BindAccelerationStructure(uint32_t binding, AERayTracingASTop *topAS);

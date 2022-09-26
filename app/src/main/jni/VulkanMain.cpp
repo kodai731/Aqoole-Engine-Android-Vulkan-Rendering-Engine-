@@ -192,7 +192,7 @@ std::unique_ptr<AESemaphore> gComputeSemaphore;
 std::unique_ptr<AEEvent> gComputeEvent;
 std::unique_ptr<AEBufferUtilOnGPU> gGeometryIndices;
 
-std::string gTargetModelPath = cowboyPath;
+std::string gTargetModelPath = phoenixPath;
 bool isAnimation = false;
 
 double lastTime;
@@ -451,11 +451,8 @@ VkResult CreateGraphicsPipeline() {
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
   gDescriptorSetLayout = std::make_unique<AEDescriptorSetLayout>(gDevice);
-  for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
-  {
-      gDescriptorSetLayout->AddDescriptorSetLayoutBinding(i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1,
-                                                          nullptr);
-  }
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+                                                      gWomanCollada->GetTextureCount(),nullptr);
   if(gWomanCollada->GetTextureCount() == 0)
       gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1,
                                                           nullptr);
@@ -635,9 +632,15 @@ bool InitVulkan(android_app* app) {
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
-  for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
-    gWomanTextureSets->BindDescriptorImage(i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, gWomanTextures[i]->GetImageView(),
-                                           gWomanTextures[i]->GetSampler());
+  std::vector<VkImageView> imageViews;
+  std::vector<VkSampler> samplers;
+  for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++) {
+      imageViews.emplace_back(*gWomanTextures[i]->GetImageView());
+      samplers.emplace_back(*gWomanTextures[i]->GetSampler());
+  }
+  gWomanTextureSets->BindDescriptorImages(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, gWomanCollada->GetTextureCount(),
+                                         imageViews,
+                                         samplers);
   gDescriptorSets.push_back(gWomanTextureSets);
   //create binding table buffer
   raygenSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 0, gQueue, gCommandPool);
