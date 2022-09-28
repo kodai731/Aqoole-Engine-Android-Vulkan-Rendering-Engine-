@@ -53,10 +53,10 @@ layout(binding = 4, set = 0) buffer Indices {uint i[];} indices[];
 layout(binding = 5, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} verticesobj[];
 layout(binding = 6, set = 0) buffer Indicesobj {uint iobj[];} indicesobj[];
 layout(binding = 7, set = 0) buffer GeometryIndices {uint gi[];} geometryIndices[];
-//layout(binding = 8, set = 0) buffer MapIndices {uint mapi[];} mapIndices[];
+layout(binding = 8, set = 0) uniform TextureCount {uint tc;} textureCount;
 
 
-layout(binding = 0, set = 1) uniform sampler2D texSampler0[];
+layout(binding = 0, set = 1) uniform sampler2D texSampler[];
 /*
 layout(binding = 1, set = 1) uniform sampler2D texSampler1;
 layout(binding = 2, set = 1) uniform sampler2D texSampler2;
@@ -305,7 +305,7 @@ void main()
   //uint objId = scnDesc.i[gl_InstanceCustomIndexEXT].objId;
   uint objId = gl_InstanceCustomIndexEXT;
   const vec3 barycentricCoords = vec3(1.0f - attribs.x - attribs.y, attribs.x, attribs.y);
-  vec3 color;
+  vec3 color = vec3(0.0);
   if(objId == 0)
   {
     //plane
@@ -376,12 +376,12 @@ void main()
     Vertex3DObj v1 = verticesobj[0].vobj[ind.y];
     Vertex3DObj v2 = verticesobj[0].vobj[ind.z];
     uint offset = 3 * gl_PrimitiveID;
-    if(offset < geometryIndices[0].gi[0])
-      color = texture(texSampler0[0], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
-      //color = vec3(0, 0, 0);
-    else
-      color = texture(texSampler0[1], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
-      //color = vec3(0, 0, 0);
+    for(uint i = 0; i < textureCount.tc; i++){
+        if(offset < geometryIndices[0].gi[i]){
+            color = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
+            break;
+        }
+    }
   }
   pld = vec4(color, 1.0);
 }

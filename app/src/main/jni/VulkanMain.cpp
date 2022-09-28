@@ -187,10 +187,10 @@ std::unique_ptr<AETextureImage> gTmpImage;
 std::unique_ptr<AECommandBuffer> gComputeCommandBuffer;
 std::unique_ptr<AEDescriptorSet> gComputeDescriptor;
 std::unique_ptr<AEFence> gAnimationFence;
-std::vector<Vertex3DObj> gZeroData;
 std::unique_ptr<AESemaphore> gComputeSemaphore;
 std::unique_ptr<AEEvent> gComputeEvent;
 std::unique_ptr<AEBufferUtilOnGPU> gGeometryIndices;
+std::unique_ptr<AEBufferUniform> gTextureCountBuffer;
 
 std::string gTargetModelPath = phoenixPath;
 bool isAnimation = false;
@@ -445,8 +445,7 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(8, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
@@ -614,6 +613,11 @@ bool InitVulkan(android_app* app) {
   std::vector<uint32_t> geometries;
   gWomanCollada->SetGeometrySize(geometries);
   gGeometryIndices->CopyData((void*)geometries.data(), 0, sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), gQueue, gCommandPool);
+  //texture count buffer
+  gTextureCountBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(uint32_t));
+  gTextureCountBuffer->CreateBuffer();
+  uint32_t tc = gWomanCollada->GetTextureCount();
+  gTextureCountBuffer->CopyData((void*)&tc, sizeof(uint32_t));
   //descriptor set
   gDescriptorSet = new AEDescriptorSet(gDevice, gLayouts[0], gDescriptorPool);
   gDescriptorSet->BindAccelerationStructure(0, astop.get());
@@ -629,6 +633,7 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(), gWomanCollada->GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(6, gibWomans[0]->GetBuffer(), gWomanCollada->GetIndexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(7, gGeometryIndices->GetBuffer(), sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(8, gTextureCountBuffer->GetBuffer(), sizeof(uint32_t), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
