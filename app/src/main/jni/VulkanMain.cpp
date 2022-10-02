@@ -193,7 +193,8 @@ std::unique_ptr<AEBufferUtilOnGPU> gGeometryIndices;
 std::unique_ptr<AEBufferUniform> gTextureCountBuffer;
 
 std::string gTargetModelPath = phoenixPath;
-bool isAnimation = false;
+bool isAnimation = true;
+float gScale = 0.02f;
 
 double lastTime;
 double startTime;
@@ -551,8 +552,7 @@ bool InitVulkan(android_app* app) {
   c.emplace_back(computeShaderPath.c_str());
   gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(gTargetModelPath.c_str(), app, gDevice, c, gCommandPool, gQueue);
   gWomanCollada->MakeAnimation();
-  if(gTargetModelPath == phoenixPath)
-    gWomanCollada->Scale(0.02f);
+  gWomanCollada->Scale(gScale);
   //woman texture
   for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
   {
@@ -853,6 +853,7 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
                                      gAnimationIndex,
                                      nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
     //gWomanCollada->Debug(gQueue, gCommandPool);
+    //gWomanCollada->DebugWeights(gQueue, gCommandPool);
   }
   aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;

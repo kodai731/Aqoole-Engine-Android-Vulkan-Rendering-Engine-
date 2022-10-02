@@ -1009,6 +1009,7 @@ scale
 */
 void AEDrawObjectBaseCollada::Scale(float scale)
 {
+    mScale = scale;
     uint32_t size = mVertices.size();
     for(uint32_t i = 0; i < size; i++)
         mVertices[i].pos *= scale;
@@ -1071,6 +1072,7 @@ void AEDrawObjectBaseCollada::MakeVertices()
     Vertex3DObj oneVertex;
     for(uint32_t i = 0; i < mPositionIndices.size(); i++)
     {
+        std::vector<uint32_t> serialP;
         for(uint32_t j = 0; j < mPositionIndices[i].size(); j++)
         {
             oneVertex.pos = mPositions[i][mPositionIndices[i][j]];
@@ -1078,12 +1080,13 @@ void AEDrawObjectBaseCollada::MakeVertices()
             oneVertex.texcoord = mMaps[i * 3][mMapIndices[i][j]];
             mVertices.emplace_back(oneVertex);
             mIndices.emplace_back(index);
-            mSerialPositionIndices.emplace_back(mPositionIndices[i][j]);
+            serialP.emplace_back(mPositionIndices[i][j]);
             index++;
         }
+        mSerialPositionIndices.emplace_back(serialP);
     }
     //check joints and weights
-    CheckJointAndWeight();
+    //CheckJointAndWeight();
 }
 
 /*
@@ -1280,6 +1283,19 @@ void AEDrawObjectBaseCollada::ReadController(const boost::property_tree::ptree::
     std::vector<std::string> vertexWeights;
     BOOST_FOREACH(const auto& skinNodes, node.second.get_child("skin")) {
         auto firstId = skinNodes.first.data();
+        //bsm
+        if(std::regex_search(firstId, std::regex("bind_shape_matrix", std::regex::icase))){
+            std::string bsmString = skinNodes.second.get_value_optional<std::string>().get();
+            AEDrawObject::Split(fields, bsmString, ' ');
+            glm::mat4 oneMatrix;
+            for (uint32_t i = 0; i * 16 < fields.size(); i++) {
+                for (uint32_t j = 0; j < 4; j++)
+                    for (uint32_t k = 0; k < 4; k++)
+                        oneMatrix[j][k] = std::stof(
+                                fields[16 * i + 4 * j + k]);
+                mBindShapeMatrices.emplace_back(oneMatrix);
+            }
+        }
         //source id = skin-joints
         if (strncmp(skinNodes.first.data(), "source", 7) == 0) {
             if (std::regex_search(
@@ -1629,6 +1645,9 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     cl.AddDescriptorSetLayoutBinding(13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                      VK_SHADER_STAGE_COMPUTE_BIT, 1,
                                      nullptr);
+    cl.AddDescriptorSetLayoutBinding(14, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                     VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
     cl.CreateDescriptorSetLayout();
     mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
     //buffers for descriptor set
@@ -1701,11 +1720,15 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     matsBuffer->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
     mBuffers.emplace_back(std::move(matsBuffer));
     //uniform buffer
-    VkDeviceSize uniformSize = sizeof(uint32_t);
+    VkDeviceSize uniformSize = sizeof(AnimationUniforms);
     std::unique_ptr<AEBufferUniform> uniformBuffer = std::make_unique<AEBufferUniform>(device, uniformSize);
     uniformBuffer->CreateBuffer();
-    int uniformData = mVerteces2.size();
-    uniformBuffer->CopyData((void*)&uniformData, uniformSize);
+    AnimationUniforms au{};
+    au.animNum = 0;
+    au.scale = mScale;
+    au.time = 0.0f;
+    au.vertexSize = mSerialPositionIndices[0].size();
+    uniformBuffer->CopyData((void*)&au, uniformSize);
     mUniformBuffers.emplace_back(std::move(uniformBuffer));
     //debug buffer
     VkDeviceSize debugSize = mVertices.size() * sizeof(uint32_t);
@@ -1732,18 +1755,11 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
     matsNextBuffer->CreateBuffer();
     matsNextBuffer->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
     mBuffers.emplace_back(std::move(matsNextBuffer));
-    //time uniform
-    VkDeviceSize uniformTimeSize = sizeof(float);
-    std::unique_ptr<AEBufferUniform> timeBuffer = std::make_unique<AEBufferUniform>(device, uniformTimeSize);
-    timeBuffer->CreateBuffer();
-    float time = 0.0f;
-    timeBuffer->CopyData((void*)&time, uniformTimeSize);
-    mUniformBuffers.emplace_back(std::move(timeBuffer));
     //index buffer
-    VkDeviceSize indicesListSize = sizeof(uint32_t) * mSerialPositionIndices.size();
+    VkDeviceSize indicesListSize = sizeof(uint32_t) * mSerialPositionIndices[0].size();
     std::unique_ptr<AEBufferUtilOnGPU> indicesList = std::make_unique<AEBufferUtilOnGPU>(device, indicesListSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     indicesList->CreateBuffer();
-    indicesList->CopyData((void*)mSerialPositionIndices.data(), 0, indicesListSize, queue, commandPool);
+    indicesList->CopyData((void*)mSerialPositionIndices[0].data(), 0, indicesListSize, queue, commandPool);
     mBuffers.emplace_back(std::move(indicesList));
     //animation key frame time
     VkDeviceSize keyFrameSize = sizeof(float) * mAnimationTime.size();
@@ -1780,13 +1796,11 @@ void AEDrawObjectBaseCollada::AnimationPrepare(android_app* app, AELogicalDevice
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         ds->BindDescriptorBuffer(9, mBuffers[6]->GetBuffer(), matBufferSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(10, mUniformBuffers[1]->GetBuffer(), uniformTimeSize,
-                                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        ds->BindDescriptorBuffer(11, mJointOffsetBuffers[i]->GetBuffer(), jointOffsetSizes[i],
+        ds->BindDescriptorBuffer(10, mJointOffsetBuffers[i]->GetBuffer(), jointOffsetSizes[i],
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(12, mBuffers[7]->GetBuffer(), indicesListSize,
+        ds->BindDescriptorBuffer(11, mBuffers[7]->GetBuffer(), indicesListSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(13, mBuffers[8]->GetBuffer(), keyFrameSize,
+        ds->BindDescriptorBuffer(12, mBuffers[8]->GetBuffer(), keyFrameSize,
                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         mDSs.emplace_back(std::move(ds));
     }
@@ -1806,17 +1820,20 @@ void AEDrawObjectBaseCollada::AnimationDispatch(AELogicalDevice* device, AEComma
     vkCmdResetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
     //update animation transforms
-    AnimationDispatchJoint(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), animationNum, mAnimationTransforms);
-    AnimationDispatchJoint(mRoot.get(), glm::mat4(1.0f), glm::mat4(1.0f), (animationNum + 1) % 5, mAnimationTransformsNext);
+    AnimationDispatchJoint(mRoot.get(), glm::transpose(mBindShapeMatrices[0]), glm::mat4(1.0f), animationNum, mAnimationTransforms);
+    AnimationDispatchJoint(mRoot.get(), glm::transpose(mBindShapeMatrices[0]), glm::mat4(1.0f), (animationNum + 1) % 5, mAnimationTransformsNext);
     //update buffer
     VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
     mBuffers[3]->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
     mBuffers[6]->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
     //uniform buffer
-    float timef = (float)time;
-    mUniformBuffers[1]->CopyData((void*)&timef, sizeof(float));
-    mUniformBuffers[0]->CopyData((void*)&animationNum, sizeof(uint32_t));
-    for(uint32_t i = 0; i < mPositionIndices.size(); i++) {
+    AnimationUniforms au{};
+    au.time = (float)time;
+    au.scale = mScale;
+    au.animNum = animationNum;
+    for(uint32_t i = 0; i < 1; i++) {
+        au.vertexSize = mSerialPositionIndices[i].size();
+        mUniformBuffers[0]->CopyData((void*)&au, sizeof(AnimationUniforms));
         AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE,
                                       mComputePipeline->GetPipelineLayout(),
                                       1, mDSs[i]->GetDescriptorSet());
@@ -2054,9 +2071,9 @@ void AEDrawObjectBaseCollada::CheckJointAndWeight()
                 v4 += w * mPositions[i][j];
             }
             if (glm::length(v4 - mVertices[i].pos) > 0.01f) {
-                __android_log_print(ANDROID_LOG_DEBUG, "animation",
-                                    (std::string("postion not equal geometry at ") +
-                                     std::to_string(i) + std::string(" ") + std::to_string(j)).c_str(), 0);
+                __android_log_print(ANDROID_LOG_DEBUG, "animation weights",
+                                    (std::string("postion not equal geometry at geometry") +
+                                     std::to_string(i) + std::string(" position ") + std::to_string(j)).c_str(), 0);
             }
         }
     }

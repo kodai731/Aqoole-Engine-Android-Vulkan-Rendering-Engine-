@@ -27,6 +27,14 @@ struct PayroadBlend
   bool hit;
 };
 
+struct AnimationUniforms
+{
+  uint animNum;
+  float time;
+  float scale;
+  uint vertexSize;
+};
+
 float nAir = 1.000;
 float nWater = 1.333;
 float nGlass = 1.55;

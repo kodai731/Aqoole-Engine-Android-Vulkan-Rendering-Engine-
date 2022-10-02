@@ -390,4 +390,11 @@ struct MatrixUBO
 	glm::mat4 m;
 };
 
+struct AnimationUniforms{
+	uint32_t animNum;
+	float time;
+	float scale;
+	uint32_t vertexSize;
+};
+
 #endif

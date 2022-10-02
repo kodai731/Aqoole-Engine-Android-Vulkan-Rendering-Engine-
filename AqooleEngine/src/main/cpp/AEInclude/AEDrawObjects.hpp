@@ -278,10 +278,12 @@ protected:
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mInfluenceCountBuffers;
     std::vector<std::vector<uint32_t>> mJointOffsetList;
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mJointOffsetBuffers;
-    std::vector<uint32_t> mSerialPositionIndices;
+    std::vector<std::vector<uint32_t>> mSerialPositionIndices;
     std::vector<float> mAnimationTime;
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBasePositionBuffers;
     std::vector<TextureMap> mTextureMap;
+    std::vector<glm::mat4> mBindShapeMatrices;
+    float mScale;
     //functions
     void MakeVertices();
     void ReadSkeletonNode(boost::property_tree::ptree::const_iterator nowNode,
