@@ -841,11 +841,10 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   vkResetFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence());
   RecordImguiCommand(nextIndex, touchPositions, isTouched);
   //animation dispatch
-  double intpart;
-  double fracpart = std::modf(passedTime, &intpart);
+  float maxKeyFrame = gWomanCollada->GetMaxKeyFrame();
+  float fracpart = std::fmodf((float)passedTime, maxKeyFrame);
   gAnimationIndex = SelectKeyframe(fracpart);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("passed time = ") + std::to_string(passedTime)).c_str(), 0);
-  __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("int time = ") + std::to_string(intpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("frac time = ") + std::to_string(fracpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("key frame = ") + std::to_string(gAnimationIndex)).c_str(), 0);
   if(isAnimation) {

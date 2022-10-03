@@ -1511,8 +1511,8 @@ void AEDrawObjectBaseCollada::Animation()
     //check vertices for each joint
     uint32_t i = 0;
     for(auto joint : mSkinJointsArray){
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("joint no = ") + std::to_string(i)).c_str(), 0);
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("joint name = ") + joint.jointName).c_str(), 0);
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("joint no = ") + std::to_string(i)).c_str(), 0);
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("joint name = ") + joint.jointName).c_str(), 0);
         std::string index;
         std::string weight;
         for(auto vw : joint.indexWeight){
@@ -1520,8 +1520,8 @@ void AEDrawObjectBaseCollada::Animation()
             index += std::string(" ");
             weight += (std::to_string(vw.second) + std::string(" "));
         }
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("vertex in joint = ") + index).c_str(), 0);
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("weight in joint = ") + weight).c_str(), 0);
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("vertex in joint = ") + index).c_str(), 0);
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("weight in joint = ") + weight).c_str(), 0);
         i++;
     }
 }

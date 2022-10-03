@@ -327,6 +327,7 @@ public:
     uint32_t GetGeometrySize(){return mPositions.size();}
     uint32_t GetMaterialSize(){return mPositionIndices.size();}
     std::vector<float>const& GetKeyFrames()const{return mAnimationTime;}
+    float GetMaxKeyFrame(){return mAnimationTime[mAnimationTime.size() - 1];}
     void SetGeometrySize(std::vector<uint32_t> &geometries){
         uint32_t offset = 0;
         for(uint32_t i = 0; i < mPositions.size(); i++){
