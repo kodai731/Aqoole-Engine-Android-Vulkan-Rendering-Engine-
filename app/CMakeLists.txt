@@ -25,6 +25,7 @@ set(GLM_DIR ${AE_DIR}/../glm)
 set(IMGUI_DIR ${AE_DIR}/imgui/imgui)
 set(STB_SRC_DIR ${SRC_DIR}/stb/stb/deprecated)
 set(BOOST_DIR ${AE_DIR}/../boost)
+set(TINY_GLTF_DIR ${AE_DIR}/../tinygltf)
 add_library(vulkanNativeActivity SHARED
             ${SRC_DIR}/VulkanMain.cpp
             ${SRC_DIR}/AndroidMain.cpp
@@ -32,7 +33,7 @@ add_library(vulkanNativeActivity SHARED
 #            ${STB_SRC_DIR}/stb_image.c
         )
 
-include_directories(${VK_INCLUDE_DIR} ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGUI_DIR} ${BOOST_DIR})
+include_directories(${VK_INCLUDE_DIR} ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGUI_DIR} ${BOOST_DIR} ${TINY_GLTF_DIR})
 #include_directories(${VK_VAL_LAYER_SRC_DIR}/include ${WRAPPER_DIR} ${AE_DIR} ${GLM_DIR} ${IMGUI_DIR})
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall \

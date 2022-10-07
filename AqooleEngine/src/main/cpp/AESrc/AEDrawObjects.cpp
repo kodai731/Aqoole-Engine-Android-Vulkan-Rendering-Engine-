@@ -16,7 +16,15 @@
 // Distributed under the Boost Software License, Version 1.0.
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
-
+#ifndef TINYGLTF_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
+#endif
+#ifndef STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#endif
+#ifndef STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#endif
 #include "AEDrawObjects.hpp"
 #include "AEUBO.hpp"
 #include "AEMatrix.hpp"
@@ -2079,6 +2087,30 @@ void AEDrawObjectBaseCollada::CheckJointAndWeight()
     }
 }
 
+
+//=====================================================================
+//AE Draw Object GLTF
+//=====================================================================
+AEDrawObjectBaseGltf::AEDrawObjectBaseGltf(const char* filePath, android_app* app)
+{
+    using namespace tinygltf;
+    AAsset* file = AAssetManager_open(app->activity->assetManager,
+                                      filePath, AASSET_MODE_BUFFER);
+    size_t fileLength = AAsset_getLength(file);
+    unsigned char* fileContent = new unsigned char[fileLength];
+    AAsset_read(file, fileContent, fileLength);
+    std::stringbuf strbuf((char*)fileContent);
+    std::basic_istream stream(&strbuf);
+    Model model;
+    TinyGLTF loader;
+    std::string err, warning;
+    std::string baseDir(filePath);
+    std::vector<std::string> fields;
+    AEDrawObject::Split(fields, baseDir, '/');
+    baseDir = fields[0];
+    bool ret = loader.LoadBinaryFromMemory(&model, &err, &warning, fileContent, fileLength, baseDir);
+    int breakpoint = 0;
+}
 
 //=====================================================================
 //AE cube

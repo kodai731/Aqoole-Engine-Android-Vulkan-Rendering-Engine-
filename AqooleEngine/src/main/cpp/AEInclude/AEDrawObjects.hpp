@@ -42,7 +42,7 @@
 #include "boost/lexical_cast.hpp"
 #include "regex"
 #include "mutex"
-
+#include "tiny_gltf.h"
 
 /*
 prototypes
@@ -355,6 +355,14 @@ public:
     AEBufferUtilOnGPU* GetBuffer(uint32_t index){return mBuffers[index].get();}
     void Debug(AEDeviceQueue* queue, AECommandPool* commandPool);
     void DebugWeights(AEDeviceQueue* queue, AECommandPool* commandPool);
+};
+
+class AEDrawObjectBaseGltf : public AEDrawObjectBase
+{
+protected:
+    std::vector<Vertex3DObj> mVertices;
+public:
+    AEDrawObjectBaseGltf(const char* filePath, android_app* app);
 };
 
 /*

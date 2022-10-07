@@ -181,6 +181,7 @@ std::string fuse1ObjPath("fuse-woman-1/source/woman.obj");
 std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
 std::string cowboyPath("cowboy/cowboy.dae");
 std::string phoenixPath("phoenix-bird/phoenix-bird2.dae");
+std::string phoenixGltfPath("phoenix-bird/phoenix.glb");
 std::string computeShaderPath("shaders/07_animationComp.spv");
 std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
@@ -191,10 +192,11 @@ std::unique_ptr<AESemaphore> gComputeSemaphore;
 std::unique_ptr<AEEvent> gComputeEvent;
 std::unique_ptr<AEBufferUtilOnGPU> gGeometryIndices;
 std::unique_ptr<AEBufferUniform> gTextureCountBuffer;
+std::unique_ptr<AEDrawObjectBaseGltf> gPhoenixGltf;
 
-std::string gTargetModelPath = phoenixPath;
+std::string gTargetModelPath = cowboyPath;
 bool isAnimation = true;
-float gScale = 0.02f;
+float gScale = 1.0f;
 
 double lastTime;
 double startTime;
@@ -562,6 +564,8 @@ bool InitVulkan(android_app* app) {
       texture->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
       gWomanTextures.push_back(std::move(texture));
   }
+  //gltf model
+  gPhoenixGltf  =std::make_unique<AEDrawObjectBaseGltf>(phoenixGltfPath.c_str(), app);
   modelview.rotate = glm::mat4(1.0f);
   modelview.scale = glm::mat4(1.0f);
   modelview.translate = glm::mat4(1.0f);
