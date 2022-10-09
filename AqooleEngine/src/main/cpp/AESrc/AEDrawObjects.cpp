@@ -2109,8 +2109,90 @@ AEDrawObjectBaseGltf::AEDrawObjectBaseGltf(const char* filePath, android_app* ap
     AEDrawObject::Split(fields, baseDir, '/');
     baseDir = fields[0];
     bool ret = loader.LoadBinaryFromMemory(&model, &err, &warning, fileContent, fileLength, baseDir);
+    ReadMesh(model);
+    ReadTexture(model);
+    MakeVertices();
     int breakpoint = 0;
 }
+
+/*
+ * read mesh
+ */
+void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model& model)
+{
+    using namespace tinygltf;
+    for(auto& primitive : model.meshes[0].primitives){
+        //each primitive
+        if(auto attrPos = primitive.attributes.find("POSITION"); attrPos != primitive.attributes.end()){
+            //positions
+            const auto& posAccr = model.accessors[attrPos->second];
+            const auto& posBufView = model.bufferViews[posAccr.bufferView];
+            size_t offsetByte = posAccr.byteOffset + posBufView.byteOffset;
+            const auto* src = reinterpret_cast<const glm::vec3*>(&(model.buffers[posBufView.buffer].data[offsetByte]));
+            size_t vertexSize = posAccr.count;
+            for(uint32_t i = 0; i < vertexSize; i++){
+                mPositions.emplace_back(src[i]);
+            }
+            //indices
+            const auto& indexAccr = model.accessors[primitive.indices];
+            const auto& indexBufView = model.bufferViews[indexAccr.bufferView];
+            size_t indexOffsetByte = indexAccr.byteOffset + indexBufView.byteOffset;
+            const auto* indexSrc = reinterpret_cast<const uint16_t*>(&(model.buffers[indexBufView.buffer].data[indexOffsetByte]));
+            for(uint32_t i = 0; i < indexAccr.count; i++)
+                mIndices.emplace_back((uint32_t)indexSrc[i]);
+        }
+    }
+}
+
+/*
+ * read texture
+ */
+void AEDrawObjectBaseGltf::ReadTexture(const tinygltf::Model &model)
+{
+    //image
+    for(const auto& image : model.images){
+        std::string filename = image.name;
+        const auto& imageBufView = model.bufferViews[image.bufferView];
+        size_t offsetByte = imageBufView.byteOffset;
+        const void* imageSrc = &model.buffers[imageBufView.buffer].data[offsetByte];
+        GltfTexture texture;
+        texture.filename = filename;
+        texture.width = image.width;
+        texture.height = image.height;
+        texture.size = imageBufView.byteLength;
+        texture.data = imageSrc;
+        mTextures.emplace_back(texture);
+    }
+    //material
+    for(const auto& material : model.materials){
+        for(const auto& value : material.values){
+            auto name = value.first;
+            if(std::regex_search(name, std::regex("basecolor", std::regex::icase))){
+
+            }
+        }
+    }
+}
+
+/*
+ * make vertices
+ */
+void AEDrawObjectBaseGltf::MakeVertices()
+{
+    //vertices
+    Vertex3DObj v = {};
+    for(uint32_t i = 0; i < mPositions.size(); i++){
+        v.pos = mPositions[i];
+        mVertices.emplace_back(v);
+    }
+    //indices
+}
+
+/*
+ * vertex buffer size
+ */
+uint32_t AEDrawObjectBaseGltf::GetVertexBufferSize(){return sizeof(Vertex3DObj) * mVertices.size();}
+
 
 //=====================================================================
 //AE cube

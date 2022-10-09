@@ -360,9 +360,30 @@ public:
 class AEDrawObjectBaseGltf : public AEDrawObjectBase
 {
 protected:
+    struct GltfTexture{
+        std::string filename;
+        uint32_t width;
+        uint32_t height;
+        size_t size;
+        const void* data;
+    };
     std::vector<Vertex3DObj> mVertices;
+    std::vector<glm::vec3> mPositions;
+    std::vector<GltfTexture> mTextures;
+    void ReadMesh(const tinygltf::Model& model);
+    void ReadTexture(const tinygltf::Model& model);
+    void MakeVertices();
 public:
     AEDrawObjectBaseGltf(const char* filePath, android_app* app);
+    uint32_t GetTextureWidth(uint32_t index){return mTextures[index].width;};
+    uint32_t GetTextureHeight(uint32_t index){return mTextures[index].height;};
+    size_t GetTextureSize(uint32_t index){return mTextures[index].size;};
+    const void* GetTextureData(uint32_t index){return mTextures[index].data;}
+    uint32_t GetVertexSize(){return mVertices.size();}
+    std::vector<Vertex3DObj>& GetVertexAddress(){return mVertices;}
+    uint32_t GetIndexSize(){return mIndices.size();}
+    std::vector<uint32_t>& GetIndexAddress(){return mIndices;}
+    uint32_t GetVertexBufferSize();
 };
 
 /*

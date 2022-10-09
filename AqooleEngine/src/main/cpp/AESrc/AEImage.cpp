@@ -453,6 +453,49 @@ AETextureImage::AETextureImage(AELogicalDevice* device, const char* imagePath,
 #endif
 
 /*
+ * texture image from raw data
+ */
+AETextureImage::AETextureImage(AELogicalDevice* device, int width, int height, size_t size, const void* imageData, AECommandPool* commandPool, AEDeviceQueue *queue)
+ : AEImageBase(device, commandPool, queue)
+{
+    VkDeviceSize imageSize = size;
+    int texWidth = width;
+    int texHeight = height;
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    AEBuffer::CreateBuffer(mDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
+                           stagingBufferMemory);
+    AEBuffer::CopyData(mDevice, stagingBufferMemory, imageSize, (void*)imageData);
+    //create image
+    AEImage::CreateImage2D(mDevice, (uint32_t)texWidth, (uint32_t)texHeight, VK_FORMAT_B8G8R8A8_UNORM,
+                           VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                                                               VK_IMAGE_USAGE_SAMPLED_BIT, VK_SHARING_MODE_EXCLUSIVE, VK_SAMPLE_COUNT_1_BIT, &mImage);
+    //bind image to memory
+    AEImage::BindImageMemory(mDevice, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                             &mImage, &mImageMemory);
+    //command buffer create
+    AECommandBuffer singleTimeCommandBuffer(mDevice, commandPool);
+    //begin single time command
+    AECommand::BeginSingleTimeCommands(&singleTimeCommandBuffer);
+    AEImage::TransitionImageLayout(mDevice, &singleTimeCommandBuffer, VK_IMAGE_LAYOUT_UNDEFINED,
+                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &mImage);
+    //copy buffer to image memory
+    AEImage::CopyBufferToImage(mDevice, &singleTimeCommandBuffer, (uint32_t)texWidth, (uint32_t)texHeight,
+                               &mImage, &stagingBuffer);
+    AEImage::TransitionImageLayout(mDevice, &singleTimeCommandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &mImage);
+    //end command
+    AECommand::EndSingleTimeCommands(&singleTimeCommandBuffer, queue);
+    //create image view
+    AEImage::CreateImageView2D(mDevice, &mImage, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT,
+                               &mImageView, 1);
+    //clean buffer
+    vkFreeMemory(*mDevice->GetDevice(), stagingBufferMemory, nullptr);
+    vkDestroyBuffer(*mDevice->GetDevice(), stagingBuffer, nullptr);
+}
+
+/*
 destructor
 */
 AETextureImage::~AETextureImage()

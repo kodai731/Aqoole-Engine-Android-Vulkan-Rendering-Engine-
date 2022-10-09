@@ -131,6 +131,7 @@ AEBufferAS* gIndexBuffer;
 AECommandPool* gCommandPool;
 ModelView modelview = {};
 ModelView phoenixModelView = {};
+ModelView gltfModelView = {};
 /*
 uniform
  */
@@ -183,6 +184,7 @@ std::string cowboyPath("cowboy/cowboy.dae");
 std::string phoenixPath("phoenix-bird/phoenix-bird2.dae");
 std::string phoenixGltfPath("phoenix-bird/phoenix.glb");
 std::string computeShaderPath("shaders/07_animationComp.spv");
+std::string cowboyGltfPath("cowboy/cowboy.glb");
 std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
 std::unique_ptr<AECommandBuffer> gComputeCommandBuffer;
@@ -193,10 +195,14 @@ std::unique_ptr<AEEvent> gComputeEvent;
 std::unique_ptr<AEBufferUtilOnGPU> gGeometryIndices;
 std::unique_ptr<AEBufferUniform> gTextureCountBuffer;
 std::unique_ptr<AEDrawObjectBaseGltf> gPhoenixGltf;
+std::unique_ptr<AEBufferAS> gvbModelGltf;
+std::unique_ptr<AEBufferAS> gibModelGltf;
 
 std::string gTargetModelPath = cowboyPath;
-bool isAnimation = true;
+bool isAnimation = false;
 float gScale = 1.0f;
+bool isCollada = false;
+bool isGltf = true;
 
 double lastTime;
 double startTime;
@@ -393,6 +399,15 @@ bool CreateBuffers(void) {
                  gWomanCollada->GetIndexBufferSize(), gQueue, gCommandPool);
     gibWomans.emplace_back(std::move(ib));
   }
+  //GLTF model
+  //vertex
+  gvbModelGltf = std::make_unique<AEBufferAS>(gDevice, gPhoenixGltf->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbModelGltf->CreateBuffer();
+  gvbModelGltf->CopyData((void*)gPhoenixGltf->GetVertexAddress().data(), 0, gPhoenixGltf->GetVertexBufferSize(), gQueue, gCommandPool);
+  //index
+  gibModelGltf = std::make_unique<AEBufferAS>(gDevice, gPhoenixGltf->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gibModelGltf->CreateBuffer();
+  gibModelGltf->CopyData((void*)gPhoenixGltf->GetIndexAddress().data(), 0, gPhoenixGltf->GetIndexBufferSize(), gQueue, gCommandPool);
   //compute pipeline shader
   std::vector<const char*> c;
   c.emplace_back(computeShaderPath.c_str());
@@ -416,8 +431,17 @@ bool CreateBuffers(void) {
   BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(),
                                 *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
   BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(), *gvbPlane->GetBuffer(), *gibPlane->GetBuffer()};
-  BLASGeometryInfo womanInfo0 = {sizeof(Vertex3DObj), gWomanCollada->GetVertexSize(), (uint32_t)gWomanCollada->GetIndexAddress().size(),
-                                *gvbWoman->GetBuffer(), *gibWomans[0]->GetBuffer()};
+  BLASGeometryInfo womanInfo0{};
+  if(isCollada) {
+      womanInfo0 = {sizeof(Vertex3DObj), gWomanCollada->GetVertexSize(),
+                    (uint32_t) gWomanCollada->GetIndexAddress().size(),
+                    *gvbWoman->GetBuffer(), *gibWomans[0]->GetBuffer()};
+  }
+  if(isGltf){
+      womanInfo0 = {sizeof(Vertex3DObj), gPhoenixGltf->GetVertexSize(),
+                    (uint32_t) gPhoenixGltf->GetIndexAddress().size(),
+                    *gvbModelGltf->GetBuffer(), *gibModelGltf->GetBuffer()};
+  }
   std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
   std::vector<BLASGeometryInfo> geometryPlane = {planeInfo};
   std::vector<BLASGeometryInfo> geometryWoman0 = {womanInfo0};
@@ -565,7 +589,11 @@ bool InitVulkan(android_app* app) {
       gWomanTextures.push_back(std::move(texture));
   }
   //gltf model
-  gPhoenixGltf  =std::make_unique<AEDrawObjectBaseGltf>(phoenixGltfPath.c_str(), app);
+  gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(cowboyGltfPath.c_str(), app);
+  std::unique_ptr<AETextureImage> gltfTextureImage = std::make_unique<AETextureImage>(gDevice, gPhoenixGltf->GetTextureWidth(0),
+                                                                                      gPhoenixGltf->GetTextureHeight(0),
+                                                                                      gPhoenixGltf->GetTextureSize(0),
+                                                                                      gPhoenixGltf->GetTextureData(0), gCommandPool, gQueue);
   modelview.rotate = glm::mat4(1.0f);
   modelview.scale = glm::mat4(1.0f);
   modelview.translate = glm::mat4(1.0f);
@@ -575,6 +603,7 @@ bool InitVulkan(android_app* app) {
                         0.1f, 100.0f);
   modelview.view = glm::mat4(1.0f);
   AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
+  //collada model modelview
   phoenixModelView.rotate = glm::rotate(glm::mat4(1.0f), (float)M_PI * 0.25f, glm::vec3(1.0f, 0.0f, 0.0f));
   phoenixModelView.scale = glm::mat4(1.0f);
   phoenixModelView.translate = glm::mat4(1.0f);
@@ -584,6 +613,16 @@ bool InitVulkan(android_app* app) {
                         0.1f, 100.0f);
   phoenixModelView.view = glm::mat4(1.0f);
   AEMatrix::View(phoenixModelView.view, cameraPos, cameraDirection, cameraUp);
+  //GLTF model modelview
+  gltfModelView.rotate = glm::rotate(glm::mat4(1.0f), 0.75f * (float)M_PI, glm::vec3(1.0f, 0.0f, 0.0f));
+  gltfModelView.scale = glm::mat4(1.0f);
+  gltfModelView.translate = glm::mat4(1.0f);
+  gltfModelView.proj = glm::mat4(1.0f);
+  AEMatrix::Perspective(gltfModelView.proj, 90.0f,
+                        (float)gSwapchain->GetExtents()[0].width / (float)gSwapchain->GetExtents()[0].height,
+                        0.1f, 100.0f);
+  gltfModelView.view = glm::mat4(1.0f);
+  AEMatrix::View(gltfModelView.view, cameraPos, cameraDirection, cameraUp);
   CreateBuffers();  // create vertex
   // Create graphics pipeline
   CreateGraphicsPipeline();
@@ -612,11 +651,28 @@ bool InitVulkan(android_app* app) {
   gUboRTBuffer->CreateBuffer();
   gUboRTBuffer->CopyData((void*)&uboRT, sizeof(UBORT));
   //geometry indices
-  gGeometryIndices = std::make_unique<AEBufferUtilOnGPU>(gDevice, sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-  gGeometryIndices->CreateBuffer();
-  std::vector<uint32_t> geometries;
-  gWomanCollada->SetGeometrySize(geometries);
-  gGeometryIndices->CopyData((void*)geometries.data(), 0, sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), gQueue, gCommandPool);
+  if (isCollada) {
+    gGeometryIndices = std::make_unique<AEBufferUtilOnGPU>(gDevice, sizeof(uint32_t) *
+                                                                    gWomanCollada->GetGeometrySize(),
+                                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    gGeometryIndices->CreateBuffer();
+    std::vector<uint32_t> geometries;
+    gWomanCollada->SetGeometrySize(geometries);
+    gGeometryIndices->CopyData((void *) geometries.data(), 0,
+                               sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), gQueue,
+                               gCommandPool);
+  }
+  if(isGltf){
+    gGeometryIndices = std::make_unique<AEBufferUtilOnGPU>(gDevice, sizeof(uint32_t) *
+                                                                    gWomanCollada->GetGeometrySize(),
+                                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    gGeometryIndices->CreateBuffer();
+    std::vector<uint32_t> geometries;
+    geometries.emplace_back(gPhoenixGltf->GetVertexAddress().size());
+    gGeometryIndices->CopyData((void *) geometries.data(), 0,
+                               sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), gQueue,
+                               gCommandPool);
+  }
   //texture count buffer
   gTextureCountBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(uint32_t));
   gTextureCountBuffer->CreateBuffer();
@@ -634,8 +690,22 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorBuffers(4, {*gibPlane->GetBuffer(), *gIndexBuffer->GetBuffer()},
                                         {gXZPlane->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(), gWomanCollada->GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(6, gibWomans[0]->GetBuffer(), gWomanCollada->GetIndexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  if(isCollada) {
+    gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(),
+                                         gWomanCollada->GetVertexBufferSize(),
+                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    gDescriptorSet->BindDescriptorBuffer(6, gibWomans[0]->GetBuffer(),
+                                         gWomanCollada->GetIndexBufferSize(),
+                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  }
+  if(isGltf){
+    gDescriptorSet->BindDescriptorBuffer(5, gvbModelGltf->GetBuffer(),
+                                         gPhoenixGltf->GetVertexBufferSize(),
+                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    gDescriptorSet->BindDescriptorBuffer(6, gibModelGltf->GetBuffer(),
+                                         gPhoenixGltf->GetIndexBufferSize(),
+                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  }
   gDescriptorSet->BindDescriptorBuffer(7, gGeometryIndices->GetBuffer(), sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(8, gTextureCountBuffer->GetBuffer(), sizeof(uint32_t), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
@@ -858,7 +928,12 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     //gWomanCollada->Debug(gQueue, gCommandPool);
     //gWomanCollada->DebugWeights(gQueue, gCommandPool);
   }
-  aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
+  if(isCollada) {
+    aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
+  }
+  if(isGltf){
+    aslsWoman->Update(&gltfModelView, gQueue, gCommandPool);
+  }
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSemaphore waitSemaphores = render.semaphore_;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};

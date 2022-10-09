@@ -104,6 +104,8 @@ class AETextureImage : public AEImageBase
 #else
     AETextureImage(AELogicalDevice* device, const char* imagePath,
                    AECommandPool* commandPool, AEDeviceQueue *queue, android_app* app);
+    AETextureImage(AELogicalDevice* device, int width, int height, size_t size, const void* imageData,
+                   AECommandPool* commandPool, AEDeviceQueue *queue);
 #endif
     ~AETextureImage();
 };
