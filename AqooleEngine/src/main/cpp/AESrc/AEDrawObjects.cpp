@@ -2123,23 +2123,35 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model& model)
     using namespace tinygltf;
     for(auto& primitive : model.meshes[0].primitives){
         //each primitive
-        if(auto attrPos = primitive.attributes.find("POSITION"); attrPos != primitive.attributes.end()){
+        for(auto& attr : primitive.attributes) {
+            std::string attName = attr.first;
             //positions
-            const auto& posAccr = model.accessors[attrPos->second];
-            const auto& posBufView = model.bufferViews[posAccr.bufferView];
-            size_t offsetByte = posAccr.byteOffset + posBufView.byteOffset;
-            const auto* src = reinterpret_cast<const glm::vec3*>(&(model.buffers[posBufView.buffer].data[offsetByte]));
-            size_t vertexSize = posAccr.count;
-            for(uint32_t i = 0; i < vertexSize; i++){
-                mPositions.emplace_back(src[i]);
+            if (std::regex_search(attName, std::regex("position", std::regex::icase))) {
+                const auto &posAccr = model.accessors[attr.second];
+                const auto &posBufView = model.bufferViews[posAccr.bufferView];
+                size_t offsetByte = posAccr.byteOffset + posBufView.byteOffset;
+                const auto *src = reinterpret_cast<const glm::vec3 *>(&(model.buffers[posBufView.buffer].data[offsetByte]));
+                size_t vertexSize = posAccr.count;
+                for (uint32_t i = 0; i < vertexSize; i++) {
+                    mPositions.emplace_back(src[i]);
+                }
+                //indices
+                const auto &indexAccr = model.accessors[primitive.indices];
+                const auto &indexBufView = model.bufferViews[indexAccr.bufferView];
+                size_t indexOffsetByte = indexAccr.byteOffset + indexBufView.byteOffset;
+                const auto *indexSrc = reinterpret_cast<const uint16_t *>(&(model.buffers[indexBufView.buffer].data[indexOffsetByte]));
+                for (uint32_t i = 0; i < indexAccr.count; i++)
+                    mIndices.emplace_back((uint32_t) indexSrc[i]);
             }
-            //indices
-            const auto& indexAccr = model.accessors[primitive.indices];
-            const auto& indexBufView = model.bufferViews[indexAccr.bufferView];
-            size_t indexOffsetByte = indexAccr.byteOffset + indexBufView.byteOffset;
-            const auto* indexSrc = reinterpret_cast<const uint16_t*>(&(model.buffers[indexBufView.buffer].data[indexOffsetByte]));
-            for(uint32_t i = 0; i < indexAccr.count; i++)
-                mIndices.emplace_back((uint32_t)indexSrc[i]);
+            //texture coord
+            if (std::regex_search(attName, std::regex("texcoord", std::regex::icase))) {
+                const auto &tcAccr = model.accessors[attr.second];
+                const auto &tcBufView = model.bufferViews[tcAccr.bufferView];
+                size_t offsetByte = tcAccr.byteOffset + tcBufView.byteOffset;
+                const auto *tcSrc = reinterpret_cast<const glm::vec2 *>(&model.buffers[tcBufView.buffer].data[offsetByte]);
+                for (uint32_t i = 0; i < tcAccr.count; i++)
+                    mTexCoord.emplace_back(tcSrc[i]);
+            }
         }
     }
 }
@@ -2183,6 +2195,7 @@ void AEDrawObjectBaseGltf::MakeVertices()
     Vertex3DObj v = {};
     for(uint32_t i = 0; i < mPositions.size(); i++){
         v.pos = mPositions[i];
+        v.texcoord = mTexCoord[i];
         mVertices.emplace_back(v);
     }
     //indices

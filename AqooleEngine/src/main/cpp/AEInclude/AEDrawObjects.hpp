@@ -370,6 +370,7 @@ protected:
     std::vector<Vertex3DObj> mVertices;
     std::vector<glm::vec3> mPositions;
     std::vector<GltfTexture> mTextures;
+    std::vector<glm::vec2> mTexCoord;
     void ReadMesh(const tinygltf::Model& model);
     void ReadTexture(const tinygltf::Model& model);
     void MakeVertices();
