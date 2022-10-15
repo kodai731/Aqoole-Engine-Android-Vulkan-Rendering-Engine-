@@ -367,12 +367,22 @@ protected:
         size_t size;
         const void* data;
     };
+    struct Joint{
+        std::string nodename;
+        int nodeid;
+        std::vector<int> children;
+        int jointNo;
+        std::vector<int> influencedVertexList;
+        std::vector<float> influencedWeightList;
+    };
     std::vector<Vertex3DObj> mVertices;
     std::vector<glm::vec3> mPositions;
     std::vector<GltfTexture> mTextures;
     std::vector<glm::vec2> mTexCoord;
+    std::vector<Joint> mJoints;
     void ReadMesh(const tinygltf::Model& model);
     void ReadTexture(const tinygltf::Model& model);
+    void ReadNode(const tinygltf::Model& model);
     void MakeVertices();
 public:
     AEDrawObjectBaseGltf(const char* filePath, android_app* app);

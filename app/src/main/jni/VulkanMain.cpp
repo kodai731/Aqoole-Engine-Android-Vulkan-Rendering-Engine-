@@ -414,8 +414,10 @@ bool CreateBuffers(void) {
   //create source buffer
   gComputeCommandBuffer = std::make_unique<AECommandBuffer>(gDevice, gCommandPool);
   AEBufferBase* registerBuffers[1] = {gvbWoman.get()};
-  gWomanCollada->AnimationPrepare(androidAppCtx, gDevice, c, registerBuffers,
-                                  gQueue, gCommandPool, gDescriptorPool);
+  if(isAnimation) {
+    gWomanCollada->AnimationPrepare(androidAppCtx, gDevice, c, registerBuffers,
+                                    gQueue, gCommandPool, gDescriptorPool);
+  }
   //offset
 //  gWomanOffset = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 //  gWomanOffset->CreateBuffer();
@@ -574,19 +576,21 @@ bool InitVulkan(android_app* app) {
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, 0.0f, top), glm::vec3(left, 0.0f, bottom),
                                        glm::vec3(right, 0.0f, bottom), glm::vec3(right, 0.0f, top), glm::vec3(0.0f, 0.2f, 0.0f));
   //woman
-  std::vector<const char*> c;
+  std::vector<const char *> c;
   c.emplace_back(computeShaderPath.c_str());
-  gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(gTargetModelPath.c_str(), app, gDevice, c, gCommandPool, gQueue);
+  gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(gTargetModelPath.c_str(), app,
+                                                            gDevice, c, gCommandPool, gQueue);
   gWomanCollada->MakeAnimation();
   gWomanCollada->Scale(gScale);
   //woman texture
-  for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++)
-  {
+  for (uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++) {
     auto texturePath = gWomanCollada->GetTexturePath(i);
-      std::unique_ptr<AETextureImage> texture(new AETextureImage(gDevice, (AEDrawObject::GetRootDirName(gTargetModelPath) +
-      gWomanCollada->GetTexturePath(i)).c_str(), gCommandPool, gQueue, app));
-      texture->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
-      gWomanTextures.push_back(std::move(texture));
+    std::unique_ptr<AETextureImage> texture(
+            new AETextureImage(gDevice, (AEDrawObject::GetRootDirName(gTargetModelPath) +
+                                         gWomanCollada->GetTexturePath(i)).c_str(), gCommandPool,
+                               gQueue, app));
+    texture->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
+    gWomanTextures.push_back(std::move(texture));
   }
   //gltf model
   gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(cowboyGltfPath.c_str(), app);

@@ -2109,49 +2109,42 @@ AEDrawObjectBaseGltf::AEDrawObjectBaseGltf(const char* filePath, android_app* ap
     AEDrawObject::Split(fields, baseDir, '/');
     baseDir = fields[0];
     bool ret = loader.LoadBinaryFromMemory(&model, &err, &warning, fileContent, fileLength, baseDir);
-    ReadMesh(model);
+    ReadNode(model);
     ReadTexture(model);
+    ReadMesh(model);
     MakeVertices();
     int breakpoint = 0;
 }
 
 /*
- * read mesh
+ * read node
  */
-void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model& model)
+void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
 {
     using namespace tinygltf;
-    for(auto& primitive : model.meshes[0].primitives){
-        //each primitive
-        for(auto& attr : primitive.attributes) {
-            std::string attName = attr.first;
-            //positions
-            if (std::regex_search(attName, std::regex("position", std::regex::icase))) {
-                const auto &posAccr = model.accessors[attr.second];
-                const auto &posBufView = model.bufferViews[posAccr.bufferView];
-                size_t offsetByte = posAccr.byteOffset + posBufView.byteOffset;
-                const auto *src = reinterpret_cast<const glm::vec3 *>(&(model.buffers[posBufView.buffer].data[offsetByte]));
-                size_t vertexSize = posAccr.count;
-                for (uint32_t i = 0; i < vertexSize; i++) {
-                    mPositions.emplace_back(src[i]);
-                }
-                //indices
-                const auto &indexAccr = model.accessors[primitive.indices];
-                const auto &indexBufView = model.bufferViews[indexAccr.bufferView];
-                size_t indexOffsetByte = indexAccr.byteOffset + indexBufView.byteOffset;
-                const auto *indexSrc = reinterpret_cast<const uint16_t *>(&(model.buffers[indexBufView.buffer].data[indexOffsetByte]));
-                for (uint32_t i = 0; i < indexAccr.count; i++)
-                    mIndices.emplace_back((uint32_t) indexSrc[i]);
-            }
-            //texture coord
-            if (std::regex_search(attName, std::regex("texcoord", std::regex::icase))) {
-                const auto &tcAccr = model.accessors[attr.second];
-                const auto &tcBufView = model.bufferViews[tcAccr.bufferView];
-                size_t offsetByte = tcAccr.byteOffset + tcBufView.byteOffset;
-                const auto *tcSrc = reinterpret_cast<const glm::vec2 *>(&model.buffers[tcBufView.buffer].data[offsetByte]);
-                for (uint32_t i = 0; i < tcAccr.count; i++)
-                    mTexCoord.emplace_back(tcSrc[i]);
-            }
+    std::vector<Joint> tmpJoint;
+    //node
+    uint32_t index = 0;
+    for(auto& node : model.nodes){
+        Joint j = {};
+        j.jointNo = -1;
+        j.nodename = node.name;
+        j.nodeid = index;
+        for(uint32_t i = 0; i < node.children.size(); i++)
+            j.children.emplace_back(node.children[i]);
+        tmpJoint.emplace_back(j);
+        index++;
+    }
+    //joint
+    for(auto& skin : model.skins){
+        for(uint32_t i = 0; i < skin.joints.size(); i++)
+            tmpJoint[i].jointNo = skin.joints[i];
+    }
+    //store joint in order
+    for(uint32_t i = 0; i < tmpJoint.size(); i++) {
+        for (uint32_t j = 0; j < tmpJoint.size(); j++) {
+            if (tmpJoint[j].jointNo == i)
+                mJoints.emplace_back(tmpJoint[j]);
         }
     }
 }
@@ -2206,6 +2199,94 @@ void AEDrawObjectBaseGltf::MakeVertices()
  */
 uint32_t AEDrawObjectBaseGltf::GetVertexBufferSize(){return sizeof(Vertex3DObj) * mVertices.size();}
 
+/*
+ * read mesh information
+ */
+void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
+{
+    using namespace tinygltf;
+    std::vector<glm::uvec4> tmpJoint;
+    std::vector<glm::vec4> tmpWeight;
+    const uint8_t* jointSrc;
+    const glm::vec4* weightSrc;
+    for(auto& primitive : model.meshes[0].primitives){
+        //each primitive
+        for(auto& attr : primitive.attributes) {
+            std::string attName = attr.first;
+            //positions
+            if (std::regex_search(attName, std::regex("position", std::regex::icase))) {
+                const auto &posAccr = model.accessors[attr.second];
+                const auto &posBufView = model.bufferViews[posAccr.bufferView];
+                size_t offsetByte = posAccr.byteOffset + posBufView.byteOffset;
+                const auto *src = reinterpret_cast<const glm::vec3 *>(&(model.buffers[posBufView.buffer].data[offsetByte]));
+                size_t vertexSize = posAccr.count;
+                for (uint32_t i = 0; i < vertexSize; i++) {
+                    mPositions.emplace_back(src[i]);
+                }
+                //indices
+                const auto &indexAccr = model.accessors[primitive.indices];
+                const auto &indexBufView = model.bufferViews[indexAccr.bufferView];
+                size_t indexOffsetByte = indexAccr.byteOffset + indexBufView.byteOffset;
+                const auto *indexSrc = reinterpret_cast<const uint16_t *>(&(model.buffers[indexBufView.buffer].data[indexOffsetByte]));
+                for (uint32_t i = 0; i < indexAccr.count; i++)
+                    mIndices.emplace_back((uint32_t) indexSrc[i]);
+            }
+            //texture coord
+            if (std::regex_search(attName, std::regex("texcoord", std::regex::icase))) {
+                const auto &tcAccr = model.accessors[attr.second];
+                const auto &tcBufView = model.bufferViews[tcAccr.bufferView];
+                size_t offsetByte = tcAccr.byteOffset + tcBufView.byteOffset;
+                const auto *tcSrc = reinterpret_cast<const glm::vec2 *>(&model.buffers[tcBufView.buffer].data[offsetByte]);
+                for (uint32_t i = 0; i < tcAccr.count; i++)
+                    mTexCoord.emplace_back(tcSrc[i]);
+            }
+            //joint information
+            if(std::regex_search(attName, std::regex("joint", std::regex::icase))){
+                const auto& jointAccr = model.accessors[attr.second];
+                const auto& jointBufView = model.bufferViews[jointAccr.bufferView];
+                size_t offsetByte = jointAccr.byteOffset + jointBufView.byteOffset;
+                //for case : acc.componentType = TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE
+                //TODO : auto select pointer types with void* ?
+                jointSrc = reinterpret_cast<const uint8_t*>(&model.buffers[jointBufView.buffer].data[offsetByte]);
+                for(uint32_t i = 0; i < jointAccr.count; i++){
+                    uint32_t index = i * 4;
+                    glm::uvec4 u(jointSrc[index], jointSrc[index + 1], jointSrc[index + 2], jointSrc[index + 3]);
+                    tmpJoint.emplace_back(u);
+                }
+            }
+            //weight information
+            if(std::regex_search(attName, std::regex("weight", std::regex::icase))){
+                const auto& weightAccr = model.accessors[attr.second];
+                const auto& weightBufView = model.bufferViews[weightAccr.bufferView];
+                size_t offsetByte = weightAccr.byteOffset + weightBufView.byteOffset;
+                weightSrc = reinterpret_cast<const glm::vec4*>(&model.buffers[weightBufView.buffer].data[offsetByte]);
+                for(uint32_t i = 0; i < weightAccr.count; i++)
+                    tmpWeight.emplace_back(weightSrc[i]);
+            }
+        }
+    }
+    //each vertex index and weight to their joint
+    for(uint32_t i = 0; i < tmpWeight.size(); i++){
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole gltf", (std::string("vertex = ") + std::to_string(i)).c_str(), 0);
+        //detect influence count
+        uint32_t ic = 0;
+        float total = 0.0f;
+        for(uint32_t j = 0; j < 4; j++){
+            total += tmpWeight[i][j];
+            if(total > 0.9999f){
+                ic = j + 1;
+                break;
+            }
+        }
+        //store vertex index and weight to node
+        for(uint32_t k = 0; k < ic; k++){
+            uint32_t jointNum = tmpJoint[i][k];
+            mJoints[jointNum].influencedVertexList.emplace_back(i);
+            mJoints[tmpJoint[i][k]].influencedWeightList.emplace_back(weightSrc[i][k]);
+        }
+    }
+    int breakpoint = 1000;
+}
 
 //=====================================================================
 //AE cube
