@@ -199,7 +199,7 @@ std::unique_ptr<AEBufferAS> gvbModelGltf;
 std::unique_ptr<AEBufferAS> gibModelGltf;
 
 std::string gTargetModelPath = cowboyPath;
-bool isAnimation = false;
+bool isAnimation = true;
 float gScale = 1.0f;
 bool isCollada = false;
 bool isGltf = true;
@@ -414,9 +414,15 @@ bool CreateBuffers(void) {
   //create source buffer
   gComputeCommandBuffer = std::make_unique<AECommandBuffer>(gDevice, gCommandPool);
   AEBufferBase* registerBuffers[1] = {gvbWoman.get()};
+  AEBufferBase* registerBuffersGltf[1] = {gvbModelGltf.get()};
   if(isAnimation) {
     gWomanCollada->AnimationPrepare(androidAppCtx, gDevice, c, registerBuffers,
                                     gQueue, gCommandPool, gDescriptorPool);
+  }
+  if(isGltf){
+      std::vector<const char*> gltfShaders = {"shaders/07_animationGltfComp.spv"};
+      gPhoenixGltf->AnimationPrepare(androidAppCtx, gDevice, gltfShaders, registerBuffersGltf,
+                                     gQueue, gCommandPool, gDescriptorPool);
   }
   //offset
 //  gWomanOffset = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -926,9 +932,11 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("frac time = ") + std::to_string(fracpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("key frame = ") + std::to_string(gAnimationIndex)).c_str(), 0);
   if(isAnimation) {
-    gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,
-                                     gAnimationIndex,
-                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
+//    gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,
+//                                     gAnimationIndex,
+//                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
+    gPhoenixGltf->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool, gAnimationIndex,
+                                    nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
     //gWomanCollada->Debug(gQueue, gCommandPool);
     //gWomanCollada->DebugWeights(gQueue, gCommandPool);
   }

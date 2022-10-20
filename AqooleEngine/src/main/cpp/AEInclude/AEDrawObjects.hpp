@@ -375,17 +375,39 @@ protected:
         std::vector<int> influencedVertexList;
         std::vector<float> influencedWeightList;
     };
+    struct AnimationComponent{
+        std::unique_ptr<AEBufferUtilOnGPU> basePositionBuffer;
+        AEBufferBase* resultBuffer;
+        std::unique_ptr<AEBufferUtilOnGPU> influenceCountBuffer;
+        std::unique_ptr<AEBufferUtilOnGPU> joint;
+    };
+    float mScale;
     std::vector<Vertex3DObj> mVertices;
-    std::vector<glm::vec3> mPositions;
+    std::vector<std::vector<glm::vec3>> mPositions;
+    std::vector<uint32_t> mAnimationIndices;
     std::vector<GltfTexture> mTextures;
     std::vector<glm::vec2> mTexCoord;
     std::vector<Joint> mJoints;
+    std::vector<std::vector<uint32_t>> mInfluenceCountList;
+    std::vector<uint32_t> mJointList;
+    std::vector<std::vector<uint32_t>> mJointOffsetList;
+    std::vector<float> mWeightList;
+    std::unique_ptr<AEComputePipeline> mComputePipeline;
+    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mInfluenceCountBuffers;
+    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBasePositionBuffers;
+    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mJointOffsetBuffers;
+    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBuffers;
+    std::vector<glm::mat4> mAnimationTransforms;
+    std::vector<glm::mat4> mAnimationTransformsNext;
+    std::vector<std::unique_ptr<AEBufferUniform>> mUniformBuffers;
+    std::vector<float> mAnimationTime;
+    std::vector<std::unique_ptr<AEDescriptorSet>> mDSs;
     void ReadMesh(const tinygltf::Model& model);
     void ReadTexture(const tinygltf::Model& model);
     void ReadNode(const tinygltf::Model& model);
     void MakeVertices();
 public:
-    AEDrawObjectBaseGltf(const char* filePath, android_app* app);
+    AEDrawObjectBaseGltf(const char* filePath, android_app* app, float scale = 1.0f);
     uint32_t GetTextureWidth(uint32_t index){return mTextures[index].width;};
     uint32_t GetTextureHeight(uint32_t index){return mTextures[index].height;};
     size_t GetTextureSize(uint32_t index){return mTextures[index].size;};
@@ -395,6 +417,10 @@ public:
     uint32_t GetIndexSize(){return mIndices.size();}
     std::vector<uint32_t>& GetIndexAddress(){return mIndices;}
     uint32_t GetVertexBufferSize();
+    void AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
+                          AEBufferBase* buffer[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
+    void AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
+            uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore, double time, AEEvent* event);
 };
 
 /*
