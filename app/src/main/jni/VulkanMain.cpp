@@ -405,9 +405,9 @@ bool CreateBuffers(void) {
   gvbModelGltf->CreateBuffer();
   gvbModelGltf->CopyData((void*)gPhoenixGltf->GetVertexAddress().data(), 0, gPhoenixGltf->GetVertexBufferSize(), gQueue, gCommandPool);
   //index
-  gibModelGltf = std::make_unique<AEBufferAS>(gDevice, gPhoenixGltf->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gibModelGltf = std::make_unique<AEBufferAS>(gDevice, gPhoenixGltf->GetIndexBufferSize(0), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gibModelGltf->CreateBuffer();
-  gibModelGltf->CopyData((void*)gPhoenixGltf->GetIndexAddress().data(), 0, gPhoenixGltf->GetIndexBufferSize(), gQueue, gCommandPool);
+  gibModelGltf->CopyData((void*)gPhoenixGltf->GetIndexAddress(0).data(), 0, gPhoenixGltf->GetIndexBufferSize(0), gQueue, gCommandPool);
   //compute pipeline shader
   std::vector<const char*> c;
   c.emplace_back(computeShaderPath.c_str());
@@ -447,7 +447,7 @@ bool CreateBuffers(void) {
   }
   if(isGltf){
       womanInfo0 = {sizeof(Vertex3DObj), gPhoenixGltf->GetVertexSize(),
-                    (uint32_t) gPhoenixGltf->GetIndexAddress().size(),
+                    (uint32_t) gPhoenixGltf->GetIndexAddress(0).size(),
                     *gvbModelGltf->GetBuffer(), *gibModelGltf->GetBuffer()};
   }
   std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
@@ -713,7 +713,7 @@ bool InitVulkan(android_app* app) {
                                          gPhoenixGltf->GetVertexBufferSize(),
                                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     gDescriptorSet->BindDescriptorBuffer(6, gibModelGltf->GetBuffer(),
-                                         gPhoenixGltf->GetIndexBufferSize(),
+                                         gPhoenixGltf->GetIndexBufferSize(0),
                                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   }
   gDescriptorSet->BindDescriptorBuffer(7, gGeometryIndices->GetBuffer(), sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);

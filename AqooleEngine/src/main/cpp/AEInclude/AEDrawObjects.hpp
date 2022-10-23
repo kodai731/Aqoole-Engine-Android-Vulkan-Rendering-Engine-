@@ -375,33 +375,37 @@ protected:
         std::vector<int> influencedVertexList;
         std::vector<float> influencedWeightList;
     };
-    struct AnimationComponent{
-        std::unique_ptr<AEBufferUtilOnGPU> basePositionBuffer;
-        AEBufferBase* resultBuffer;
+    struct Geometry{
+        std::vector<glm::vec3> positions;
+        std::vector<uint32_t> indices;
+        std::vector<glm::vec2> texCoords;
+        std::vector<uint32_t> influences;
+        std::vector<uint32_t> jointOffsets;
+        std::vector<float> weights;
+        std::vector<uint32_t> animationIndices;
+    };
+    struct GeometryBuffers{
+        std::unique_ptr<AEBufferUtilOnGPU> positionBuffer;
+        std::unique_ptr<AEBufferUtilOnGPU> indexBuffer;
+        std::unique_ptr<AEBufferUtilOnGPU> texCoodBuffer;
         std::unique_ptr<AEBufferUtilOnGPU> influenceCountBuffer;
-        std::unique_ptr<AEBufferUtilOnGPU> joint;
+        std::unique_ptr<AEBufferUtilOnGPU> jointOffsetBuffer;
+        std::unique_ptr<AEBufferUtilOnGPU> weightBuffer;
     };
     float mScale;
     std::vector<Vertex3DObj> mVertices;
-    std::vector<std::vector<glm::vec3>> mPositions;
-    std::vector<uint32_t> mAnimationIndices;
     std::vector<GltfTexture> mTextures;
-    std::vector<glm::vec2> mTexCoord;
     std::vector<Joint> mJoints;
-    std::vector<std::vector<uint32_t>> mInfluenceCountList;
     std::vector<uint32_t> mJointList;
-    std::vector<std::vector<uint32_t>> mJointOffsetList;
-    std::vector<float> mWeightList;
     std::unique_ptr<AEComputePipeline> mComputePipeline;
-    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mInfluenceCountBuffers;
-    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBasePositionBuffers;
-    std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mJointOffsetBuffers;
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBuffers;
     std::vector<glm::mat4> mAnimationTransforms;
     std::vector<glm::mat4> mAnimationTransformsNext;
     std::vector<std::unique_ptr<AEBufferUniform>> mUniformBuffers;
     std::vector<float> mAnimationTime;
     std::vector<std::unique_ptr<AEDescriptorSet>> mDSs;
+    std::vector<Geometry> mGeometries;
+    std::vector<GeometryBuffers> mGeoBuffers;
     void ReadMesh(const tinygltf::Model& model);
     void ReadTexture(const tinygltf::Model& model);
     void ReadNode(const tinygltf::Model& model);
@@ -414,8 +418,9 @@ public:
     const void* GetTextureData(uint32_t index){return mTextures[index].data;}
     uint32_t GetVertexSize(){return mVertices.size();}
     std::vector<Vertex3DObj>& GetVertexAddress(){return mVertices;}
-    uint32_t GetIndexSize(){return mIndices.size();}
-    std::vector<uint32_t>& GetIndexAddress(){return mIndices;}
+    uint32_t GetIndexSize(uint32_t index){return mGeometries[index].indices.size();}
+    std::vector<uint32_t>& GetIndexAddress(uint32_t index){return mGeometries[index].indices;}
+    VkDeviceSize GetIndexBufferSize(uint32_t index){return mGeometries[index].indices.size() * sizeof(uint32_t);};
     uint32_t GetVertexBufferSize();
     void AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
                           AEBufferBase* buffer[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);

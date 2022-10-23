@@ -18,20 +18,18 @@ layout(binding = 7, set = 0, scalar) buffer Debug {uint d[];} debug[];
 layout(binding = 8, set = 0, scalar) buffer DebugVertex {Vertex3DObj dv[];} debugV[];
 layout(binding = 9, set = 0, scalar) buffer MatsNext{mat4 m[];} matsNext[];
 layout(binding = 10, set = 0, scalar) buffer JointOffset{uint o[];} jointOffset[];
-layout(binding = 11, set = 0, scalar) buffer Indices{uint i[];} indices[];
-layout(binding = 12, set = 0, scalar) buffer KeyFrames{float kf[];} keyFrames;
+layout(binding = 11, set = 0, scalar) buffer KeyFrames{float kf[];} keyFrames;
 
 void main()
 {
   //uint ii = gl_WorkGroupID.y * 1024 + gl_WorkGroupID.x;
   uint ii = gl_WorkGroupID.x * 1024 + gl_LocalInvocationIndex;
   if(ii < animationUniforms.au.vertexSize){
-    uint index = indices[0].i[ii];
-    uint influence = influenceCount[0].i[index];
     vec3 v3 = vec3(0.0);
     vec3 v4 = vec3(0.0);
-    vec3 v0 = verticesobj[0].vobj[index];
-    uint offset = jointOffset[0].o[index];
+    vec3 v0 = verticesobj[0].vobj[ii];
+    uint influence = influenceCount[0].i[ii];
+    uint offset = jointOffset[0].o[ii];
     for (int k = 0; k < influence; k++){
       float w = weights[0].f[offset + k];
       //    memoryBarrierShared();
@@ -45,13 +43,14 @@ void main()
       interval = 1.0 / interval;
       v3 += v1 + ((v2 - v1) * ((animationUniforms.au.time - keyFrames.kf[animationUniforms.au.animNum]) * interval));
       //v4 += (1.0f / float(influence)) * v0;
-      v4 += (w * v0);
+      //v4 += (w * v0);
+      v4 += w * v0;
       //v0 = w * v0;
       //debugV[0].dv[offset + k].pos = v3;
     }
-    debug[0].d[ii] = index;
+    debug[0].d[ii] = ii;
     //verticesobjDst[0].vobjDst[ii].pos = animationUniforms.au.scale * v4 * 0.3;
-    verticesobjDst[0].vobjDst[index].pos = v4;
+    verticesobjDst[0].vobjDst[ii].pos = 0.5 * v4;
     //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
   }
 }

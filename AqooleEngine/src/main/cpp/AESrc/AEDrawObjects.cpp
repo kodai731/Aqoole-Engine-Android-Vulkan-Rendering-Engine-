@@ -2187,10 +2187,10 @@ void AEDrawObjectBaseGltf::MakeVertices()
 {
     //vertices
     Vertex3DObj v = {};
-    for(uint32_t i = 0; i < mPositions.size(); i++) {
-        for (uint32_t j = 0; j < mPositions[i].size(); j++) {
-            v.pos = mPositions[i][j];
-            v.texcoord = mTexCoord[j];
+    for(uint32_t i = 0; i < mGeometries.size(); i++) {
+        for (uint32_t j = 0; j < mGeometries[i].positions.size(); j++) {
+            v.pos = mGeometries[i].positions[j];
+            v.texcoord = mGeometries[i].texCoords[j];
             mVertices.emplace_back(v);
         }
     }
@@ -2214,27 +2214,26 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
     const glm::vec4* weightSrc;
     for(auto& primitive : model.meshes[0].primitives){
         //each primitive
+        Geometry geo = {};
         for(auto& attr : primitive.attributes) {
             std::string attName = attr.first;
             //positions
             if (std::regex_search(attName, std::regex("position", std::regex::icase))) {
-                std::vector<glm::vec3> positions;
                 const auto &posAccr = model.accessors[attr.second];
                 const auto &posBufView = model.bufferViews[posAccr.bufferView];
                 size_t offsetByte = posAccr.byteOffset + posBufView.byteOffset;
                 const auto *src = reinterpret_cast<const glm::vec3 *>(&(model.buffers[posBufView.buffer].data[offsetByte]));
                 size_t vertexSize = posAccr.count;
                 for (uint32_t i = 0; i < vertexSize; i++) {
-                    positions.emplace_back(src[i]);
+                    geo.positions.emplace_back(src[i]);
                 }
-                mPositions.emplace_back(positions);
                 //indices
                 const auto &indexAccr = model.accessors[primitive.indices];
                 const auto &indexBufView = model.bufferViews[indexAccr.bufferView];
                 size_t indexOffsetByte = indexAccr.byteOffset + indexBufView.byteOffset;
                 const auto *indexSrc = reinterpret_cast<const uint16_t *>(&(model.buffers[indexBufView.buffer].data[indexOffsetByte]));
                 for (uint32_t i = 0; i < indexAccr.count; i++)
-                    mIndices.emplace_back((uint32_t) indexSrc[i]);
+                    geo.indices.emplace_back((uint32_t) indexSrc[i]);
             }
             //texture coord
             if (std::regex_search(attName, std::regex("texcoord", std::regex::icase))) {
@@ -2243,7 +2242,7 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
                 size_t offsetByte = tcAccr.byteOffset + tcBufView.byteOffset;
                 const auto *tcSrc = reinterpret_cast<const glm::vec2 *>(&model.buffers[tcBufView.buffer].data[offsetByte]);
                 for (uint32_t i = 0; i < tcAccr.count; i++)
-                    mTexCoord.emplace_back(tcSrc[i]);
+                    geo.texCoords.emplace_back(tcSrc[i]);
             }
             //joint information
             if(std::regex_search(attName, std::regex("joint", std::regex::icase))){
@@ -2269,11 +2268,10 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
                     tmpWeight.emplace_back(weightSrc[i]);
             }
         }
+        mGeometries.emplace_back(geo);
     }
-    //each vertex index and weight to their joint
+    //apply joint information
     uint32_t totalInfluences = 0;
-    std::vector<uint32_t> jointOffset;
-    std::vector<uint32_t> influenceCount;
     for(uint32_t i = 0; i < tmpWeight.size(); i++){
         __android_log_print(ANDROID_LOG_DEBUG, "aqoole gltf", (std::string("vertex = ") + std::to_string(i)).c_str(), 0);
         //detect influence count
@@ -2286,21 +2284,19 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
                 break;
             }
         }
-        influenceCount.emplace_back(ic);
-        jointOffset.emplace_back(totalInfluences);
+        mGeometries[0].influences.emplace_back(ic);
+        mGeometries[0].jointOffsets.emplace_back(totalInfluences);
         totalInfluences += ic;
         //store vertex index and weight to node
         for(uint32_t k = 0; k < ic; k++){
-            mAnimationIndices.emplace_back(i);
+            mGeometries[0].animationIndices.emplace_back(i);
             uint32_t jointNum = tmpJoint[i][k];
             mJoints[jointNum].influencedVertexList.emplace_back(i);
             mJoints[tmpJoint[i][k]].influencedWeightList.emplace_back(weightSrc[i][k]);
             mJointList.emplace_back(jointNum);
-            mWeightList.emplace_back(weightSrc[i][k]);
+            mGeometries[0].weights.emplace_back(weightSrc[i][k]);
         }
     }
-    mJointOffsetList.emplace_back(jointOffset);
-    mInfluenceCountList.emplace_back(influenceCount);
     int breakpoint = 1000;
 }
 
@@ -2362,47 +2358,51 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
     //buffers for descriptor set
     VkDeviceSize indicesBufferSize = mVertices.size() * sizeof(uint32_t);
     VkDeviceSize jointsBufferSize = mJoints.size() * sizeof(uint32_t);
-    VkDeviceSize weightsBufferSize = mWeightList.size() * sizeof(float);
     //buffer sizes
     std::vector<VkDeviceSize> positionBufferSizes;
     std::vector<VkDeviceSize> influenceCountSizes;
     std::vector<VkDeviceSize> jointOffsetSizes;
-    for(uint32_t i = 0; i < mPositions.size(); i++) {
+    std::vector<VkDeviceSize> weightBufferSizes;
+    std::vector<VkDeviceSize> animationIndexSizes;
+    for(uint32_t i = 0; i < mGeometries.size(); i++) {
+        GeometryBuffers geoBuf;
         //base position buffer
-        positionBufferSizes.emplace_back(mPositions[i].size() * sizeof(glm::vec3));
-        std::unique_ptr<AEBufferUtilOnGPU> positionBuffer = std::make_unique<AEBufferUtilOnGPU>(device,
-                                                                                                positionBufferSizes[i],
-                                                                                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        positionBuffer->CreateBuffer();
-        positionBuffer->CopyData((void *) mPositions[0].data(), 0, positionBufferSizes[i], queue,
+        positionBufferSizes.emplace_back(mGeometries[i].positions.size() * sizeof(glm::vec3));
+        geoBuf.positionBuffer = std::make_unique<AEBufferUtilOnGPU>(device, positionBufferSizes[i],
+                                                                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        geoBuf.positionBuffer->CreateBuffer();
+        geoBuf.positionBuffer->CopyData((void*)mGeometries[i].positions.data(), 0, positionBufferSizes[i], queue,
                                  commandPool);
-        mBasePositionBuffers.emplace_back(std::move(positionBuffer));
         //influence count buffer
         VkDeviceSize influenceCountListBufferSize =
-                mInfluenceCountList[i].size() * sizeof(uint32_t);
+                mGeometries[i].influences.size() * sizeof(uint32_t);
         influenceCountSizes.emplace_back(influenceCountListBufferSize);
-        std::unique_ptr<AEBufferUtilOnGPU> influenceCountListBuffer = std::make_unique<AEBufferUtilOnGPU>(
-                device, influenceCountListBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        influenceCountListBuffer->CreateBuffer();
-        influenceCountListBuffer->CopyData((void *) mInfluenceCountList[i].data(), 0,
+        geoBuf.influenceCountBuffer = std::make_unique<AEBufferUtilOnGPU>( device, influenceCountListBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        geoBuf.influenceCountBuffer->CreateBuffer();
+        geoBuf.influenceCountBuffer->CopyData((void *) mGeometries[i].influences.data(), 0,
                                            influenceCountListBufferSize, queue, commandPool);
-        mInfluenceCountBuffers.emplace_back(std::move(influenceCountListBuffer));
         //joint offset buffer
-        VkDeviceSize jointOffsetSize = mJointOffsetList[i].size() * sizeof(uint32_t);
+        VkDeviceSize jointOffsetSize = mGeometries[i].jointOffsets.size() * sizeof(uint32_t);
         jointOffsetSizes.emplace_back(jointOffsetSize);
-        std::unique_ptr<AEBufferUtilOnGPU> jointOffsetBuffer = std::make_unique<AEBufferUtilOnGPU>(
-                device, jointOffsetSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        jointOffsetBuffer->CreateBuffer();
-        jointOffsetBuffer->CopyData((void *) mJointOffsetList[i].data(), 0, jointOffsetSize, queue,
+        geoBuf.jointOffsetBuffer = std::make_unique<AEBufferUtilOnGPU>( device, jointOffsetSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        geoBuf.jointOffsetBuffer->CreateBuffer();
+        geoBuf.jointOffsetBuffer->CopyData((void *) mGeometries[i].jointOffsets.data(), 0, jointOffsetSize, queue,
                                     commandPool);
-        mJointOffsetBuffers.emplace_back(std::move(jointOffsetBuffer));
+        //weight buffer
+        VkDeviceSize weightBufferSize = mGeometries[i].weights.size() * sizeof(float);
+        weightBufferSizes.emplace_back(weightBufferSize);
+        geoBuf.weightBuffer = std::make_unique<AEBufferUtilOnGPU>(device, weightBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        geoBuf.weightBuffer->CreateBuffer();
+        geoBuf.weightBuffer->CopyData((void*)mGeometries[i].weights.data(), 0, weightBufferSize, queue, commandPool);
+        //save at member
+        mGeoBuffers.emplace_back(std::move(geoBuf));
     }
     //animation result positions
     if (buffer == nullptr) {
         std::unique_ptr<AEBufferUtilOnGPU> positionResultBuffer = std::make_unique<AEBufferUtilOnGPU>(
                 device, positionBufferSizes[0], VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         positionResultBuffer->CreateBuffer();
-        positionResultBuffer->CopyData((void *) mPositions[0].data(), 0, positionBufferSizes[0], queue,
+        positionResultBuffer->CopyData((void *) mGeometries[0].positions.data(), 0, positionBufferSizes[0], queue,
                                        commandPool);
         mBuffers.emplace_back(std::move(positionResultBuffer));
     } else {
@@ -2413,13 +2413,8 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
     jointBuffer->CreateBuffer();
     jointBuffer->CopyData((void*)mJoints.data(), 0, jointsBufferSize, queue, commandPool);
     mBuffers.emplace_back(std::move(jointBuffer));
-    //weights
-    std::unique_ptr<AEBufferUtilOnGPU> weightBuffer = std::make_unique<AEBufferUtilOnGPU>(device, weightsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    weightBuffer->CreateBuffer();
-    weightBuffer->CopyData((void*)mWeightList.data(), 0, weightsBufferSize, queue, commandPool);
-    mBuffers.emplace_back(std::move(weightBuffer));
     //animation mats
-    for(uint32_t i = 0; i < mPositions.size(); i++){
+    for(uint32_t i = 0; i < mGeometries.size(); i++){
         mAnimationTransforms.emplace_back(glm::mat4(1.0f));
         mAnimationTransformsNext.emplace_back(glm::mat4(1.0f));
     }
@@ -2436,7 +2431,7 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
     au.animNum = 0;
     au.scale = mScale;
     au.time = 0.0f;
-    au.vertexSize = mInfluenceCountList[0].size();
+    au.vertexSize = mGeometries[0].positions.size();
     uniformBuffer->CopyData((void*)&au, uniformSize);
     mUniformBuffers.emplace_back(std::move(uniformBuffer));
     //debug buffer
@@ -2464,12 +2459,6 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
     matsNextBuffer->CreateBuffer();
     matsNextBuffer->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
     mBuffers.emplace_back(std::move(matsNextBuffer));
-    //index buffer
-    VkDeviceSize indicesListSize = sizeof(uint32_t) * mAnimationIndices.size();
-    std::unique_ptr<AEBufferUtilOnGPU> indicesList = std::make_unique<AEBufferUtilOnGPU>(device, indicesListSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    indicesList->CreateBuffer();
-    indicesList->CopyData((void*)mAnimationIndices.data(), 0, indicesListSize, queue, commandPool);
-    mBuffers.emplace_back(std::move(indicesList));
     //animation key frame time
     if(mAnimationTime.size() == 0)
         mAnimationTime.emplace_back(0.0f);
@@ -2479,9 +2468,9 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
     keyFrameBuffer->CopyData((void*)mAnimationTime.data(), 0, keyFrameSize, queue, commandPool);
     mBuffers.emplace_back(std::move(keyFrameBuffer));
     //prepare descriptor set
-    for(uint32_t i = 0; i < mPositions.size(); i++) {
+    for(uint32_t i = 0; i < mGeometries.size(); i++) {
         std::unique_ptr<AEDescriptorSet> ds = std::make_unique<AEDescriptorSet>(device, &cl, descriptorPool);
-        ds->BindDescriptorBuffer(0, mBasePositionBuffers[i]->GetBuffer(), positionBufferSizes[i],
+        ds->BindDescriptorBuffer(0, mGeoBuffers[i].positionBuffer->GetBuffer(), positionBufferSizes[i],
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         if (buffer == nullptr) {
             ds->BindDescriptorBuffer(1, mBuffers[0]->GetBuffer(), positionBufferSizes[0],
@@ -2491,30 +2480,29 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
                                      sizeof(Vertex3DObj) * mVertices.size(),
                                      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         }
-        ds->BindDescriptorBuffer(2, mInfluenceCountBuffers[i]->GetBuffer(), influenceCountSizes[i],
+        ds->BindDescriptorBuffer(2, mGeoBuffers[i].influenceCountBuffer->GetBuffer(), influenceCountSizes[i],
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         ds->BindDescriptorBuffer(3, mBuffers[1]->GetBuffer(), jointsBufferSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(4, mBuffers[2]->GetBuffer(), weightsBufferSize,
+        ds->BindDescriptorBuffer(4, mGeoBuffers[i].weightBuffer->GetBuffer(), weightBufferSizes[i],
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(5, mBuffers[3]->GetBuffer(), matBufferSize,
+        ds->BindDescriptorBuffer(5, mBuffers[2]->GetBuffer(), matBufferSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         ds->BindDescriptorBuffer(6, mUniformBuffers[0]->GetBuffer(), uniformSize,
                                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        ds->BindDescriptorBuffer(7, mBuffers[4]->GetBuffer(), debugSize,
+        ds->BindDescriptorBuffer(7, mBuffers[3]->GetBuffer(), debugSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(8, mBuffers[5]->GetBuffer(), debugVSize,
+        ds->BindDescriptorBuffer(8, mBuffers[4]->GetBuffer(), debugVSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(9, mBuffers[6]->GetBuffer(), matBufferSize,
+        ds->BindDescriptorBuffer(9, mBuffers[5]->GetBuffer(), matBufferSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(10, mJointOffsetBuffers[i]->GetBuffer(), jointOffsetSizes[i],
+        ds->BindDescriptorBuffer(10, mGeoBuffers[i].jointOffsetBuffer->GetBuffer(), jointOffsetSizes[i],
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(11, mBuffers[7]->GetBuffer(), indicesListSize,
-                                 VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(12, mBuffers[8]->GetBuffer(), keyFrameSize,
+        ds->BindDescriptorBuffer(11, mBuffers[6]->GetBuffer(), keyFrameSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         mDSs.emplace_back(std::move(ds));
     }
+    int breakpoint = 10000;
 }
 
 /*
@@ -2534,22 +2522,23 @@ void AEDrawObjectBaseGltf::AnimationDispatch(AELogicalDevice* device, AECommandB
 //    AnimationDispatchJoint(mRoot.get(), glm::transpose(mBindShapeMatrices[0]), glm::mat4(1.0f), (animationNum + 1) % 5, mAnimationTransformsNext);
     //update buffer
     VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
-    mBuffers[3]->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
-    mBuffers[6]->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
+    mBuffers[2]->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
+    mBuffers[5]->CopyData((void*)mAnimationTransformsNext.data(), 0, matBufferSize, queue, commandPool);
     //uniform buffer
     AnimationUniforms au{};
     au.time = (float)time;
     au.scale = mScale;
     au.animNum = animationNum;
     for(uint32_t i = 0; i < 1; i++) {
-        au.vertexSize = mPositions[i].size();
+        au.vertexSize = mGeometries[i].positions.size();
         mUniformBuffers[0]->CopyData((void*)&au, sizeof(AnimationUniforms));
         AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE,
                                       mComputePipeline->GetPipelineLayout(),
                                       1, mDSs[i]->GetDescriptorSet());
         //dispatch
         //each work groups
-        vkCmdDispatch(*command->GetCommandBuffer(), 9, 1, 1);
+        uint32_t groups = (mGeometries[0].positions.size() / 1024) + 1;
+        vkCmdDispatch(*command->GetCommandBuffer(), groups, 1, 1);
     }
     vkCmdSetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     //each local thread
