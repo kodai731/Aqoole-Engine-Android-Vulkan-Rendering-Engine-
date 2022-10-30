@@ -2118,12 +2118,85 @@ AEDrawObjectBaseGltf::AEDrawObjectBaseGltf(const char* filePath, android_app* ap
 }
 
 /*
+ * read buffer from accessor id
+ */
+void AEDrawObjectBaseGltf::ReadBuffer(const tinygltf::Model& model, uint32_t accId, size_t componentSize, void* dstBuf)
+{
+    const auto& accs = model.accessors[accId];
+    const auto& bufview = model.bufferViews[accs.bufferView];
+    const auto& buf = model.buffers[bufview.buffer];
+    size_t byteoffset = accs.byteOffset + bufview.byteOffset;
+    memcpy(dstBuf, &buf.data[byteoffset], accs.count * componentSize);
+}
+
+/*
+ * translation to mat4
+ */
+glm::mat4 AEDrawObjectBaseGltf::t2m(const glm::vec3& translate)
+{
+    glm::mat4 a(1.0f);
+    a[3][0] = translate.x;
+    a[3][1] = translate.y;
+    a[3][2] = translate.z;
+    return a;
+}
+
+/*
+ * scale to mat4
+ */
+glm::mat4 AEDrawObjectBaseGltf::s2m(const glm::vec3& scale)
+{
+    glm::mat4 a(1.0f);
+    a[0][0] = scale.x;
+    a[1][1] = scale.y;
+    a[2][2] = scale.z;
+    return a;
+}
+
+/*
+ * rotate to mat4
+ */
+glm::mat4 AEDrawObjectBaseGltf::r2m(const glm::vec4& rotate)
+{
+    float qxx = rotate.x * rotate.x;
+    float qxy = rotate.x * rotate.y;
+    float qxz = rotate.x * rotate.z;
+    float qxw = rotate.x * rotate.w;
+    float qyy = rotate.y * rotate.y;
+    float qyz = rotate.y * rotate.z;
+    float qyw = rotate.y * rotate.w;
+    float qzz = rotate.z * rotate.z;
+    float qzw = rotate.z * rotate.w;
+    glm::mat4 a(1.0f);
+    a[0][0] = 1.0f - 2.0f * qyy - 2.0f * qzz;
+    a[0][1] = 2.0f * (qxy + qzw);
+    a[0][2] = 2.0f * (qxz - qyw);
+    a[1][0] = 2.0f * (qxy - qzw);
+    a[1][1] = 1.0f - 2.0f * (qxx - qzz);
+    a[1][2] = 2.0f * (qyz + qxw);
+    a[2][0] = 2.0f * (qxz + qyw);
+    a[2][1] = 2.0f * (qyz - qxw);
+    a[2][2] = 1.0f - 2.0f * (qxx - qyy);
+    return a;
+}
+
+
+
+/*
  * read node
  */
 void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
 {
     using namespace tinygltf;
     std::vector<Joint> tmpJoint;
+    std::vector<glm::mat4> tmpIbms;
+    std::vector<std::vector<glm::mat4>> tmpTranslates;
+    std::vector<std::vector<glm::mat4>> tmpScales;
+    std::vector<std::vector<glm::mat4>> tmpRotations;
+    std::vector<std::vector<float>> tmpInputsT;
+    std::vector<std::vector<float>> tmpInputsS;
+    std::vector<std::vector<float>> tmpInputsR;
+    std::vector<float> maxFrames;
     //node
     uint32_t index = 0;
     for(auto& node : model.nodes){
@@ -2138,9 +2211,98 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
     }
     //joint
     for(auto& skin : model.skins){
+        //joint number
         for(uint32_t i = 0; i < skin.joints.size(); i++)
             tmpJoint[i].jointNo = skin.joints[i];
+        //inverse bind matrix
+        if(skin.inverseBindMatrices > -1){
+            const auto& ibmAcc = model.accessors[skin.inverseBindMatrices];
+            const auto& ibmBufView = model.bufferViews[ibmAcc.bufferView];
+            const auto& ibmBuf = model.buffers[ibmBufView.buffer];
+            for(uint32_t i = 0; i < ibmAcc.count; i++)
+                tmpIbms.emplace_back(glm::mat4(1.0f));
+            size_t byteOffset = ibmAcc.byteOffset + ibmBufView.byteOffset;
+            memcpy(tmpIbms.data(), &ibmBuf.data[byteOffset], ibmAcc.count * sizeof(glm::mat4));
+            for(uint32_t i = 0; i < tmpJoint.size(); i++)
+                tmpJoint[i].ibm = tmpIbms[i];
+        }
     }
+    //read animation
+    uint32_t jointSize = tmpJoint.size();
+    tmpTranslates.resize(jointSize);
+    tmpScales.resize(jointSize);
+    tmpRotations.resize(jointSize);
+    tmpInputsT.resize(jointSize);
+    tmpInputsS.resize(jointSize);
+    tmpInputsR.resize(jointSize);
+    for(auto& animation : model.animations){
+        for(auto& channel : animation.channels){
+            int targetNode = channel.target_node;
+            std::string path = channel.target_path;
+            int samplerId = channel.sampler;
+            const auto& sampler = animation.samplers[samplerId];
+            uint32_t inputId = sampler.input;
+            std::vector<float> keyFrames(model.accessors[inputId].count);
+            if(maxFrames.size() < keyFrames.size())
+                maxFrames = keyFrames;
+            ReadBuffer(model, inputId, sizeof(float), keyFrames.data());
+            uint32_t outputId = sampler.output;
+            std::vector<glm::mat4> outputMats(model.accessors[outputId].count);
+            if(path == std::string("translation") || path == std::string("scale")){
+                std::vector<glm::vec3> outputs(model.accessors[outputId].count);
+                ReadBuffer(model, outputId, sizeof(glm::vec3), outputs.data());
+                if(path == std::string("translation")){
+                    for(uint32_t i = 0; i < outputs.size(); i++)
+                        outputMats[i] = t2m(outputs[i]);
+                    tmpTranslates[targetNode] = outputMats;
+                    tmpInputsT[targetNode] = keyFrames;
+                } else if(path == std::string("scale")){
+                    for(uint32_t i = 0; i < outputs.size(); i++)
+                        outputMats[i] = s2m(outputs[i]);
+                    tmpScales[targetNode] = outputMats;
+                    tmpInputsS[targetNode] = keyFrames;
+                }
+            } else if(path == std::string("rotation")) {
+                std::vector<glm::vec4> outputs(model.accessors[outputId].count);
+                ReadBuffer(model, outputId, sizeof(glm::vec4), outputs.data());
+                for(uint32_t i = 0; i < outputs.size(); i++)
+                    outputMats[i] = r2m(outputs[i]);
+                tmpRotations[targetNode] = outputMats;
+                tmpInputsR[targetNode] = keyFrames;
+            } else {
+            }
+        }
+    }
+    //make TRS matrix
+    uint32_t maxKeyframeCount = maxFrames.size();
+    for(uint32_t i = 0; i < tmpJoint.size(); i++){
+        glm::mat4 t;
+        glm::mat4 r;
+        glm::mat4 s;
+        for(uint32_t j = 0; j < maxKeyframeCount; j++){
+            float keyFrame = maxFrames[j];
+            uint32_t index = 0;
+            //translation
+            if(hasKeyFrames(keyFrame, tmpInputsT[i], index))
+                t = tmpTranslates[i][index];
+            else
+                t = glm::mat4(1.0f);
+            //scale
+            if(hasKeyFrames(keyFrame, tmpInputsS[i], index))
+                s = tmpScales[i][index];
+            else
+                s = glm::mat4(1.0f);
+            //rotate
+            if(hasKeyFrames(keyFrame, tmpInputsR[i], index))
+                r = tmpRotations[i][index];
+            else
+                r = glm::mat4(1.0f);
+            //make TRS matrix and store to joint
+            tmpJoint[i].keyFrames.emplace_back(keyFrame);
+            tmpJoint[i].animationTransform.emplace_back(t * r * s);
+        }
+    }
+    int breakpoint = 99999;
     //store joint in order
     for(uint32_t i = 0; i < tmpJoint.size(); i++) {
         for (uint32_t j = 0; j < tmpJoint.size(); j++) {
@@ -2149,6 +2311,21 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
         }
     }
 }
+
+/*
+ * has keyframes in input
+ */
+bool AEDrawObjectBaseGltf::hasKeyFrames(float keyframe, std::vector<float>const& keyFrames, uint32_t &index)
+{
+    for(uint32_t i = 0; i < keyFrames.size(); i++){
+        if(keyFrames[i] == keyframe){
+            index = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 
 /*
  * read texture
@@ -2344,15 +2521,6 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
     cl.AddDescriptorSetLayoutBinding(11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                      VK_SHADER_STAGE_COMPUTE_BIT, 1,
                                      nullptr);
-    cl.AddDescriptorSetLayoutBinding(12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                     VK_SHADER_STAGE_COMPUTE_BIT, 1,
-                                     nullptr);
-    cl.AddDescriptorSetLayoutBinding(13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                     VK_SHADER_STAGE_COMPUTE_BIT, 1,
-                                     nullptr);
-    cl.AddDescriptorSetLayoutBinding(14, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                     VK_SHADER_STAGE_COMPUTE_BIT, 1,
-                                     nullptr);
     cl.CreateDescriptorSetLayout();
     mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
     //buffers for descriptor set
@@ -2503,6 +2671,14 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
         mDSs.emplace_back(std::move(ds));
     }
     int breakpoint = 10000;
+}
+
+/*
+ * make animation
+ */
+void AEDrawObjectBaseGltf::MakeAnimation()
+{
+
 }
 
 /*

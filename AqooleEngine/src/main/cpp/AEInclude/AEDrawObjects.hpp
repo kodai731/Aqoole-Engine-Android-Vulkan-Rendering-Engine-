@@ -374,6 +374,9 @@ protected:
         int jointNo;
         std::vector<int> influencedVertexList;
         std::vector<float> influencedWeightList;
+        glm::mat4 ibm;
+        std::vector<float> keyFrames;
+        std::vector<glm::mat4> animationTransform;
     };
     struct Geometry{
         std::vector<glm::vec3> positions;
@@ -410,6 +413,12 @@ protected:
     void ReadTexture(const tinygltf::Model& model);
     void ReadNode(const tinygltf::Model& model);
     void MakeVertices();
+    void ReadBuffer(const tinygltf::Model& model, uint32_t accId, size_t componentSize, void* dstBuf);
+    glm::mat4 t2m(const glm::vec3& translate);
+    glm::mat4 s2m(const glm::vec3& scale);
+    glm::mat4 r2m(const glm::vec4& rotate);
+    void MakeAnimation();
+    bool hasKeyFrames(float keyframe, std::vector<float>const& keyFrames, uint32_t &index);
 public:
     AEDrawObjectBaseGltf(const char* filePath, android_app* app, float scale = 1.0f);
     uint32_t GetTextureWidth(uint32_t index){return mTextures[index].width;};
