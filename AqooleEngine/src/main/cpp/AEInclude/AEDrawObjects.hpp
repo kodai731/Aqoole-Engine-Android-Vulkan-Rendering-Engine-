@@ -409,6 +409,7 @@ protected:
     std::vector<std::unique_ptr<AEDescriptorSet>> mDSs;
     std::vector<Geometry> mGeometries;
     std::vector<GeometryBuffers> mGeoBuffers;
+    uint32_t mRoot;
     void ReadMesh(const tinygltf::Model& model);
     void ReadTexture(const tinygltf::Model& model);
     void ReadNode(const tinygltf::Model& model);
@@ -419,6 +420,8 @@ protected:
     glm::mat4 r2m(const glm::vec4& rotate);
     void MakeAnimation();
     bool hasKeyFrames(float keyframe, std::vector<float>const& keyFrames, uint32_t &index);
+    void PrepareAnimationMatrices(AEDrawObjectBaseGltf::Joint& joint, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t keyframe,
+                                  std::vector<glm::mat4> &targetTransform);
 public:
     AEDrawObjectBaseGltf(const char* filePath, android_app* app, float scale = 1.0f);
     uint32_t GetTextureWidth(uint32_t index){return mTextures[index].width;};
@@ -431,6 +434,7 @@ public:
     std::vector<uint32_t>& GetIndexAddress(uint32_t index){return mGeometries[index].indices;}
     VkDeviceSize GetIndexBufferSize(uint32_t index){return mGeometries[index].indices.size() * sizeof(uint32_t);};
     uint32_t GetVertexBufferSize();
+    std::vector<float>& GetKeyFrames(){return mAnimationTime;}
     void AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
                           AEBufferBase* buffer[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
     void AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,

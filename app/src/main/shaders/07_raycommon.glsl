@@ -33,6 +33,7 @@ struct AnimationUniforms
   float time;
   float scale;
   uint vertexSize;
+  uint keyFramesSize;
 };
 
 float nAir = 1.000;

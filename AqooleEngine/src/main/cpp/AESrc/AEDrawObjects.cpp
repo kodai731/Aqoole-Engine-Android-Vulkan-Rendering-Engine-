@@ -2243,9 +2243,9 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
             const auto& sampler = animation.samplers[samplerId];
             uint32_t inputId = sampler.input;
             std::vector<float> keyFrames(model.accessors[inputId].count);
+            ReadBuffer(model, inputId, sizeof(float), keyFrames.data());
             if(maxFrames.size() < keyFrames.size())
                 maxFrames = keyFrames;
-            ReadBuffer(model, inputId, sizeof(float), keyFrames.data());
             uint32_t outputId = sampler.output;
             std::vector<glm::mat4> outputMats(model.accessors[outputId].count);
             if(path == std::string("translation") || path == std::string("scale")){
@@ -2275,6 +2275,7 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
     }
     //make TRS matrix
     uint32_t maxKeyframeCount = maxFrames.size();
+    mAnimationTime = maxFrames;
     for(uint32_t i = 0; i < tmpJoint.size(); i++){
         glm::mat4 t;
         glm::mat4 r;
@@ -2302,14 +2303,18 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
             tmpJoint[i].animationTransform.emplace_back(t * r * s);
         }
     }
-    int breakpoint = 99999;
+    //read root node
+    mRoot = model.scenes[0].nodes[0];
     //store joint in order
-    for(uint32_t i = 0; i < tmpJoint.size(); i++) {
-        for (uint32_t j = 0; j < tmpJoint.size(); j++) {
-            if (tmpJoint[j].jointNo == i)
-                mJoints.emplace_back(tmpJoint[j]);
-        }
-    }
+//    for(uint32_t i = 0; i < tmpJoint.size(); i++) {
+//        for (uint32_t j = 0; j < tmpJoint.size(); j++) {
+//            if (tmpJoint[j].jointNo == i)
+//                mJoints.emplace_back(tmpJoint[j]);
+//        }
+//    }
+    //store in order
+    for(uint32_t i = 0; i < tmpJoint.size(); i++)
+        mJoints.emplace_back(tmpJoint[i]);
 }
 
 /*
@@ -2525,7 +2530,7 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
     mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
     //buffers for descriptor set
     VkDeviceSize indicesBufferSize = mVertices.size() * sizeof(uint32_t);
-    VkDeviceSize jointsBufferSize = mJoints.size() * sizeof(uint32_t);
+    VkDeviceSize jointsBufferSize = mJointList.size() * sizeof(uint32_t);
     //buffer sizes
     std::vector<VkDeviceSize> positionBufferSizes;
     std::vector<VkDeviceSize> influenceCountSizes;
@@ -2579,10 +2584,10 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
     //joints
     std::unique_ptr<AEBufferUtilOnGPU> jointBuffer = std::make_unique<AEBufferUtilOnGPU>(device, jointsBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     jointBuffer->CreateBuffer();
-    jointBuffer->CopyData((void*)mJoints.data(), 0, jointsBufferSize, queue, commandPool);
+    jointBuffer->CopyData((void*)mJointList.data(), 0, jointsBufferSize, queue, commandPool);
     mBuffers.emplace_back(std::move(jointBuffer));
     //animation mats
-    for(uint32_t i = 0; i < mGeometries.size(); i++){
+    for(uint32_t i = 0; i < mJoints[0].animationTransform.size(); i++){
         mAnimationTransforms.emplace_back(glm::mat4(1.0f));
         mAnimationTransformsNext.emplace_back(glm::mat4(1.0f));
     }
@@ -2674,6 +2679,27 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
 }
 
 /*
+ * prepare animaton matrix
+ */
+void AEDrawObjectBaseGltf::PrepareAnimationMatrices(AEDrawObjectBaseGltf::Joint& joint, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t keyframe,
+                                                     std::vector<glm::mat4> &targetTransform)
+{
+    //create joint and weight buffer
+    if(joint.animationTransform.size() > 0) {
+        //compute matrices and put uniform buffer
+        parentAnimationMatrix = parentAnimationMatrix * joint.animationTransform[keyframe];
+        parentBindPoseMatrix = joint.ibm * parentBindPoseMatrix;
+        glm::mat4 finalTransform = parentAnimationMatrix * parentBindPoseMatrix;
+        targetTransform[joint.jointNo] = finalTransform;
+    }
+    //continue to child
+    if(joint.children.size() > 0) {
+        for (auto &child: joint.children)
+            PrepareAnimationMatrices(mJoints[child], parentBindPoseMatrix, parentAnimationMatrix, keyframe, targetTransform);
+    }
+}
+
+/*
  * make animation
  */
 void AEDrawObjectBaseGltf::MakeAnimation()
@@ -2694,8 +2720,8 @@ void AEDrawObjectBaseGltf::AnimationDispatch(AELogicalDevice* device, AECommandB
     vkCmdResetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
     AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
     //update animation transforms
-//    AnimationDispatchJoint(mRoot.get(), glm::transpose(mBindShapeMatrices[0]), glm::mat4(1.0f), animationNum, mAnimationTransforms);
-//    AnimationDispatchJoint(mRoot.get(), glm::transpose(mBindShapeMatrices[0]), glm::mat4(1.0f), (animationNum + 1) % 5, mAnimationTransformsNext);
+    PrepareAnimationMatrices(mJoints[mRoot], glm::mat4(1.0f), glm::mat4(1.0f), animationNum, mAnimationTransforms);
+    PrepareAnimationMatrices(mJoints[mRoot], glm::mat4(1.0f), glm::mat4(1.0f), (animationNum + 1) % mAnimationTime.size(), mAnimationTransformsNext);
     //update buffer
     VkDeviceSize matBufferSize = mAnimationTransforms.size() * sizeof(glm::mat4);
     mBuffers[2]->CopyData((void*)mAnimationTransforms.data(), 0, matBufferSize, queue, commandPool);
@@ -2705,6 +2731,7 @@ void AEDrawObjectBaseGltf::AnimationDispatch(AELogicalDevice* device, AECommandB
     au.time = (float)time;
     au.scale = mScale;
     au.animNum = animationNum;
+    au.keyFramesSize = mAnimationTime.size();
     for(uint32_t i = 0; i < 1; i++) {
         au.vertexSize = mGeometries[i].positions.size();
         mUniformBuffers[0]->CopyData((void*)&au, sizeof(AnimationUniforms));

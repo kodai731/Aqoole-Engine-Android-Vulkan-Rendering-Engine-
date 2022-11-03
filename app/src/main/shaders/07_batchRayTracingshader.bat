@@ -1,6 +1,7 @@
 @rem /usr/bin/glslangValidator --target-env spirv1.4 -l/07_raycommon.glsl -V 07_raygen.rgen -o 07_raygenRgen.spv
 set TOOL_DIR=C:\Users\kodai\AppData\Local\Android\Sdk\ndk\25.0.8221429\shader-tools\windows-x86_64
-set DST_DIR=C:\Users\kodai\AndroidStudioProjects\vulkanTutorial\android-vulkan-tutorials_myRepo\Aqoole_project00\app\build\intermediates\assets\debug\mergeDebugAssets\shaders
+@rem set DST_DIR=C:\Users\kodai\AndroidStudioProjects\vulkanTutorial\android-vulkan-tutorials_myRepo\Aqoole_project00\app\build\intermediates\assets\debug\mergeDebugAssets\shaders
+set DST_DIR=C:\Users\kodai\AndroidStudioProjects\vulkanTutorial\android-vulkan-tutorials_myRepo\Aqoole_project00\app\build\intermediates\assets\debug\shaders
 setlocal
 %TOOL_DIR%\glslc --target-spv=spv1.4 -std=460 07_raygen.rgen -o %DST_DIR%\07_raygenRgen.spv
 %TOOL_DIR%\glslc --target-spv=spv1.4 -std=460 07_raymiss.rmiss -o %DST_DIR%\07_rayRmiss.spv

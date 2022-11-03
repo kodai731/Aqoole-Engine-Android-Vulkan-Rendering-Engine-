@@ -42,6 +42,7 @@ void main()
       float interval = keyFrames.kf[1] - keyFrames.kf[0];
       interval = 1.0 / interval;
       v3 += v1 + ((v2 - v1) * ((animationUniforms.au.time - keyFrames.kf[animationUniforms.au.animNum]) * interval));
+      //v3 += v2;
       //v4 += (1.0f / float(influence)) * v0;
       //v4 += (w * v0);
       v4 += w * v0;
@@ -50,7 +51,8 @@ void main()
     }
     debug[0].d[ii] = ii;
     //verticesobjDst[0].vobjDst[ii].pos = animationUniforms.au.scale * v4 * 0.3;
-    verticesobjDst[0].vobjDst[ii].pos = 0.5 * v4;
+    verticesobjDst[0].vobjDst[ii].pos = animationUniforms.au.scale * v3;
+    //verticesobjDst[0].vobjDst[ii].pos = animationUniforms.au.scale * v4;
     //verticesobjDst.vobjDst[0].pos = vec3(-1000.0);
   }
 }

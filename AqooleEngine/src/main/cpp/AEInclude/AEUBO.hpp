@@ -395,6 +395,7 @@ struct AnimationUniforms{
 	float time;
 	float scale;
 	uint32_t vertexSize;
+	uint32_t keyFramesSize;
 };
 
 #endif

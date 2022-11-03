@@ -200,7 +200,7 @@ std::unique_ptr<AEBufferAS> gibModelGltf;
 
 std::string gTargetModelPath = cowboyPath;
 bool isAnimation = true;
-float gScale = 1.0f;
+float gScale = 0.5f;
 bool isCollada = false;
 bool isGltf = true;
 
@@ -231,7 +231,7 @@ void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image, VkImageAspectFlags
                     VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
                     VkPipelineStageFlags srcStages,
                     VkPipelineStageFlags destStages);
-uint32_t SelectKeyframe(double frac);
+uint32_t SelectKeyframe(double frac, std::vector<float>& keyFrames);
 
 // Create vulkan device
 void CreateVulkanDevice(ANativeWindow* platformWindow,
@@ -599,7 +599,7 @@ bool InitVulkan(android_app* app) {
     gWomanTextures.push_back(std::move(texture));
   }
   //gltf model
-  gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(cowboyGltfPath.c_str(), app);
+  gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(cowboyGltfPath.c_str(), app, gScale);
   std::unique_ptr<AETextureImage> gltfTextureImage = std::make_unique<AETextureImage>(gDevice, gPhoenixGltf->GetTextureWidth(0),
                                                                                       gPhoenixGltf->GetTextureHeight(0),
                                                                                       gPhoenixGltf->GetTextureSize(0),
@@ -927,7 +927,7 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   //animation dispatch
   float maxKeyFrame = gWomanCollada->GetMaxKeyFrame();
   float fracpart = std::fmodf((float)passedTime, maxKeyFrame);
-  gAnimationIndex = SelectKeyframe(fracpart);
+  gAnimationIndex = SelectKeyframe(fracpart, gPhoenixGltf->GetKeyFrames());
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("passed time = ") + std::to_string(passedTime)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("frac time = ") + std::to_string(fracpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("key frame = ") + std::to_string(gAnimationIndex)).c_str(), 0);
@@ -1265,12 +1265,12 @@ bool isTouchButton(glm::vec2* touchPos, ImVec2 buttonPos, ImVec2 buttonRegion)
   return false;
 }
 
-uint32_t SelectKeyframe(double frac)
+uint32_t SelectKeyframe(double frac, std::vector<float>& keyFrames)
 {
-  uint32_t keyFrameSize = gWomanCollada->GetKeyFrames().size();
-    for(uint32_t i = 0; i < keyFrameSize - 1; i++){
-        if(frac < gWomanCollada->GetKeyFrames()[i + 1])
-            return i;
-    }
-    return keyFrameSize - 1;
+  uint32_t keyFrameSize = keyFrames.size();
+  for(uint32_t i = 0; i < keyFrameSize - 1; i++){
+      if(frac < keyFrames[i + 1])
+          return i;
+  }
+  return keyFrameSize - 1;
 }
