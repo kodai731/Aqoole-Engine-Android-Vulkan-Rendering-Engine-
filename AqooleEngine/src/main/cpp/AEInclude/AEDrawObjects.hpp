@@ -372,8 +372,6 @@ protected:
         int nodeid;
         std::vector<int> children;
         int jointNo;
-        std::vector<int> influencedVertexList;
-        std::vector<float> influencedWeightList;
         glm::mat4 ibm;
         std::vector<float> keyFrames;
         std::vector<glm::mat4> animationTransform;
@@ -385,7 +383,6 @@ protected:
         std::vector<uint32_t> influences;
         std::vector<uint32_t> jointOffsets;
         std::vector<float> weights;
-        std::vector<uint32_t> animationIndices;
     };
     struct GeometryBuffers{
         std::unique_ptr<AEBufferUtilOnGPU> positionBuffer;
@@ -418,6 +415,8 @@ protected:
     glm::mat4 t2m(const glm::vec3& translate);
     glm::mat4 s2m(const glm::vec3& scale);
     glm::mat4 r2m(const glm::vec4& rotate);
+    uint32_t joint2node(uint32_t jointNum);
+    uint32_t joint2node(uint32_t jointNum, std::vector<Joint> const& joints);
     void MakeAnimation();
     bool hasKeyFrames(float keyframe, std::vector<float>const& keyFrames, uint32_t &index);
     void PrepareAnimationMatrices(AEDrawObjectBaseGltf::Joint& joint, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t keyframe,

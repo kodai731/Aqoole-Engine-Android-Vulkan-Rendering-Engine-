@@ -85,8 +85,9 @@ int32_t handle_input(struct android_app* app, AInputEvent* inputEvent)
         isTouched = true;
         touchPositions[0].x = AMotionEvent_getX(inputEvent, 0);
         touchPositions[0].y = AMotionEvent_getY(inputEvent, 0);
-        touchPositions[1].x = AMotionEvent_getX(inputEvent, 1);
-        touchPositions[1].y = AMotionEvent_getY(inputEvent, 1);
+        //fixme : getHistoricalRawPointerCoords: Invalid pointer index 1 for MotionEvent in Android 13
+        touchPositions[1].x = AMotionEvent_getX(inputEvent, 0);
+        touchPositions[1].y = AMotionEvent_getY(inputEvent, 0);
         break;
       case AINPUT_EVENT_TYPE_FOCUS :
           isFocused = true;

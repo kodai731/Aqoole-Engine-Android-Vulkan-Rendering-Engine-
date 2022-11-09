@@ -2155,9 +2155,12 @@ glm::mat4 AEDrawObjectBaseGltf::s2m(const glm::vec3& scale)
 
 /*
  * rotate to mat4
+ * above :
+ * bottom : https://automaticaddison.com/how-to-convert-a-quaternion-to-a-rotation-matrix/
  */
-glm::mat4 AEDrawObjectBaseGltf::r2m(const glm::vec4& rotate)
+glm::mat4 AEDrawObjectBaseGltf::r2m(const glm::vec4& r)
 {
+    glm::vec4 rotate = glm::normalize(r);
     float qxx = rotate.x * rotate.x;
     float qxy = rotate.x * rotate.y;
     float qxz = rotate.x * rotate.z;
@@ -2168,15 +2171,24 @@ glm::mat4 AEDrawObjectBaseGltf::r2m(const glm::vec4& rotate)
     float qzz = rotate.z * rotate.z;
     float qzw = rotate.z * rotate.w;
     glm::mat4 a(1.0f);
-    a[0][0] = 1.0f - 2.0f * qyy - 2.0f * qzz;
+    a[0][0] = 1.0f - 2.0f * (qyy + qzz);
     a[0][1] = 2.0f * (qxy + qzw);
     a[0][2] = 2.0f * (qxz - qyw);
     a[1][0] = 2.0f * (qxy - qzw);
-    a[1][1] = 1.0f - 2.0f * (qxx - qzz);
+    a[1][1] = 1.0f - 2.0f * (qxx + qzz);
     a[1][2] = 2.0f * (qyz + qxw);
     a[2][0] = 2.0f * (qxz + qyw);
     a[2][1] = 2.0f * (qyz - qxw);
-    a[2][2] = 1.0f - 2.0f * (qxx - qyy);
+    a[2][2] = 1.0f - 2.0f * (qxx + qyy);
+//    a[0][0] = 2.0f * (qxx + qyy) - 1.0f;
+//    a[0][1] = 2.0f * (qyz + qxw);
+//    a[0][2] = 2.0f * (qyw - qxz);
+//    a[1][0] = 2.0f * (qyz - qxw);
+//    a[1][1] = 2.0f * (qxx + qzz) - 1.0f;
+//    a[1][2] = 2.0f * (qzw + qxy);
+//    a[2][0] = 2.0f * (qyw + qxz);
+//    a[2][1] = 2.0f * (qzw - qxy);
+//    a[2][2] = 2.0f * (qxx + qzz) - 1.0f;
     return a;
 }
 
@@ -2197,6 +2209,8 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
     std::vector<std::vector<float>> tmpInputsS;
     std::vector<std::vector<float>> tmpInputsR;
     std::vector<float> maxFrames;
+    //root node
+    mRoot = model.scenes[0].nodes[0];
     //node
     uint32_t index = 0;
     for(auto& node : model.nodes){
@@ -2206,14 +2220,20 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
         j.nodeid = index;
         for(uint32_t i = 0; i < node.children.size(); i++)
             j.children.emplace_back(node.children[i]);
+        j.ibm = glm::mat4(1.0f);
         tmpJoint.emplace_back(j);
         index++;
     }
     //joint
     for(auto& skin : model.skins){
         //joint number
-        for(uint32_t i = 0; i < skin.joints.size(); i++)
-            tmpJoint[i].jointNo = skin.joints[i];
+        for(uint32_t i = 0; i < tmpJoint.size(); i++){
+            for(uint32_t j = 0; j < skin.joints.size(); j++){
+                if(tmpJoint[i].nodeid == skin.joints[j]) {
+                    tmpJoint[i].jointNo = j;
+                }
+            }
+        }
         //inverse bind matrix
         if(skin.inverseBindMatrices > -1){
             const auto& ibmAcc = model.accessors[skin.inverseBindMatrices];
@@ -2223,18 +2243,22 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
                 tmpIbms.emplace_back(glm::mat4(1.0f));
             size_t byteOffset = ibmAcc.byteOffset + ibmBufView.byteOffset;
             memcpy(tmpIbms.data(), &ibmBuf.data[byteOffset], ibmAcc.count * sizeof(glm::mat4));
-            for(uint32_t i = 0; i < tmpJoint.size(); i++)
-                tmpJoint[i].ibm = tmpIbms[i];
+            for(uint32_t i = 0; i < skin.joints.size(); i++)
+                tmpJoint[joint2node(i, tmpJoint)].ibm = tmpIbms[i];
         }
     }
     //read animation
     uint32_t jointSize = tmpJoint.size();
-    tmpTranslates.resize(jointSize);
-    tmpScales.resize(jointSize);
-    tmpRotations.resize(jointSize);
-    tmpInputsT.resize(jointSize);
-    tmpInputsS.resize(jointSize);
-    tmpInputsR.resize(jointSize);
+    std::vector<glm::mat4> vm;
+    std::vector<float> vf;
+    for(uint32_t i = 0; i < jointSize; i++){
+        tmpTranslates.emplace_back(vm);
+        tmpScales.emplace_back(vm);
+        tmpRotations.emplace_back(vm);
+        tmpInputsR.emplace_back(vf);
+        tmpInputsS.emplace_back(vf);
+        tmpInputsT.emplace_back(vf);
+    }
     for(auto& animation : model.animations){
         for(auto& channel : animation.channels){
             int targetNode = channel.target_node;
@@ -2282,20 +2306,29 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
         glm::mat4 s;
         for(uint32_t j = 0; j < maxKeyframeCount; j++){
             float keyFrame = maxFrames[j];
-            uint32_t index = 0;
+            uint32_t keyFrameIndex = 0;
             //translation
-            if(hasKeyFrames(keyFrame, tmpInputsT[i], index))
-                t = tmpTranslates[i][index];
+            if(hasKeyFrames(keyFrame, tmpInputsT[i], keyFrameIndex)) {
+                if (keyFrameIndex >= tmpTranslates[i].size())
+                    throw std::runtime_error("index is greater than output size");
+                t = tmpTranslates[i][keyFrameIndex];
+            }
             else
                 t = glm::mat4(1.0f);
             //scale
-            if(hasKeyFrames(keyFrame, tmpInputsS[i], index))
-                s = tmpScales[i][index];
+            if(hasKeyFrames(keyFrame, tmpInputsS[i], keyFrameIndex)) {
+                if(keyFrameIndex >= tmpScales[i].size())
+                    throw std::runtime_error("index is greater than output size");
+                s = tmpScales[i][keyFrameIndex];
+            }
             else
                 s = glm::mat4(1.0f);
             //rotate
-            if(hasKeyFrames(keyFrame, tmpInputsR[i], index))
-                r = tmpRotations[i][index];
+            if(hasKeyFrames(keyFrame, tmpInputsR[i], keyFrameIndex)) {
+                if(keyFrameIndex >= tmpRotations[i].size())
+                    throw std::runtime_error("index is greater than output size");
+                r = tmpRotations[i][keyFrameIndex];
+            }
             else
                 r = glm::mat4(1.0f);
             //make TRS matrix and store to joint
@@ -2303,9 +2336,7 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
             tmpJoint[i].animationTransform.emplace_back(t * r * s);
         }
     }
-    //read root node
-    mRoot = model.scenes[0].nodes[0];
-    //store joint in order
+//    //store joint in order
 //    for(uint32_t i = 0; i < tmpJoint.size(); i++) {
 //        for (uint32_t j = 0; j < tmpJoint.size(); j++) {
 //            if (tmpJoint[j].jointNo == i)
@@ -2319,15 +2350,21 @@ void AEDrawObjectBaseGltf::ReadNode(const tinygltf::Model& model)
 
 /*
  * has keyframes in input
+ * todo : type uint32_t function
  */
 bool AEDrawObjectBaseGltf::hasKeyFrames(float keyframe, std::vector<float>const& keyFrames, uint32_t &index)
 {
-    for(uint32_t i = 0; i < keyFrames.size(); i++){
-        if(keyFrames[i] == keyframe){
+    if(keyFrames.size() < 1){
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "input size is zero", 0);
+        return false;
+    }
+    for(uint32_t i = 0; i < keyFrames.size() - 1; i++){
+        if(keyframe < keyFrames[i + 1]){
             index = i;
             return true;
         }
     }
+    index = keyFrames.size() - 1;
     return false;
 }
 
@@ -2471,16 +2508,37 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
         totalInfluences += ic;
         //store vertex index and weight to node
         for(uint32_t k = 0; k < ic; k++){
-            mGeometries[0].animationIndices.emplace_back(i);
             uint32_t jointNum = tmpJoint[i][k];
-            mJoints[jointNum].influencedVertexList.emplace_back(i);
-            mJoints[tmpJoint[i][k]].influencedWeightList.emplace_back(weightSrc[i][k]);
-            mJointList.emplace_back(jointNum);
+            uint32_t nodeId = joint2node(jointNum);
+            mJointList.emplace_back(nodeId);
             mGeometries[0].weights.emplace_back(weightSrc[i][k]);
         }
     }
     int breakpoint = 1000;
 }
+
+/*
+ * joint num to node id
+ */
+uint32_t AEDrawObjectBaseGltf::joint2node(uint32_t jointNum)
+{
+    for(uint32_t i = 0; i < mJoints.size(); i++){
+        if(mJoints[i].jointNo == jointNum)
+            return mJoints[i].nodeid;
+    }
+    throw std::runtime_error("failed to convert joint to node");
+    return mJoints.size();
+}
+
+uint32_t AEDrawObjectBaseGltf::joint2node(uint32_t jointNum, std::vector<Joint> const& joints)
+{
+    for(uint32_t i = 0; i < joints.size(); i++){
+        if(joints[i].jointNo == jointNum)
+            return joints[i].nodeid;
+    }
+    return joints.size();
+}
+
 
 /*
  * animation prepare
@@ -2689,13 +2747,13 @@ void AEDrawObjectBaseGltf::PrepareAnimationMatrices(AEDrawObjectBaseGltf::Joint&
         //compute matrices and put uniform buffer
         parentAnimationMatrix = parentAnimationMatrix * joint.animationTransform[keyframe];
         parentBindPoseMatrix = joint.ibm * parentBindPoseMatrix;
-        glm::mat4 finalTransform = parentAnimationMatrix * parentBindPoseMatrix;
-        targetTransform[joint.jointNo] = finalTransform;
+        glm::mat4 finalTransform = parentAnimationMatrix * joint.ibm;
+        targetTransform[joint.nodeid] = finalTransform;
     }
     //continue to child
     if(joint.children.size() > 0) {
-        for (auto &child: joint.children)
-            PrepareAnimationMatrices(mJoints[child], parentBindPoseMatrix, parentAnimationMatrix, keyframe, targetTransform);
+        for(uint32_t i = 0; i < joint.children.size(); i++)
+            PrepareAnimationMatrices(mJoints[joint.children[i]], parentBindPoseMatrix, parentAnimationMatrix, keyframe, targetTransform);
     }
 }
 
@@ -2732,7 +2790,7 @@ void AEDrawObjectBaseGltf::AnimationDispatch(AELogicalDevice* device, AECommandB
     au.scale = mScale;
     au.animNum = animationNum;
     au.keyFramesSize = mAnimationTime.size();
-    for(uint32_t i = 0; i < 1; i++) {
+    for(uint32_t i = 0; i < mGeometries.size(); i++) {
         au.vertexSize = mGeometries[i].positions.size();
         mUniformBuffers[0]->CopyData((void*)&au, sizeof(AnimationUniforms));
         AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE,
