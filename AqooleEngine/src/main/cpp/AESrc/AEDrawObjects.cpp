@@ -2365,7 +2365,7 @@ bool AEDrawObjectBaseGltf::hasKeyFrames(float keyframe, std::vector<float>const&
         }
     }
     index = keyFrames.size() - 1;
-    return false;
+    return true;
 }
 
 

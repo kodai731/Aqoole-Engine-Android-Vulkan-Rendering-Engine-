@@ -41,7 +41,10 @@ void main()
       vec3 v2 = w * (matsNext[0].m[jj] * vec4(v0, 1.0)).xyz;
       float interval = keyFrames.kf[1] - keyFrames.kf[0];
       interval = 1.0 / interval;
-      v3 += v1 + ((v2 - v1) * ((animationUniforms.au.time - keyFrames.kf[animationUniforms.au.animNum]) * interval));
+      if(animationUniforms.au.animNum != animationUniforms.au.keyFramesSize - 1)
+        v3 += v1 + ((v2 - v1) * ((animationUniforms.au.time - keyFrames.kf[animationUniforms.au.animNum]) * interval));
+      else
+        v3 += v1 + ((v2 - v1) * ((1.0 - keyFrames.kf[animationUniforms.au.animNum]) * interval));
       //v3 += v2;
       //v4 += (1.0f / float(influence)) * v0;
       //v4 += (w * v0);
