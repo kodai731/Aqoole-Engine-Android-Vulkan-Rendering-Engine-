@@ -375,6 +375,11 @@ protected:
         glm::mat4 ibm;
         std::vector<float> keyFrames;
         std::vector<glm::mat4> animationTransform;
+        std::vector<std::vector<float>> morphWeights;
+    };
+    struct Morph{
+        std::string name;
+        std::vector<glm::vec3> data3;
     };
     struct Geometry{
         std::vector<glm::vec3> positions;
@@ -383,6 +388,7 @@ protected:
         std::vector<uint32_t> influences;
         std::vector<uint32_t> jointOffsets;
         std::vector<float> weights;
+        std::vector<std::vector<Morph>> morphTargets;
     };
     struct GeometryBuffers{
         std::unique_ptr<AEBufferUtilOnGPU> positionBuffer;
@@ -391,6 +397,8 @@ protected:
         std::unique_ptr<AEBufferUtilOnGPU> influenceCountBuffer;
         std::unique_ptr<AEBufferUtilOnGPU> jointOffsetBuffer;
         std::unique_ptr<AEBufferUtilOnGPU> weightBuffer;
+        std::unique_ptr<AEBufferUtilOnGPU> morphTargetsBuffer;
+        std::unique_ptr<AEBufferUtilOnGPU> morphWeightsBuffer;
     };
     float mScale;
     std::vector<Vertex3DObj> mVertices;
@@ -398,6 +406,7 @@ protected:
     std::vector<Joint> mJoints;
     std::vector<uint32_t> mJointList;
     std::unique_ptr<AEComputePipeline> mComputePipeline;
+    std::unique_ptr<AEComputePipeline> mComputePipelineMorph;
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBuffers;
     std::vector<glm::mat4> mAnimationTransforms;
     std::vector<glm::mat4> mAnimationTransformsNext;
@@ -406,7 +415,9 @@ protected:
     std::vector<std::unique_ptr<AEDescriptorSet>> mDSs;
     std::vector<Geometry> mGeometries;
     std::vector<GeometryBuffers> mGeoBuffers;
+    std::vector<float> mMorphWeight;
     uint32_t mRoot;
+    uint32_t mMorphNode;
     void ReadMesh(const tinygltf::Model& model);
     void ReadTexture(const tinygltf::Model& model);
     void ReadNode(const tinygltf::Model& model);
@@ -417,6 +428,7 @@ protected:
     glm::mat4 r2m(const glm::vec4& rotate);
     uint32_t joint2node(uint32_t jointNum);
     uint32_t joint2node(uint32_t jointNum, std::vector<Joint> const& joints);
+    void InputMorphData(const tinygltf::Model &model, Morph& m, uint32_t accId);
     void MakeAnimation();
     bool hasKeyFrames(float keyframe, std::vector<float>const& keyFrames, uint32_t &index);
     void PrepareAnimationMatrices(AEDrawObjectBaseGltf::Joint& joint, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t keyframe,
@@ -438,6 +450,10 @@ public:
                           AEBufferBase* buffer[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
     void AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
             uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore, double time, AEEvent* event);
+    void AnimationPrepareMorph(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
+                               AEBufferBase* buffer[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
+    void AnimationDispatchMorph(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
+                           uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore, double time, AEEvent* event);
 };
 
 /*

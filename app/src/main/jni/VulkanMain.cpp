@@ -185,6 +185,7 @@ std::string phoenixPath("phoenix-bird/phoenix-bird2.dae");
 std::string phoenixGltfPath("phoenix-bird/phoenix.glb");
 std::string computeShaderPath("shaders/07_animationComp.spv");
 std::string cowboyGltfPath("cowboy/cowboy.glb");
+std::string yardGrassGltfPath("yard_grass/yard_grass.glb");
 std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
 std::unique_ptr<AECommandBuffer> gComputeCommandBuffer;
@@ -200,9 +201,10 @@ std::unique_ptr<AEBufferAS> gibModelGltf;
 
 std::string gTargetModelPath = cowboyPath;
 bool isAnimation = true;
-float gScale = 0.5f;
+float gScale = 0.25f;
 bool isCollada = false;
 bool isGltf = true;
+bool isMorph = true;
 
 double lastTime;
 double startTime;
@@ -421,8 +423,14 @@ bool CreateBuffers(void) {
   }
   if(isGltf){
       std::vector<const char*> gltfShaders = {"shaders/07_animationGltfComp.spv"};
-      gPhoenixGltf->AnimationPrepare(androidAppCtx, gDevice, gltfShaders, registerBuffersGltf,
-                                     gQueue, gCommandPool, gDescriptorPool);
+      if(isMorph){
+          gltfShaders[0] = "shaders/07_animationGltfMorphComp.spv";
+          gPhoenixGltf->AnimationPrepareMorph(androidAppCtx, gDevice, gltfShaders, registerBuffersGltf,
+                                              gQueue, gCommandPool, gDescriptorPool);
+      } else {
+          gPhoenixGltf->AnimationPrepare(androidAppCtx, gDevice, gltfShaders, registerBuffersGltf,
+                                         gQueue, gCommandPool, gDescriptorPool);
+      }
   }
   //offset
 //  gWomanOffset = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -599,7 +607,7 @@ bool InitVulkan(android_app* app) {
     gWomanTextures.push_back(std::move(texture));
   }
   //gltf model
-  gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(cowboyGltfPath.c_str(), app, gScale);
+  gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(yardGrassGltfPath.c_str(), app, gScale);
   std::unique_ptr<AETextureImage> gltfTextureImage = std::make_unique<AETextureImage>(gDevice, gPhoenixGltf->GetTextureWidth(0),
                                                                                       gPhoenixGltf->GetTextureHeight(0),
                                                                                       gPhoenixGltf->GetTextureSize(0),
@@ -935,7 +943,11 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
 //    gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,
 //                                     gAnimationIndex,
 //                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
-    gPhoenixGltf->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool, gAnimationIndex,
+    if(isMorph)
+        gPhoenixGltf->AnimationDispatchMorph(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool, gAnimationIndex,
+                                            nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
+      else
+          gPhoenixGltf->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool, gAnimationIndex,
                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
     //gWomanCollada->Debug(gQueue, gCommandPool);
     //gWomanCollada->DebugWeights(gQueue, gCommandPool);
