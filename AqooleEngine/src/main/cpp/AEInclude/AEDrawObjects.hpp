@@ -446,6 +446,7 @@ public:
     VkDeviceSize GetIndexBufferSize(uint32_t index){return mGeometries[index].indices.size() * sizeof(uint32_t);};
     uint32_t GetVertexBufferSize();
     std::vector<float>& GetKeyFrames(){return mAnimationTime;}
+    float GetMaxKeyframe(){return mAnimationTime[mAnimationTime.size() - 1];}
     void AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
                           AEBufferBase* buffer[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
     void AnimationDispatch(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,

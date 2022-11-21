@@ -2426,7 +2426,7 @@ void AEDrawObjectBaseGltf::MakeVertices()
     for(uint32_t i = 0; i < mGeometries.size(); i++) {
         for (uint32_t j = 0; j < mGeometries[i].positions.size(); j++) {
             v.pos = mGeometries[i].positions[j];
-            v.texcoord = mGeometries[i].texCoords[j];
+            v.texcoord =mGeometries[i].texCoords[j];
             mVertices.emplace_back(v);
         }
     }
@@ -2896,8 +2896,8 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
     //buffer sizes
     std::vector<VkDeviceSize> positionBufferSizes;
     std::vector<VkDeviceSize> animationIndexSizes;
-    VkDeviceSize allTargetsSize;
-    VkDeviceSize allWeightsSize;
+    VkDeviceSize targetSize;
+    VkDeviceSize weightSize;
     for(uint32_t i = 0; i < mGeometries.size(); i++) {
         GeometryBuffers geoBuf;
         //base position buffer
@@ -2913,28 +2913,26 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
                                             commandPool);
         }
         //morph target
-        VkDeviceSize oneTargetSize = mGeometries[i].morphTargets[0][0].data3.size() * sizeof(glm::vec3);
-        allTargetsSize = mGeometries[i].morphTargets.size() * oneTargetSize;
-        for(uint32_t j = 0; j < mGeometries[i].morphTargets.size(); j++){
-            allTargetsSize += oneTargetSize * mGeometries[i].morphTargets[j].size();
-        }
-        geoBuf.morphTargetsBuffer = std::make_unique<AEBufferUtilOnGPU>(device, allTargetsSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        VkDeviceSize onetargetSize = mGeometries[i].morphTargets[0][1].data3.size() * sizeof(glm::vec3);
+        targetSize = mGeometries[i].morphTargets.size() * onetargetSize;
+        geoBuf.morphTargetsBuffer = std::make_unique<AEBufferUtilOnGPU>(device, targetSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         geoBuf.morphTargetsBuffer->CreateBuffer();
         for(uint32_t j = 0; j < mGeometries[i].morphTargets.size(); j++){
-            for(uint32_t k = 0; k < mGeometries[i].morphTargets[j].size(); k++)
-                geoBuf.morphTargetsBuffer->CopyData((void*)mGeometries[i].morphTargets[j][k].data3.data(), oneTargetSize * (j * mGeometries[i].morphTargets[j].size() + k),
-                                                oneTargetSize, queue, commandPool);
+            //choose position index
+            uint32_t positionIndex = 0;
+            for(uint32_t k = 0; k < mGeometries[i].morphTargets[j].size(); k++){
+                if(mGeometries[i].morphTargets[j][k].name == std::string("POSITION")) {
+                    positionIndex = k;
+                    break;
+                }
+            }
+            geoBuf.morphTargetsBuffer->CopyData((void*)mGeometries[0].morphTargets[j][positionIndex].data3.data(),
+                                                onetargetSize * j, onetargetSize, queue, commandPool);
         }
         //morph weight
-        VkDeviceSize oneWeightSize = mJoints[mMorphNode].morphWeights[0].size() * sizeof(float);
-        allWeightsSize = mJoints[mMorphNode].morphWeights.size() * oneWeightSize;
-        geoBuf.morphWeightsBuffer = std::make_unique<AEBufferUtilOnGPU>(device, allWeightsSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        weightSize = mJoints[mMorphNode].morphWeights[0].size() * sizeof(float);
+        geoBuf.morphWeightsBuffer = std::make_unique<AEBufferUtilOnGPU>(device, weightSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         geoBuf.morphWeightsBuffer->CreateBuffer();
-        for(uint32_t j = 0; j < mJoints[mMorphNode].morphWeights.size(); j++){
-            geoBuf.morphWeightsBuffer->CopyData((void*)mJoints[mMorphNode].morphWeights[j].data(), oneWeightSize * j,
-                                                mJoints[mMorphNode].morphWeights[j].size() * sizeof(float), queue, commandPool);
-        }
-        //
         //save at member
         mGeoBuffers.emplace_back(std::move(geoBuf));
     }
@@ -2958,6 +2956,8 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
     au.scale = mScale;
     au.time = 0.0f;
     au.vertexSize = mGeometries[0].positions.size();
+    au.morphTargetSize = mGeometries[0].morphTargets.size();
+    au.morphTargetPositionSize = mGeometries[0].morphTargets[0].size();
     uniformBuffer->CopyData((void*)&au, uniformSize);
     mUniformBuffers.emplace_back(std::move(uniformBuffer));
     //debug buffer
@@ -3001,9 +3001,9 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
                                      sizeof(Vertex3DObj) * mVertices.size(),
                                      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         }
-        ds->BindDescriptorBuffer(2, mGeoBuffers[i].morphTargetsBuffer->GetBuffer(), allTargetsSize,
+        ds->BindDescriptorBuffer(2, mGeoBuffers[i].morphTargetsBuffer->GetBuffer(), targetSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(3, mGeoBuffers[i].morphWeightsBuffer->GetBuffer(), allWeightsSize,
+        ds->BindDescriptorBuffer(3, mGeoBuffers[i].morphWeightsBuffer->GetBuffer(), weightSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         ds->BindDescriptorBuffer(4, mUniformBuffers[0]->GetBuffer(), uniformSize,
                                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
@@ -3111,6 +3111,9 @@ void AEDrawObjectBaseGltf::AnimationDispatchMorph(AELogicalDevice* device, AECom
     AECommand::BeginCommand(command);
     //prepare event
     vkCmdResetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    //copy data
+    mGeoBuffers[0].morphWeightsBuffer->CopyData((void*)mJoints[mMorphNode].morphWeights[animationNum].data(), 0,
+                                                mJoints[mMorphNode].morphWeights[animationNum].size() * sizeof(float), queue, commandPool);
     AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipelineMorph.get());
     //uniform buffer
     AnimationUniforms au{};
@@ -3118,6 +3121,8 @@ void AEDrawObjectBaseGltf::AnimationDispatchMorph(AELogicalDevice* device, AECom
     au.scale = mScale;
     au.animNum = animationNum;
     au.keyFramesSize = mAnimationTime.size();
+    au.morphTargetSize = mGeometries[0].morphTargets.size();
+    au.morphTargetPositionSize = mGeometries[0].morphTargets[0][1].data3.size();
     uint32_t threads = mGeometries[0].positions.size();
     for(uint32_t i = 0; i < mGeometries.size(); i++) {
         au.vertexSize = threads;

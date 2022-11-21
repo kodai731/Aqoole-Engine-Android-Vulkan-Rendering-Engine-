@@ -377,10 +377,11 @@ void main()
     Vertex3DObj v2 = verticesobj[0].vobj[ind.z];
     uint offset = 3 * gl_PrimitiveID;
     for(uint i = 0; i < textureCount.tc; i++){
-        if(offset < geometryIndices[0].gi[i]){
+        //TODO : multi texture in gltf model
+        //if(offset < geometryIndices[0].gi[i]){
             color = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
             break;
-        }
+        //}
     }
   }
   pld = vec4(color, 1.0);

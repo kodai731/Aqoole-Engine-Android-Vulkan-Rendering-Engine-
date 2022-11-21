@@ -198,6 +198,9 @@ std::unique_ptr<AEBufferUniform> gTextureCountBuffer;
 std::unique_ptr<AEDrawObjectBaseGltf> gPhoenixGltf;
 std::unique_ptr<AEBufferAS> gvbModelGltf;
 std::unique_ptr<AEBufferAS> gibModelGltf;
+std::vector<VkImageView> imageViews;
+std::vector<VkSampler> samplers;
+std::unique_ptr<AETextureImage> gltfTextureImage;
 
 std::string gTargetModelPath = cowboyPath;
 bool isAnimation = true;
@@ -247,7 +250,7 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
 
   instance_extensions.push_back("VK_KHR_surface");
   instance_extensions.push_back("VK_KHR_android_surface");
-  instance_extensions.push_back(("VK_EXT_debug_report"));
+  instance_extensions.push_back("VK_EXT_debug_report");
   instance_extensions.push_back("VK_KHR_get_physical_device_properties2");
 
   instance_extension_s.push_back(std::string("VK_KHR_surface"));
@@ -493,9 +496,13 @@ VkResult CreateGraphicsPipeline() {
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
   gDescriptorSetLayout = std::make_unique<AEDescriptorSetLayout>(gDevice);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+  if(isCollada)
+    gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
                                                       gWomanCollada->GetTextureCount(),nullptr);
-  if(gWomanCollada->GetTextureCount() == 0)
+  if(isGltf)
+    gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+                                                        1,nullptr);
+  if(!isGltf && gWomanCollada->GetTextureCount() == 0)
       gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1,
                                                           nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
@@ -608,10 +615,11 @@ bool InitVulkan(android_app* app) {
   }
   //gltf model
   gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(yardGrassGltfPath.c_str(), app, gScale);
-  std::unique_ptr<AETextureImage> gltfTextureImage = std::make_unique<AETextureImage>(gDevice, gPhoenixGltf->GetTextureWidth(0),
-                                                                                      gPhoenixGltf->GetTextureHeight(0),
-                                                                                      gPhoenixGltf->GetTextureSize(0),
-                                                                                      gPhoenixGltf->GetTextureData(0), gCommandPool, gQueue);
+//  gltfTextureImage = std::make_unique<AETextureImage>(gDevice, gPhoenixGltf->GetTextureWidth(2),
+//                                                      gPhoenixGltf->GetTextureHeight(2),
+//                                                      gPhoenixGltf->GetTextureSize(2),
+//                                                      "yard_grass/material_baseColor.png", gCommandPool, gQueue);
+  gltfTextureImage = std::make_unique<AETextureImage>(gDevice, "yard_grass/material_baseColor.png", gCommandPool, gQueue, androidAppCtx);
   modelview.rotate = glm::mat4(1.0f);
   modelview.scale = glm::mat4(1.0f);
   modelview.translate = glm::mat4(1.0f);
@@ -695,6 +703,8 @@ bool InitVulkan(android_app* app) {
   gTextureCountBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(uint32_t));
   gTextureCountBuffer->CreateBuffer();
   uint32_t tc = gWomanCollada->GetTextureCount();
+  if(isGltf)
+    tc = 1;
   gTextureCountBuffer->CopyData((void*)&tc, sizeof(uint32_t));
   //descriptor set
   gDescriptorSet = new AEDescriptorSet(gDevice, gLayouts[0], gDescriptorPool);
@@ -729,15 +739,24 @@ bool InitVulkan(android_app* app) {
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
-  std::vector<VkImageView> imageViews;
-  std::vector<VkSampler> samplers;
-  for(uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++) {
+  if(isCollada) {
+    for (uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++) {
       imageViews.emplace_back(*gWomanTextures[i]->GetImageView());
       samplers.emplace_back(*gWomanTextures[i]->GetSampler());
+    }
+    gWomanTextureSets->BindDescriptorImages(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                            gWomanCollada->GetTextureCount(),
+                                            imageViews,
+                                            samplers);
   }
-  gWomanTextureSets->BindDescriptorImages(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, gWomanCollada->GetTextureCount(),
-                                         imageViews,
-                                         samplers);
+  if(isGltf){
+    imageViews.emplace_back(*gltfTextureImage->GetImageView());
+    samplers.emplace_back(*gltfTextureImage->GetSampler());
+    gWomanTextureSets->BindDescriptorImages(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                            1,
+                                            imageViews,
+                                            samplers);
+  }
   gDescriptorSets.push_back(gWomanTextureSets);
   //create binding table buffer
   raygenSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 0, gQueue, gCommandPool);
@@ -934,6 +953,8 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   RecordImguiCommand(nextIndex, touchPositions, isTouched);
   //animation dispatch
   float maxKeyFrame = gWomanCollada->GetMaxKeyFrame();
+  if(isGltf)
+      maxKeyFrame = gPhoenixGltf->GetMaxKeyframe();
   float fracpart = std::fmodf((float)passedTime, maxKeyFrame);
   gAnimationIndex = SelectKeyframe(fracpart, gPhoenixGltf->GetKeyFrames());
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("passed time = ") + std::to_string(passedTime)).c_str(), 0);

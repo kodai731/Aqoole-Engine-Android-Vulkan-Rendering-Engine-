@@ -396,6 +396,8 @@ struct AnimationUniforms{
 	float scale;
 	uint32_t vertexSize;
 	uint32_t keyFramesSize;
+    uint32_t morphTargetSize;
+    uint32_t morphTargetPositionSize;
 };
 
 #endif

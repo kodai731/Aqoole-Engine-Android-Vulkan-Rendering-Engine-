@@ -34,6 +34,8 @@ struct AnimationUniforms
   float scale;
   uint vertexSize;
   uint keyFramesSize;
+  uint morphTargetSize;
+  uint morphTargetPositionSize;
 };
 
 float nAir = 1.000;
