@@ -25,6 +25,7 @@ struct PayroadBlend
   vec3 color;
   vec3 normal;
   bool hit;
+  bool isMiss;
 };
 
 struct AnimationUniforms
@@ -36,6 +37,10 @@ struct AnimationUniforms
   uint keyFramesSize;
   uint morphTargetSize;
   uint morphTargetPositionSize;
+};
+
+struct GltfMaterial{
+  float alphaCutoff;
 };
 
 float nAir = 1.000;

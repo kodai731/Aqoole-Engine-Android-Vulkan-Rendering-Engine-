@@ -400,4 +400,8 @@ struct AnimationUniforms{
     uint32_t morphTargetPositionSize;
 };
 
+struct GltfMaterial{
+    float alphaCutoff;
+};
+
 #endif

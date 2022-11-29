@@ -2091,7 +2091,7 @@ void AEDrawObjectBaseCollada::CheckJointAndWeight()
 //=====================================================================
 //AE Draw Object GLTF
 //=====================================================================
-AEDrawObjectBaseGltf::AEDrawObjectBaseGltf(const char* filePath, android_app* app, float scale)
+AEDrawObjectBaseGltf::AEDrawObjectBaseGltf(const char* filePath, android_app* app, AELogicalDevice* device, float scale)
 {
     mScale = scale;
     using namespace tinygltf;
@@ -2113,6 +2113,7 @@ AEDrawObjectBaseGltf::AEDrawObjectBaseGltf(const char* filePath, android_app* ap
     ReadNode(model);
     ReadTexture(model);
     ReadMesh(model);
+    ReadMaterial(model, device);
     MakeVertices();
     int breakpoint = 0;
 }
@@ -2461,7 +2462,10 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
                 const auto *src = reinterpret_cast<const glm::vec3 *>(&(model.buffers[posBufView.buffer].data[offsetByte]));
                 size_t vertexSize = posAccr.count;
                 for (uint32_t i = 0; i < vertexSize; i++) {
-                    geo.positions.emplace_back(src[i]);
+                    //y axis reverse
+                    glm::vec3 pos = src[i];
+                    pos.y *= -1.0f;
+                    geo.positions.emplace_back(pos);
                 }
                 //indices
                 const auto &indexAccr = model.accessors[primitive.indices];
@@ -2571,6 +2575,23 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
             }
         }
     }
+    int breakpoint = 1000;
+}
+
+/*
+ * read material
+ */
+void AEDrawObjectBaseGltf::ReadMaterial(const tinygltf::Model& model, AELogicalDevice* device)
+{
+    using namespace tinygltf;
+    GltfMaterial gm = {};
+    for(const auto& material : model.materials){
+        gm.alphaCutoff = (float)material.alphaCutoff;
+    }
+    //copy data to uniform buffer
+    mUniforms.material = std::make_unique<AEBufferUniform>(device, sizeof(GltfMaterial));
+    mUniforms.material->CreateBuffer();
+    mUniforms.material->CopyData((void*)&gm, sizeof(GltfMaterial));
     int breakpoint = 1000;
 }
 
@@ -2755,7 +2776,7 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
     au.time = 0.0f;
     au.vertexSize = mGeometries[0].positions.size();
     uniformBuffer->CopyData((void*)&au, uniformSize);
-    mUniformBuffers.emplace_back(std::move(uniformBuffer));
+    mUniforms.animationUniform = std::move(uniformBuffer);
     //debug buffer
     VkDeviceSize debugSize = mVertices.size() * sizeof(uint32_t);
     std::vector<uint32_t> debugData;
@@ -2810,7 +2831,7 @@ void AEDrawObjectBaseGltf::AnimationPrepare(android_app* app, AELogicalDevice* d
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         ds->BindDescriptorBuffer(5, mBuffers[2]->GetBuffer(), matBufferSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(6, mUniformBuffers[0]->GetBuffer(), uniformSize,
+        ds->BindDescriptorBuffer(6, mUniforms.animationUniform->GetBuffer(), uniformSize,
                                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         ds->BindDescriptorBuffer(7, mBuffers[3]->GetBuffer(), debugSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -2959,7 +2980,7 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
     au.morphTargetSize = mGeometries[0].morphTargets.size();
     au.morphTargetPositionSize = mGeometries[0].morphTargets[0].size();
     uniformBuffer->CopyData((void*)&au, uniformSize);
-    mUniformBuffers.emplace_back(std::move(uniformBuffer));
+    mUniforms.animationUniform = std::move(uniformBuffer);
     //debug buffer
     VkDeviceSize debugSize = mVertices.size() * sizeof(uint32_t);
     std::vector<uint32_t> debugData;
@@ -3005,7 +3026,7 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         ds->BindDescriptorBuffer(3, mGeoBuffers[i].morphWeightsBuffer->GetBuffer(), weightSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        ds->BindDescriptorBuffer(4, mUniformBuffers[0]->GetBuffer(), uniformSize,
+        ds->BindDescriptorBuffer(4, mUniforms.animationUniform->GetBuffer(), uniformSize,
                                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         ds->BindDescriptorBuffer(5, mBuffers[1]->GetBuffer(), debugSize,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -3045,7 +3066,7 @@ void AEDrawObjectBaseGltf::AnimationDispatch(AELogicalDevice* device, AECommandB
     au.keyFramesSize = mAnimationTime.size();
     for(uint32_t i = 0; i < mGeometries.size(); i++) {
         au.vertexSize = mGeometries[i].positions.size();
-        mUniformBuffers[0]->CopyData((void*)&au, sizeof(AnimationUniforms));
+        mUniforms.animationUniform->CopyData((void*)&au, sizeof(AnimationUniforms));
         AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE,
                                       mComputePipeline->GetPipelineLayout(),
                                       1, mDSs[i]->GetDescriptorSet());
@@ -3126,7 +3147,7 @@ void AEDrawObjectBaseGltf::AnimationDispatchMorph(AELogicalDevice* device, AECom
     uint32_t threads = mGeometries[0].positions.size();
     for(uint32_t i = 0; i < mGeometries.size(); i++) {
         au.vertexSize = threads;
-        mUniformBuffers[0]->CopyData((void*)&au, sizeof(AnimationUniforms));
+        mUniforms.animationUniform->CopyData((void*)&au, sizeof(AnimationUniforms));
         AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE,
                                       mComputePipelineMorph->GetPipelineLayout(),
                                       1, mDSs[i]->GetDescriptorSet());

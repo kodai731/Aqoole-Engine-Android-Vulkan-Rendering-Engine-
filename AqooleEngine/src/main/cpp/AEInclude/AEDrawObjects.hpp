@@ -52,6 +52,7 @@ struct Vertex3DTexture;
 struct Vertex3DObj;
 struct Vertex2D;
 struct Vertex3DTEST;
+struct GltfMaterial;
 class AEComputePipeline;
 class AELogicalDevice;
 class AECommandPool;
@@ -400,6 +401,10 @@ protected:
         std::unique_ptr<AEBufferUtilOnGPU> morphTargetsBuffer;
         std::unique_ptr<AEBufferUtilOnGPU> morphWeightsBuffer;
     };
+    struct UniformBuffers{
+        std::unique_ptr<AEBufferUniform> animationUniform;
+        std::unique_ptr<AEBufferUniform> material;
+    };
     float mScale;
     std::vector<Vertex3DObj> mVertices;
     std::vector<GltfTexture> mTextures;
@@ -410,7 +415,7 @@ protected:
     std::vector<std::unique_ptr<AEBufferUtilOnGPU>> mBuffers;
     std::vector<glm::mat4> mAnimationTransforms;
     std::vector<glm::mat4> mAnimationTransformsNext;
-    std::vector<std::unique_ptr<AEBufferUniform>> mUniformBuffers;
+    UniformBuffers mUniforms;
     std::vector<float> mAnimationTime;
     std::vector<std::unique_ptr<AEDescriptorSet>> mDSs;
     std::vector<Geometry> mGeometries;
@@ -421,6 +426,7 @@ protected:
     void ReadMesh(const tinygltf::Model& model);
     void ReadTexture(const tinygltf::Model& model);
     void ReadNode(const tinygltf::Model& model);
+    void ReadMaterial(const tinygltf::Model& model, AELogicalDevice* device);
     void MakeVertices();
     void ReadBuffer(const tinygltf::Model& model, uint32_t accId, size_t componentSize, void* dstBuf);
     glm::mat4 t2m(const glm::vec3& translate);
@@ -434,7 +440,7 @@ protected:
     void PrepareAnimationMatrices(AEDrawObjectBaseGltf::Joint& joint, glm::mat4 parentBindPoseMatrix, glm::mat4 parentAnimationMatrix, uint32_t keyframe,
                                   std::vector<glm::mat4> &targetTransform);
 public:
-    AEDrawObjectBaseGltf(const char* filePath, android_app* app, float scale = 1.0f);
+    AEDrawObjectBaseGltf(const char* filePath, android_app* app, AELogicalDevice* device, float scale = 1.0f);
     uint32_t GetTextureWidth(uint32_t index){return mTextures[index].width;};
     uint32_t GetTextureHeight(uint32_t index){return mTextures[index].height;};
     size_t GetTextureSize(uint32_t index){return mTextures[index].size;};
@@ -446,6 +452,7 @@ public:
     VkDeviceSize GetIndexBufferSize(uint32_t index){return mGeometries[index].indices.size() * sizeof(uint32_t);};
     uint32_t GetVertexBufferSize();
     std::vector<float>& GetKeyFrames(){return mAnimationTime;}
+    AEBufferUniform* GetMaterialUniform(){return mUniforms.material.get();}
     float GetMaxKeyframe(){return mAnimationTime[mAnimationTime.size() - 1];}
     void AnimationPrepare(android_app* app, AELogicalDevice* device, std::vector<const char*>& shaders,
                           AEBufferBase* buffer[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);

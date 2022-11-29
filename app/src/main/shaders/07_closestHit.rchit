@@ -54,14 +54,10 @@ layout(binding = 5, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} ve
 layout(binding = 6, set = 0) buffer Indicesobj {uint iobj[];} indicesobj[];
 layout(binding = 7, set = 0) buffer GeometryIndices {uint gi[];} geometryIndices[];
 layout(binding = 8, set = 0) uniform TextureCount {uint tc;} textureCount;
-
+layout(binding = 9, set = 0) uniform Material {GltfMaterial gm;} Gm;
+layout(binding = 10, set = 0) uniform CPOS {vec3 cp;} Cp;
 
 layout(binding = 0, set = 1) uniform sampler2D texSampler[];
-/*
-layout(binding = 1, set = 1) uniform sampler2D texSampler1;
-layout(binding = 2, set = 1) uniform sampler2D texSampler2;
-layout(binding = 3, set = 1) uniform sampler2D texSampler3;
-*/
 
 layout(push_constant) uniform Constants
 {
@@ -306,6 +302,8 @@ void main()
   uint objId = gl_InstanceCustomIndexEXT;
   const vec3 barycentricCoords = vec3(1.0f - attribs.x - attribs.y, attribs.x, attribs.y);
   vec3 color = vec3(0.0);
+  vec4 color4 = vec4(0.0);
+  float alpha = 1.0;
   if(objId == 0)
   {
     //plane
@@ -361,14 +359,6 @@ void main()
   else
   {
     //woman
-/*
-    ivec3 mapind = ivec3(mapIndices[0].mapi[3 * gl_PrimitiveID + 0],   //
-                      mapIndices[0].mapi[3 * gl_PrimitiveID + 1],   //
-                      mapIndices[0].mapi[3 * gl_PrimitiveID + 2]);  //
-    vec2 v0 = mapVertices[0].mapv[mapind.x];
-    vec2 v1 = mapVertices[0].mapv[mapind.y];
-    vec2 v2 = mapVertices[0].mapv[mapind.z];
-*/
     ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 1],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 2]);  //
@@ -379,10 +369,29 @@ void main()
     for(uint i = 0; i < textureCount.tc; i++){
         //TODO : multi texture in gltf model
         //if(offset < geometryIndices[0].gi[i]){
-            color = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z).xyz;
-            break;
+            color4 = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z);
+            color = color4.xyz;
+            alpha = color4.w;
+            if(alpha < Gm.gm.alphaCutoff){
+                vec3 srcPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
+                vec4 cameraPos = vec4(Cp.cp, 1.0);
+                //vec4 cameraPos = cam.viewInverse * vec4(0.0, 0.0, 0.0, 1.0);
+                vec3 direction = normalize(srcPos - cameraPos.xyz);
+                prdBlend.hit = false;
+                prdBlend.color = pushC.clearColor.xyz;
+                prdBlend.pos = srcPos;
+                prdBlend.isMiss = false;
+                for(uint j = 0; j < 4; j++){
+                    traceRayEXT(topLevelAS, gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, 1, 32, 1, srcPos, 0.01, direction, 100, 2);
+                    color = prdBlend.color;
+                    if(prdBlend.hit == true || prdBlend.isMiss == true){
+                        break;
+                    }
+                    srcPos = prdBlend.pos;
+                }
+            }
         //}
     }
   }
-  pld = vec4(color, 1.0);
+  pld = vec4(color, alpha);
 }

@@ -201,6 +201,7 @@ std::unique_ptr<AEBufferAS> gibModelGltf;
 std::vector<VkImageView> imageViews;
 std::vector<VkSampler> samplers;
 std::unique_ptr<AETextureImage> gltfTextureImage;
+std::unique_ptr<AEBufferUniform> cameraPosBuffer;
 
 std::string gTargetModelPath = cowboyPath;
 bool isAnimation = true;
@@ -466,7 +467,7 @@ bool CreateBuffers(void) {
   std::vector<BLASGeometryInfo> geometryWoman0 = {womanInfo0};
   aslsPlane = std::make_unique<AERayTracingASBottom>(gDevice, geometryPlane, &modelview, gQueue, gCommandPool);
   aslsCubes = std::make_unique<AERayTracingASBottom>(gDevice, geometryCubes, &modelview, gQueue, gCommandPool);
-  aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman0, &phoenixModelView, gQueue, gCommandPool);
+  aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman0, &gltfModelView, gQueue, gCommandPool);
   //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
   std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsCubes.get(), aslsWoman.get()/*, aslsWoman1.get()*/};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
@@ -492,6 +493,8 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(8, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(9, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
@@ -614,7 +617,7 @@ bool InitVulkan(android_app* app) {
     gWomanTextures.push_back(std::move(texture));
   }
   //gltf model
-  gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(yardGrassGltfPath.c_str(), app, gScale);
+  gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(yardGrassGltfPath.c_str(), app, gDevice, gScale);
 //  gltfTextureImage = std::make_unique<AETextureImage>(gDevice, gPhoenixGltf->GetTextureWidth(2),
 //                                                      gPhoenixGltf->GetTextureHeight(2),
 //                                                      gPhoenixGltf->GetTextureSize(2),
@@ -640,7 +643,7 @@ bool InitVulkan(android_app* app) {
   phoenixModelView.view = glm::mat4(1.0f);
   AEMatrix::View(phoenixModelView.view, cameraPos, cameraDirection, cameraUp);
   //GLTF model modelview
-  gltfModelView.rotate = glm::rotate(glm::mat4(1.0f), 0.75f * (float)M_PI, glm::vec3(1.0f, 0.0f, 0.0f));
+  gltfModelView.rotate = glm::mat4(1.0f);
   gltfModelView.scale = glm::mat4(1.0f);
   gltfModelView.translate = glm::mat4(1.0f);
   gltfModelView.proj = glm::mat4(1.0f);
@@ -650,6 +653,11 @@ bool InitVulkan(android_app* app) {
   gltfModelView.view = glm::mat4(1.0f);
   AEMatrix::View(gltfModelView.view, cameraPos, cameraDirection, cameraUp);
   CreateBuffers();  // create vertex
+  //create camera buffer
+  cameraPosBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(glm::vec3));
+  cameraPosBuffer->CreateBuffer();
+  cameraPosBuffer->CopyData((void*)&cameraPos, sizeof(glm::vec3));
+
   // Create graphics pipeline
   CreateGraphicsPipeline();
   //prepare matrix
@@ -736,6 +744,8 @@ bool InitVulkan(android_app* app) {
   }
   gDescriptorSet->BindDescriptorBuffer(7, gGeometryIndices->GetBuffer(), sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(8, gTextureCountBuffer->GetBuffer(), sizeof(uint32_t), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(9, gPhoenixGltf->GetMaterialUniform()->GetBuffer(), sizeof(GltfMaterial), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(10, cameraPosBuffer->GetBuffer(), sizeof(glm::vec3), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
@@ -925,14 +935,16 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     //cameraPos += glm::vec3(0.0f, 0.0f, 0.1f);
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
     phoenixModelView.view = modelview.view;
+    gltfModelView.view = modelview.view;
     glm::mat4 modelViewInverse = glm::inverse(
             modelview.translate * modelview.rotate * modelview.scale);
     modelViewInverse = glm::transpose(modelViewInverse);
     uboRT.viewInverse = glm::inverse(modelview.view);
     uboRT.projInverse = glm::inverse(modelview.proj);
-    uboRT.modelViewProj = modelview.translate * modelview.rotate * modelview.scale;
+    uboRT.modelViewProj = gltfModelView.translate * gltfModelView.rotate * gltfModelView.scale;
     uboRT.normalMatrix = modelViewInverse;
     gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
+    cameraPosBuffer->CopyData((void*)&cameraPos, sizeof(glm::vec3));
     //update AS
     //aslsPlane->Update(&modelview, gQueue, gCommandPool);
     //aslsCubes->Update(&modelview, gQueue, gCommandPool);
@@ -1170,7 +1182,6 @@ void Look(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* to
     cameraDirection = rotate * cameraDirection;
     cameraUp = glm::normalize(glm::cross(cameraDirection, firstCameraBasis));
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-//    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
 
 }
 
@@ -1205,7 +1216,6 @@ void LookByGravity(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm:
     cameraDirection = (rotateX * rotateY * rotateZ) * cameraDirection;
     cameraUp = glm::normalize(glm::cross(cameraDirection, firstCameraBasis));
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-//    gModelViewBuffer->CopyData((void*)&modelview, sizeof(ModelView));
 }
 
 void ResetCamera()
