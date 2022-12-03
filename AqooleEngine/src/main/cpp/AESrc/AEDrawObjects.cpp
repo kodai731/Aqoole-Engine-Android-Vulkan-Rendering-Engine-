@@ -2510,27 +2510,31 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
         }
         //morph target
         for(const auto& target : primitive.targets){
-            Morph m{};
             std::vector<Morph> ms;
             if(target.count("NORMAL") > 0){
+                Morph m{};
                 m.name = "NORMAL";
                 InputMorphData(model, m, target.at(m.name.c_str()));
                 ms.emplace_back(m);
             }
             if(target.count("POSITION") > 0){
+                Morph m{};
                 m.name = "POSITION";
                 InputMorphData(model, m, target.at(m.name.c_str()));
                 ms.emplace_back(m);
             }
             if(target.count("TANGETNT") > 0) {
+                Morph m{};
                 m.name = "TANGETNT";
                 ms.emplace_back(m);
             }
             if(target.count("TEXCOORD_n") > 0){
+                Morph m{};
                 m.name = "TEXCOORD_n";
                 ms.emplace_back(m);
             }
             if(target.count("COLOR_n") > 0){
+                Morph m{};
                 m.name = "COLOR_n";
                 ms.emplace_back(m);
             }
@@ -2906,7 +2910,7 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
     cl.AddDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                      VK_SHADER_STAGE_COMPUTE_BIT, 1,
                                      nullptr);
-    cl.AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+    cl.AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                      VK_SHADER_STAGE_COMPUTE_BIT, 1,
                                      nullptr);
     cl.AddDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -2951,9 +2955,14 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
                                                 onetargetSize * j, onetargetSize, queue, commandPool);
         }
         //morph weight
-        weightSize = mJoints[mMorphNode].morphWeights[0].size() * sizeof(float);
+        VkDeviceSize oneWeightSize = mJoints[mMorphNode].morphWeights[0].size() * sizeof(float);
+        weightSize = mJoints[mMorphNode].morphWeights.size() * oneWeightSize;
         geoBuf.morphWeightsBuffer = std::make_unique<AEBufferUtilOnGPU>(device, weightSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         geoBuf.morphWeightsBuffer->CreateBuffer();
+        for(uint32_t j = 0; j < mJoints[mMorphNode].morphWeights.size(); j++){
+            geoBuf.morphWeightsBuffer->CopyData((void*)mJoints[mMorphNode].morphWeights[j].data(), j * oneWeightSize, oneWeightSize,
+                                                queue, commandPool);
+        }
         //save at member
         mGeoBuffers.emplace_back(std::move(geoBuf));
     }
@@ -2977,7 +2986,7 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
     au.scale = mScale;
     au.time = 0.0f;
     au.vertexSize = mGeometries[0].positions.size();
-    au.morphTargetSize = mGeometries[0].morphTargets.size();
+    au.morphTargetSize = mGeometries[0].morphTargets[0][1].data3.size();
     au.morphTargetPositionSize = mGeometries[0].morphTargets[0].size();
     uniformBuffer->CopyData((void*)&au, uniformSize);
     mUniforms.animationUniform = std::move(uniformBuffer);
@@ -3132,9 +3141,6 @@ void AEDrawObjectBaseGltf::AnimationDispatchMorph(AELogicalDevice* device, AECom
     AECommand::BeginCommand(command);
     //prepare event
     vkCmdResetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    //copy data
-    mGeoBuffers[0].morphWeightsBuffer->CopyData((void*)mJoints[mMorphNode].morphWeights[animationNum].data(), 0,
-                                                mJoints[mMorphNode].morphWeights[animationNum].size() * sizeof(float), queue, commandPool);
     AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipelineMorph.get());
     //uniform buffer
     AnimationUniforms au{};

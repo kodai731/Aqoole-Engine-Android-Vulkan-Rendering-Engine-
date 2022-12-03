@@ -24,15 +24,16 @@ void main()
     vec3 v4 = vec3(0.0);
     vec3 v0 = verticesobj[0].vobj[ii];
     vec3 v3 = v0;
-    vec3 v1 = vec3(0.0);
-    vec3 v2 = vec3(0.0);
     float interval = keyFrames.kf[1] - keyFrames.kf[0];
+    uint weightoffset = animationUniforms.au.animNum * animationUniforms.au.morphTargetSize;
+    uint weightoffsetNext = ((animationUniforms.au.animNum + 1) % animationUniforms.au.animNum )* animationUniforms.au.morphTargetSize;
     interval = 1.0 / interval;
+    interval = (animationUniforms.au.time - keyFrames.kf[animationUniforms.au.animNum]) * interval;
     for(uint j = 0; j < animationUniforms.au.morphTargetSize; j++){
-      v1 = morph.mor[animationUniforms.au.morphTargetPositionSize * j + 2 * ii];
-      v2 = morph.mor[animationUniforms.au.morphTargetPositionSize * j + 2 * ii + 1];
-      v2 = v1 + ((v2 - v1) * ((animationUniforms.au.time - keyFrames.kf[animationUniforms.au.animNum]) * interval));
-      v3 += weight.w[j] * v2;
+      vec3 v1 = morph.mor[animationUniforms.au.morphTargetPositionSize * j + ii];
+      float cw = weight.w[weightoffset + j];
+      float nw = weight.w[weightoffsetNext + j];
+      v3 += (cw + (nw - cw) * interval) * v1;
     }
     //v3 += v1 + ((v2 - v1) * ((animationUniforms.au.time - keyFrames.kf[animationUniforms.au.animNum]) * interval));
     verticesobjDst[0].vobjDst[ii].pos = animationUniforms.au.scale * v3;

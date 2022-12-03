@@ -538,7 +538,7 @@ bool InitVulkan(android_app* app) {
       .pNext = nullptr,
       .pApplicationName = "tutorial05_triangle_window",
       .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-      .pEngineName = "tutorial",
+      .pEngineName = "Aqoole Engine",
       .engineVersion = VK_MAKE_VERSION(1, 0, 0),
       .apiVersion = VK_MAKE_VERSION(1, 1, 0),
   };
@@ -597,8 +597,9 @@ bool InitVulkan(android_app* app) {
   float right = 40.0f;
   float top = 20.0f;
   float bottom = -10.0f;
-  gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, 0.0f, top), glm::vec3(left, 0.0f, bottom),
-                                       glm::vec3(right, 0.0f, bottom), glm::vec3(right, 0.0f, top), glm::vec3(0.0f, 0.2f, 0.0f));
+  float planeY = 0.5f;
+  gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, planeY, top), glm::vec3(left, planeY, bottom),
+                                       glm::vec3(right, planeY, bottom), glm::vec3(right, planeY, top), glm::vec3(0.0f, 0.2f, 0.0f));
   //woman
   std::vector<const char *> c;
   c.emplace_back(computeShaderPath.c_str());
