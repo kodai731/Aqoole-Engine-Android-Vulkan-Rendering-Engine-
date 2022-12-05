@@ -2951,7 +2951,7 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
                     break;
                 }
             }
-            geoBuf.morphTargetsBuffer->CopyData((void*)mGeometries[0].morphTargets[j][positionIndex].data3.data(),
+            geoBuf.morphTargetsBuffer->CopyData((void*)mGeometries[i].morphTargets[j][positionIndex].data3.data(),
                                                 onetargetSize * j, onetargetSize, queue, commandPool);
         }
         //morph weight
@@ -3045,6 +3045,7 @@ void AEDrawObjectBaseGltf::AnimationPrepareMorph(android_app *app, AELogicalDevi
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         mDSs.emplace_back(std::move(ds));
     }
+    DebugBuffer(queue, commandPool);
     int breakpoint = 10000;
 }
 
@@ -3205,6 +3206,64 @@ void AEDrawObjectBaseGltf::AnimationDispatchMorph(AELogicalDevice* device, AECom
     }
     else{
         vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
+    }
+}
+
+/*
+ * output position for debug
+ */
+void AEDrawObjectBaseGltf::OutputPosition(uint32_t frameNum, AEBufferUtilOnGPU* buffer, AEDeviceQueue* const queue, AECommandPool* const commandpool)
+{
+    std::string space(" ");
+    std::string lb("\n");
+    std::vector<Vertex3DObj> data(mVertices.size());
+    float invScale = 1.0f / mScale;
+    buffer->BackData((void*)data.data(), 0, GetVertexBufferSize(), queue, commandpool);
+    __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::string("frame = ") + std::to_string(frameNum) + lb).c_str(), 0);
+    for(uint32_t i = 0; i < mVertices.size(); i++){
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", (std::to_string(i) + space + std::to_string(data[i].pos.x * invScale) + space +
+        std::to_string(data[i].pos.y * invScale) + space + std::to_string(data[i].pos.z * invScale) + lb).c_str(), 0);
+    }
+    DebugBuffer(queue, commandpool);
+}
+
+/*
+ * debug buffer
+ */
+void AEDrawObjectBaseGltf::DebugBuffer(AEDeviceQueue* const queue, AECommandPool* const commandpool)
+{
+    //target
+    uint32_t toneSize = mGeometries[0].morphTargets[0][1].data3.size();
+    uint32_t tsize = toneSize * mGeometries[0].morphTargets.size();
+    std::vector<glm::vec3> targets(tsize);
+    mGeoBuffers[0].morphTargetsBuffer->BackData((void*)targets.data(), 0, tsize * sizeof(glm::vec3), queue, commandpool);
+    //check
+    for(uint32_t i = 0; i < mGeometries[0].morphTargets.size(); i++){
+        for(uint32_t j = 0; j < toneSize; j++){
+            if(mGeometries[0].morphTargets[i][1].data3[j] != targets[toneSize * i + j]){
+                __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "detect conflict %c", 0);
+            }
+        }
+    }
+    //weight
+    uint32_t onewSize = mJoints[mMorphNode].morphWeights[0].size();
+    uint32_t wsize = mJoints[mMorphNode].morphWeights.size() * onewSize;
+    std::vector<float> weights(wsize);
+    mGeoBuffers[0].morphWeightsBuffer->BackData((void*)weights.data(), 0, wsize * sizeof(float), queue, commandpool);
+    //check
+    for(uint32_t i = 0; i < mJoints[mMorphNode].morphWeights.size(); i++){
+        for(uint32_t j = 0; j < onewSize; j++){
+            if(mJoints[mMorphNode].morphWeights[i][j] != weights[onewSize * i + j]){
+                __android_log_print(ANDROID_LOG_DEBUG, "aqoole animation", "detect weight conflict %c", 0);
+            }
+        }
+    }
+    //vertex index
+    std::vector<uint32_t> indices(mVertices.size());
+    mBuffers[1]->BackData((void*)indices.data(), 0, mVertices.size() * sizeof(uint32_t), queue, commandpool);
+    for(uint32_t i = 0; i < mVertices.size(); i++){
+        if(i != indices[i])
+            int breakpoint = 9999999;
     }
 }
 

@@ -953,6 +953,10 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     //aslsWoman1->Update(&modelview, gQueue, gCommandPool);
   }
 //  astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
+  //debug position
+  if(gAnimationIndex == 1){
+      gPhoenixGltf->OutputPosition(gAnimationIndex, gvbModelGltf.get(), gQueue, gCommandPool);
+  }
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   VkResult resNextImage = vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
@@ -1292,6 +1296,11 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
       gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
                          gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   }
+  ImGui::SameLine();
+  ImGui::End();
+  ImGui::Begin("button3");
+  ImGui::Button("frame", buttonSize);
+  ImGui::Text("frame = %u", gAnimationIndex);
   ImGui::SameLine();
   ImGui::End();
   ImGui::Render();

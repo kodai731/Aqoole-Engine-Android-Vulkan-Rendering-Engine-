@@ -462,6 +462,8 @@ public:
                                AEBufferBase* buffer[], AEDeviceQueue* queue, AECommandPool* commandPool, AEDescriptorPool* descriptorPool);
     void AnimationDispatchMorph(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
                            uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore, double time, AEEvent* event);
+    void OutputPosition(uint32_t frameNum, AEBufferUtilOnGPU* buffer, AEDeviceQueue* const queue, AECommandPool* const commandpool);
+    void DebugBuffer(AEDeviceQueue* const queue, AECommandPool* const commandpool);
 };
 
 /*
