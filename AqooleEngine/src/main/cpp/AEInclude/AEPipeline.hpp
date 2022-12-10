@@ -136,6 +136,8 @@ class AEPipelineRaytracing : public AEPipeline
     void CreateShaderStageRayTracing(VkPipelineShaderStageCreateInfo *stageInfo, const char* shaderPath,
                                      std::vector<VkShaderModule> &shaderModules,
                                      std::vector<VkRayTracingShaderGroupCreateInfoKHR> &raygenGroups, android_app* app);
+    void AddHitGroups(uint32_t index, std::vector<std::vector<uint32_t>>const& indices,
+                      std::vector<const char*> const&shaderPaths, std::vector<VkRayTracingShaderGroupCreateInfoKHR> &raygenGroups);
 #endif
 public:
 #ifndef __ANDROID__
@@ -143,6 +145,7 @@ public:
         std::vector<std::unique_ptr<AEDescriptorSetLayout>> const* layouts);
 #else
     AEPipelineRaytracing(AELogicalDevice const* device, std::vector<const char*> &shaderPaths,
+                         std::vector<std::vector<uint32_t>> const& hitIndices,
                          std::vector<std::unique_ptr<AEDescriptorSetLayout>> const* layouts, android_app* app);
 #endif
     ~AEPipelineRaytracing();

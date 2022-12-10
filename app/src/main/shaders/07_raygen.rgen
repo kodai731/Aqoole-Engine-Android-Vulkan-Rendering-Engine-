@@ -69,7 +69,8 @@ void main()
 	float tmin = 0.001;
 	float tmax = 1000.0;
 
-	uint flags = gl_RayFlagsOpaqueEXT;
+	uint flags = gl_RayFlagsNoneEXT;
+	//uint flags = gl_RayFlagsOpaqueEXT;
     prd = vec4(0.0);
 
     traceRayEXT(topLevelAS, flags, 0xff, 0, 0, 0, origin.xyz, tmin, direction.xyz, tmax, 0);		//stride = 32, sizeof(stride) * stride = 256

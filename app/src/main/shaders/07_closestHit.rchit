@@ -372,7 +372,7 @@ void main()
             color4 = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z);
             color = color4.xyz;
             alpha = color4.w;
-            if(alpha < Gm.gm.alphaCutoff){
+            if(alpha < 0){
                 vec3 srcPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
                 vec4 cameraPos = vec4(Cp.cp, 1.0);
                 //vec4 cameraPos = cam.viewInverse * vec4(0.0, 0.0, 0.0, 1.0);
@@ -381,7 +381,7 @@ void main()
                 prdBlend.color = pushC.clearColor.xyz;
                 prdBlend.pos = srcPos;
                 prdBlend.isMiss = false;
-                for(uint j = 0; j < 4; j++){
+                for(uint j = 0; j < 0; j++){
                     traceRayEXT(topLevelAS, gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, 1, 32, 1, srcPos, 0.01, direction, 100, 2);
                     color = prdBlend.color;
                     if(prdBlend.hit == true || prdBlend.isMiss == true){

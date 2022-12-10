@@ -928,7 +928,8 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, std::vector<
 		VkAccelerationStructureGeometryKHR oneGeometry = {};
 		oneGeometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
 		oneGeometry.geometryType = VkGeometryTypeKHR::VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-		oneGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+		oneGeometry.flags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
+        //oneGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
 		oneGeometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
 		oneGeometry.geometry.triangles.vertexFormat = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;				//vec3 vertex position data
 		oneGeometry.geometry.triangles.vertexData = vertexDataDeviceAddress;

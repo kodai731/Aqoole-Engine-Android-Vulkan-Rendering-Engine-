@@ -712,7 +712,7 @@ AEPipelineRaytracing::AEPipelineRaytracing(AELogicalDevice const* device, std::v
 		vkDestroyShaderModule(*mDevice->GetDevice(), shaderModule, nullptr);
 }
 #else
-AEPipelineRaytracing::AEPipelineRaytracing(AELogicalDevice const* device, std::vector<const char*> &shaderPaths,
+AEPipelineRaytracing::AEPipelineRaytracing(AELogicalDevice const* device, std::vector<const char*> &shaderPaths, std::vector<std::vector<uint32_t>> const& hitIndices,
 										   std::vector<std::unique_ptr<AEDescriptorSetLayout>> const* layouts, android_app* app)
 		: AEPipeline(device) {
 	PFN_vkCreateRayTracingPipelinesKHR pfnCreateRayTracingPipelinesKHR = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>
@@ -748,9 +748,13 @@ AEPipelineRaytracing::AEPipelineRaytracing(AELogicalDevice const* device, std::v
 	uint32_t shaderCount = shaderPaths.size();
 	std::vector<VkShaderModule> shaderModules;
 	std::vector<VkPipelineShaderStageCreateInfo> shaderStageCreateInfo(shaderCount);
-	for (uint32_t i = 0; i < shaderPaths.size(); i++)
+	for (uint32_t i = 0; i < shaderPaths.size(); i++) {
 		CreateShaderStageRayTracing(&shaderStageCreateInfo[i], shaderPaths[i], shaderModules,
 									mShaderGroup, app);
+	}
+    for(uint32_t i = 0; i < hitIndices.size(); i++){
+        AddHitGroups(i, hitIndices, shaderPaths, mShaderGroup);
+    }
 	//create pipeline
 	VkRayTracingPipelineCreateInfoKHR createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
@@ -767,7 +771,7 @@ AEPipelineRaytracing::AEPipelineRaytracing(AELogicalDevice const* device, std::v
 				std::string("failed to create ray tracing pipeline error code = ") +
 				std::to_string(ret).c_str());
 	//delete
-	for (auto shaderModule : shaderModules)
+	for (auto& shaderModule : shaderModules)
 		vkDestroyShaderModule(*mDevice->GetDevice(), shaderModule, nullptr);
 }
 #endif
@@ -867,26 +871,41 @@ void AEPipelineRaytracing::CreateShaderStageRayTracing(VkPipelineShaderStageCrea
 		stageInfo->stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 	else if (std::regex_search(shaderPath, std::regex("comp", std::regex_constants::icase)))
 		stageInfo->stage = VK_SHADER_STAGE_COMPUTE_BIT;
-	stageInfo->module = shaderModules[shaderModules.size() - 1];
+    else if (std::regex_search(shaderPath, std::regex("rahit", std::regex_constants::icase)))
+        stageInfo->stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+    stageInfo->module = shaderModules[shaderModules.size() - 1];
 	stageInfo->pName = "main";
-	//raygen groups
-	VkRayTracingShaderGroupCreateInfoKHR raygenGroup{};
-	raygenGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-	raygenGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-	raygenGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-	if (std::regex_search(shaderPath, std::regex("rgen", std::regex_constants::icase)) ||
-		std::regex_search(shaderPath, std::regex("rmiss", std::regex_constants::icase))) {
-		raygenGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-		raygenGroup.generalShader = static_cast<uint32_t>(shaderModules.size()) - 1;
-		raygenGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
-	} else if (std::regex_search(shaderPath,
-								 std::regex("rchit", std::regex_constants::icase))) {
-		raygenGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-		raygenGroup.generalShader = VK_SHADER_UNUSED_KHR;
-		raygenGroup.closestHitShader = static_cast<uint32_t>(shaderModules.size()) - 1;
-	}
-	raygenGroups.push_back(raygenGroup);
     delete[] fileContent;
+}
+
+/*
+ * add hit groups
+ */
+void AEPipelineRaytracing::AddHitGroups(uint32_t index, std::vector<std::vector<uint32_t>>const& indices,
+                                        std::vector<const char*> const&shaderPaths, std::vector<VkRayTracingShaderGroupCreateInfoKHR> &raygenGroups)
+{
+	VkRayTracingShaderGroupCreateInfoKHR raygenGroup{};
+    raygenGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+    raygenGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+	raygenGroup.generalShader = VK_SHADER_UNUSED_KHR;
+    raygenGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+    raygenGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+    for(uint32_t i = 0; i < indices[index].size(); i++){
+        uint32_t pointingIndex = indices[index][i];
+		if(std::regex_search(shaderPaths[pointingIndex], std::regex("rgen", std::regex::icase)) ||
+                std::regex_search(shaderPaths[pointingIndex], std::regex("rmiss", std::regex::icase))){
+            raygenGroup.generalShader = pointingIndex;
+        }
+        else if(std::regex_search(shaderPaths[pointingIndex], std::regex("rchit", std::regex::icase))){
+            raygenGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+            raygenGroup.closestHitShader = pointingIndex;
+        }
+        else if(std::regex_search(shaderPaths[pointingIndex], std::regex("rahit", std::regex::icase))){
+            raygenGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+            raygenGroup.anyHitShader = pointingIndex;
+        }
+    }
+	raygenGroups.emplace_back(raygenGroup);
 }
 
 #endif
