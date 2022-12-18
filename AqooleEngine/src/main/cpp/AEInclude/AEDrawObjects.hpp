@@ -523,7 +523,6 @@ class AESphere : public AEDrawObjectBase3D
     ~AESphere();
 };
 
-#ifdef __RAY_TRACING__PC
 class AEWaterSurface : public AEDrawObjectBase3D
 {
     protected:
@@ -545,7 +544,8 @@ class AEWaterSurface : public AEDrawObjectBase3D
     uint32_t FindClosestPoint(glm::vec3 pos);
     float Wave(float x);
     public:
-    AEWaterSurface(float seaBase, float leftX, float rightX, float topZ, float bottomZ, glm::vec3 color);
+    AEWaterSurface(float seaBase, float leftX, float rightX, float topZ, float bottomZ, glm::vec3 color, float poolbottom = 0.0f,
+                   bool surfaceOnly = false, float length = 0.04);
     AEWaterSurface(float seaBase, float leftX, float rightX, float topZ, float bottomZ, glm::vec3 color, glm::vec3 cameraPos);
     ~AEWaterSurface();
     void SeaLevel(float time);
@@ -560,6 +560,5 @@ class AEWaterSurface : public AEDrawObjectBase3D
     void SetWaveAmp(float amp){mAmp = amp;}
     
 };
-#endif
 
 #endif

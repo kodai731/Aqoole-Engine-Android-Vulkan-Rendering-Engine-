@@ -3476,7 +3476,6 @@ void AESphere::CalcVertex(Vertex3D& v, float r, float theta, float phi)
     v.pos.z = r * st * cp;
 }
 
-#ifdef __RAY_TRACING__PC
 //=====================================================================
 //AE water surface
 //=====================================================================
@@ -3490,7 +3489,8 @@ constructor
 z
 
 */
-AEWaterSurface::AEWaterSurface(float seaBase, float leftX, float rightX, float topZ, float bottomZ, glm::vec3 color)
+AEWaterSurface::AEWaterSurface(float seaBase, float leftX, float rightX, float topZ, float bottomZ, glm::vec3 color, float poolbottom,
+                               bool surfaceOnly, float inLength)
     : AEDrawObjectBase3D(), mRand(16, 24)
 {
     //initialize
@@ -3501,7 +3501,7 @@ AEWaterSurface::AEWaterSurface(float seaBase, float leftX, float rightX, float t
     mFreq = 6.0f;
     mAmp = 2.0f;
     mDz = 1.0f;
-    float length = 0.04;
+    float length = inLength;
     //float length = 0.5;
     float y = mSeaBase;
     uint32_t i = 0;
@@ -3599,45 +3599,43 @@ AEWaterSurface::AEWaterSurface(float seaBase, float leftX, float rightX, float t
             //     j--;
             // else
             //     AddVertex(rightTop, color, normal);
-            if(top == TOP)
-            {
-                glm::vec3 sideTopRight(left, 0.0f, top);
-                glm::vec3 sideTopLeft(left + length, 0.0f, top);
-                AddVertex(sideTopRight, glassColor, glm::vec3(0.0, 0.0, -1.0f));
-                AddVertex(sideTopLeft, glassColor, glm::vec3(0.0, 0.0, -1.0f));
-                //side left, top right, top left, side right
-                AddIndex(i + j + 1, rightTopIndex, leftTopIndex, i + j);
-                j += 2;
-            }
-            if(left == LEFT)
-            {
-                glm::vec3 sideBottomRight(left, 0.0f, top - length);
-                glm::vec3 sideBottomLeft(left, 0.0f, top);
-                AddVertex(sideBottomRight, glassColor, glm::vec3(-1.0f, 0.0, 0.0));
-                AddVertex(sideBottomLeft, glassColor, glm::vec3(-1.0f, 0.0, 0.0));
-                //side left, top left, left bottom, side right
-                AddIndex(i + j + 1, leftTopIndex, leftBottomIndex, i + j);
-                j += 2;
-            }
-            if(top - length <= BOTTOM)
-            {
-                glm::vec3 sideBottomRight(left + length, 0.0f, top - length);
-                glm::vec3 sideBottomLeft(left, 0.0f, top - length);
-                AddVertex(sideBottomRight, glassColor, glm::vec3(0.0, 0.0, -1.0f));
-                AddVertex(sideBottomLeft, glassColor, glm::vec3(0.0, 0.0, -1.0f));
-                //side left, left bottom, right bottom, side right
-                AddIndex(i + j + 1, leftBottomIndex, rightBottomIndex, i + j);
-                j += 2;
-            }
-            if(left + length >= RIGHT)
-            {
-                glm::vec3 sideBottomRight(left + length, 0.0f, top);
-                glm::vec3 sideBottomLeft(left + length, 0.0f, top - length);
-                AddVertex(sideBottomRight, glassColor, glm::vec3(1.0f, 0.0, 0.0));
-                AddVertex(sideBottomLeft, glassColor, glm::vec3(1.0f, 0.0, 0.0));
-                //side left, right bottom, roght top, side right
-                AddIndex(i + j + 1, rightBottomIndex, rightTopIndex, i + j);
-                j += 2;
+            if(!surfaceOnly) {
+                if (top == TOP) {
+                    glm::vec3 sideTopRight(left, poolbottom, top);
+                    glm::vec3 sideTopLeft(left + length, poolbottom, top);
+                    AddVertex(sideTopRight, glassColor, glm::vec3(0.0, 0.0, -1.0f));
+                    AddVertex(sideTopLeft, glassColor, glm::vec3(0.0, 0.0, -1.0f));
+                    //side left, top right, top left, side right
+                    AddIndex(i + j + 1, rightTopIndex, leftTopIndex, i + j);
+                    j += 2;
+                }
+                if (left == LEFT) {
+                    glm::vec3 sideBottomRight(left, poolbottom, top - length);
+                    glm::vec3 sideBottomLeft(left, poolbottom, top);
+                    AddVertex(sideBottomRight, glassColor, glm::vec3(-1.0f, 0.0, 0.0));
+                    AddVertex(sideBottomLeft, glassColor, glm::vec3(-1.0f, 0.0, 0.0));
+                    //side left, top left, left bottom, side right
+                    AddIndex(i + j + 1, leftTopIndex, leftBottomIndex, i + j);
+                    j += 2;
+                }
+                if (top - length <= BOTTOM) {
+                    glm::vec3 sideBottomRight(left + length, poolbottom, top - length);
+                    glm::vec3 sideBottomLeft(left, poolbottom, top - length);
+                    AddVertex(sideBottomRight, glassColor, glm::vec3(0.0, 0.0, -1.0f));
+                    AddVertex(sideBottomLeft, glassColor, glm::vec3(0.0, 0.0, -1.0f));
+                    //side left, left bottom, right bottom, side right
+                    AddIndex(i + j + 1, leftBottomIndex, rightBottomIndex, i + j);
+                    j += 2;
+                }
+                if (left + length >= RIGHT) {
+                    glm::vec3 sideBottomRight(left + length, poolbottom, top);
+                    glm::vec3 sideBottomLeft(left + length, poolbottom, top - length);
+                    AddVertex(sideBottomRight, glassColor, glm::vec3(1.0f, 0.0, 0.0));
+                    AddVertex(sideBottomLeft, glassColor, glm::vec3(1.0f, 0.0, 0.0));
+                    //side left, right bottom, roght top, side right
+                    AddIndex(i + j + 1, rightBottomIndex, rightTopIndex, i + j);
+                    j += 2;
+                }
             }
             i += j;
             j = 0;
@@ -3650,6 +3648,7 @@ AEWaterSurface::AEWaterSurface(float seaBase, float leftX, float rightX, float t
 
 /*
 water surface LOD ver.
+ make a rectangler
 */
 AEWaterSurface::AEWaterSurface(float seaBase, float leftX, float rightX, float topZ, float bottomZ, glm::vec3 color, glm::vec3 cameraPos)
     : AEDrawObjectBase3D(), mRand(16, 24)
@@ -3809,7 +3808,6 @@ AEWaterSurface::AEWaterSurface(float seaBase, float leftX, float rightX, float t
     mEngine.seed(seed());
 }
 
-
 /*
 destructor
 */
@@ -3862,7 +3860,7 @@ calc sea level
 */
 void AEWaterSurface::SeaLevel(float time)
 {
-    const uint32_t threadNum = 30;
+    const uint32_t threadNum = 4;
     std::array<std::unique_ptr<std::thread>, threadNum> threads;
     for(uint32_t i = 0; i < threadNum; i++)
         threads[i] = std::make_unique<std::thread>(&AEWaterSurface::CalcSeaLevel, this, i, time, threadNum);
@@ -3884,8 +3882,8 @@ void AEWaterSurface::CalcSeaLevel(uint32_t mod, float time, uint32_t threadNum)
     for(uint32_t i = 0 + mod; i < vertexSize; i = i + threadNum)
     {
         glm::vec3& pos = mVertices[i].pos;
-        if(pos.y > -0.0001f)
-            continue;
+//        if(pos.y > -0.0001f)
+//            continue;
         // float relativeZ = (pos.z + mEdge) / (2.0f * mEdge);
         // float relativeX = (pos.x) / (2.0f * mEdge);
         // float sinY = sin(time * M_PI);
@@ -4052,10 +4050,9 @@ float AEWaterSurface::Wave(float x)
 {
     float t = fmod(x, 2.0f) - 1.0f;
     if(t <= 0.0f)
-        return powf32(t, 3.0f) + t + 1;
+        return powf(t, 3.0f) + t + 1;
     else
-        return -powf32(t, 3.0f) - t + 1;
+        return -powf(t, 3.0f) - t + 1;
 }
 
 
-#endif

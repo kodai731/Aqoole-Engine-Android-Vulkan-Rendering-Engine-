@@ -169,6 +169,9 @@ std::unique_ptr<AEBufferSBT> chitSBT;
 std::unique_ptr<AEPlane> gXZPlane;
 std::unique_ptr<AEBufferAS> gvbPlane;
 std::unique_ptr<AEBufferAS> gibPlane;
+std::unique_ptr<AEWaterSurface> gWater;
+std::unique_ptr<AEBufferAS> gvbWater;
+std::unique_ptr<AEBufferAS> gibWater;
 std::unique_ptr<AEDrawObjectBaseObjFile> gWoman;
 std::unique_ptr<AEBufferAS> gvbWoman;
 std::vector<std::unique_ptr<AEBufferAS>> gibWomans;
@@ -390,6 +393,13 @@ bool CreateBuffers(void) {
   gibPlane = std::make_unique<AEBufferAS>(gDevice, gXZPlane->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gibPlane->CreateBuffer();
   gibPlane->CopyData((void*)gXZPlane->GetIndexAddress().data(), 0, gXZPlane->GetIndexBufferSize(), gQueue, gCommandPool);
+  //water buffer
+  gvbWater = std::make_unique<AEBufferAS>(gDevice, gWater->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbWater->CreateBuffer();
+  gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue, gCommandPool);
+  gibWater = std::make_unique<AEBufferAS>(gDevice, gWater->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gibWater->CreateBuffer();
+  gibWater->CopyData((void*)gWater->GetIndexAddress().data(), 0, gWater->GetIndexBufferSize(), gQueue, gCommandPool);
   //woman buffers collada
   gvbWoman = std::make_unique<AEBufferAS>(gDevice, gWomanCollada->GetVertexBufferSize(),
                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -451,6 +461,8 @@ bool CreateBuffers(void) {
   BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(),
                                 *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
   BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(), *gvbPlane->GetBuffer(), *gibPlane->GetBuffer()};
+  BLASGeometryInfo waterInfo = {sizeof(Vertex3D), gWater->GetVertexSize(), gWater->GetIndexSize(),
+                                *gvbWater->GetBuffer(), *gibWater->GetBuffer()};
   BLASGeometryInfo womanInfo0{};
   if(isCollada) {
       womanInfo0 = {sizeof(Vertex3DObj), gWomanCollada->GetVertexSize(),
@@ -463,13 +475,13 @@ bool CreateBuffers(void) {
                     *gvbModelGltf->GetBuffer(), *gibModelGltf->GetBuffer()};
   }
   std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
-  std::vector<BLASGeometryInfo> geometryPlane = {planeInfo};
+  std::vector<BLASGeometryInfo> geometryPlane = {/*planeInfo*/waterInfo};
   std::vector<BLASGeometryInfo> geometryWoman0 = {womanInfo0};
   aslsPlane = std::make_unique<AERayTracingASBottom>(gDevice, geometryPlane, &modelview, gQueue, gCommandPool);
   aslsCubes = std::make_unique<AERayTracingASBottom>(gDevice, geometryCubes, &modelview, gQueue, gCommandPool);
   aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman0, &gltfModelView, gQueue, gCommandPool);
   //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
-  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsCubes.get(), aslsWoman.get()/*, aslsWoman1.get()*/};
+  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsWoman.get()/*, aslsWoman1.get()*/};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
   return true;
 }
@@ -605,13 +617,18 @@ bool InitVulkan(android_app* app) {
     offsetZ += nextPosition;
   }
   //plane
-  float left = -40.0f;
-  float right = 40.0f;
-  float top = 20.0f;
+  float left = -20.0f;
+  float right = 20.0f;
+  float top = 10.0f;
   float bottom = -10.0f;
-  float planeY = 0.0f;
+  float planeY = 0.5f;
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, planeY, top), glm::vec3(left, planeY, bottom),
                                        glm::vec3(right, planeY, bottom), glm::vec3(right, planeY, top), glm::vec3(0.0f, 0.2f, 0.0f));
+  //water
+  gWater = std::make_unique<AEWaterSurface>(planeY, left, right, top, bottom,
+                                            glm::vec3((float)223/255, (float)225/255, (float)188/255), 5.0f, 1.0f);
+  gWater->SetWaveAmp(0.5f);
+  gWater->SetWaveSpeed(1.0f);
   //woman
   std::vector<const char *> c;
   c.emplace_back(computeShaderPath.c_str());
@@ -631,10 +648,6 @@ bool InitVulkan(android_app* app) {
   }
   //gltf model
   gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(yardGrassGltfPath.c_str(), app, gDevice, gScale);
-//  gltfTextureImage = std::make_unique<AETextureImage>(gDevice, gPhoenixGltf->GetTextureWidth(2),
-//                                                      gPhoenixGltf->GetTextureHeight(2),
-//                                                      gPhoenixGltf->GetTextureSize(2),
-//                                                      "yard_grass/material_baseColor.png", gCommandPool, gQueue);
   gltfTextureImage = std::make_unique<AETextureImage>(gDevice, "yard_grass/material_baseColor.png", gCommandPool, gQueue, androidAppCtx);
   modelview.rotate = glm::mat4(1.0f);
   modelview.scale = glm::mat4(1.0f);
@@ -733,11 +746,17 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorImage(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, gStorageImage->GetImageView(),
                                       nullptr);
   gDescriptorSet->BindDescriptorBuffer(2, gUboRTBuffer->GetBuffer(), sizeof(UBORT), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  gDescriptorSet->BindDescriptorBuffers(3, {*gvbPlane->GetBuffer(),*gVertexBuffer->GetBuffer()},
-                                        {gXZPlane->GetVertexBufferSize(), sizeof(Vertex3D) * gCubes[0]->GetVertexSize() * gCubes.size()},
+//  gDescriptorSet->BindDescriptorBuffers(3, {*gvbWater->GetBuffer(),*gVertexBuffer->GetBuffer()},
+//                                        {gWater->GetVertexBufferSize(), sizeof(Vertex3D) * gCubes[0]->GetVertexSize() * gCubes.size()},
+//                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+//  gDescriptorSet->BindDescriptorBuffers(4, {*gibWater->GetBuffer(), *gIndexBuffer->GetBuffer()},
+//                                        {gWater->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
+//                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffers(3, {*gvbWater->GetBuffer()},
+                                        {gWater->GetVertexBufferSize()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffers(4, {*gibPlane->GetBuffer(), *gIndexBuffer->GetBuffer()},
-                                        {gXZPlane->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
+  gDescriptorSet->BindDescriptorBuffers(4, {*gibWater->GetBuffer()},
+                                        {gWater->GetIndexBufferSize()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   if(isCollada) {
     gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(),
@@ -1008,6 +1027,9 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   if(isGltf){
     aslsWoman->Update(&gltfModelView, gQueue, gCommandPool);
   }
+  gWater->SeaLevel(passedTime);
+  gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue, gCommandPool);
+  aslsPlane->Update(&modelview, gQueue, gCommandPool);
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSemaphore waitSemaphores = render.semaphore_;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};

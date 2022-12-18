@@ -83,10 +83,11 @@ void main()
     normal = normalize(normal);
     vec3 color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;
     prdBlend.pos = worldPos;
-    prdBlend.hit = true;
+    prdBlend.hit = false;
     prdBlend.color = color;
     prdBlend.normal = normal;
   }
+  /*
   else if(objId == 1)          //cube
   {
     ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
@@ -103,9 +104,8 @@ void main()
     prdBlend.normal = normal;
     prdBlend.color = color;
     prdBlend.hit = false;
-    //test
-    //prdBlend.color = vec3(0.0, 0.0, 1.0);
   }
+  */
   else //woman
   {
     ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
@@ -123,10 +123,6 @@ void main()
     prdBlend.normal = normal;
     prdBlend.color = color4.xyz;
     prdBlend.hit = true;
-    if(color4.w < Gm.gm.alphaCutoff){
-        prdBlend.hit = false;
-        prdBlend.color = pushC.clearColor.xyz;
-    }
   }
   
 }

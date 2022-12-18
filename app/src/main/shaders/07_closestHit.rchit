@@ -83,7 +83,7 @@ float[NODE] reflectance;
 float dotNL;
 
 float reflectionOld = ((nAir - nWater)/(nAir + nWater)) * ((nAir - nWater)/(nAir + nWater));
-vec3 waterColor = vec3(0.0, 1.0, 192.0 / 255.0);
+vec3 waterColor = vec3(0.0, 0.5, 96.0 / 255.0);
 float waterAlpha = 0.1;
 
 vec3[6] normals = vec3[]
@@ -129,7 +129,7 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
     n0 = nWater;
     n1 = nAir;
   }
-  uint flags = gl_RayFlagsOpaqueEXT;
+  uint flags = gl_RayFlagsNoneEXT;
   float tMin = 0.01;
   float tMax = 20.0;
   //reflect
@@ -162,11 +162,10 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
     refractNormal = prdBlend.normal;
     refractColor = prdBlend.color;
     refractPlane = prdBlend.hit;
-
     if(refractPlane)
     {
       //caustics
-      uint causticFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT;
+      uint causticFlags = gl_RayFlagsNoneEXT | gl_RayFlagsTerminateOnFirstHitEXT;
       InitPayLoad(vec3(0.0), vec3(1.0));
       traceRayEXT(topLevelAS, causticFlags, 0xFF, 1, 0, 1, refractPos, 0.001, vec3(0.0, -1.0, 0.0), 10.0, 2);
       vec3 waterSurface = prdBlend.pos;
@@ -213,8 +212,7 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
         //waterAlpha *= 1.0 + (length(refractPos - waterSurface) / 10000.0);
       }
     }
- 
-    reflectance = (ReflectanceP(incident, normal, n0, n1) * 0.5) + (ReflectanceS(incident, normal, n0, n1) * 0.5);
+    reflectance = (ReflectanceP(incident, normal, n0, n1) * 0.5) + (ReflectanceS(incident, normal, n0, n1) * 0.5) * 10.0;
   }
 }
 
@@ -248,20 +246,6 @@ vec3 ColorBlendALL(vec3 surfaceColor, float reflectanceOrigin, inout bool[NODE] 
    inout float[NODE] reflectance)
 {
   /*
-  for(uint i = 62; i < 126; i++)
-  {
-    uint reflectIndex = 2 * i + 2;
-    uint refractIndex = 2 * i + 3;
-    colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
-  }
-
-  for(uint i = 30; i < 62; i++)
-  {
-    uint reflectIndex = 2 * i + 2;
-    uint refractIndex = 2 * i + 3;
-    colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
-  }
-
   for(uint i = 14; i < 30; i++)
   {
     uint reflectIndex = 2 * i + 2;
@@ -275,7 +259,6 @@ vec3 ColorBlendALL(vec3 surfaceColor, float reflectanceOrigin, inout bool[NODE] 
     uint refractIndex = 2 * i + 3;
     colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
   }
-*/
   for(uint i = 2; i < 6; i++)
   {
     uint reflectIndex = 2 * i + 2;
@@ -289,7 +272,18 @@ vec3 ColorBlendALL(vec3 surfaceColor, float reflectanceOrigin, inout bool[NODE] 
     uint refractIndex = 2 * i + 3;
     colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
   }
-  
+  */
+  uint totalindex = 0;
+  uint nexttotal = totalindex * 2 + 2;
+  while(nexttotal < NODE){
+    for(uint i = totalindex; i < nexttotal; i++){
+        uint reflectIndex = 2 * i + 2;
+        uint refractIndex = 2 * i + 3;
+        colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
+    }
+    totalindex = nexttotal;
+    nexttotal = totalindex * 2 + 2;
+  }
   vec3 traceColor = ColorBlend(reflectanceOrigin, surfaceColor, false, isMiss[0], colors[0], isMiss[1], colors[1], isAllReflect[1]);
   return mix(traceColor, surfaceColor, 0.2);
 }
@@ -304,6 +298,7 @@ void main()
   vec3 color = vec3(0.0);
   vec4 color4 = vec4(0.0);
   float alpha = 1.0;
+  /*
   if(objId == 0)
   {
     //plane
@@ -316,7 +311,8 @@ void main()
     vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
     color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;
   }
-  else if(objId == 1)
+  */
+  if(objId == 0)
   {
     //cube
     ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
@@ -326,9 +322,8 @@ void main()
     Vertex3D v1 = vertices[nonuniformEXT(objId)].v[ind.y];
     Vertex3D v2 = vertices[nonuniformEXT(objId)].v[ind.z];
     vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
-    float refractRatio = nAir / nGlass;
+    float refractRatio = nAir / nWater;
     prdBlend.hit = false;
-    //prdBlend.color = pushC.clearColor.xyz;
     prdBlend.color = vec3(1.0, 1.0, 1.0);
     vec4 cameraPos = cam.viewInverse * vec4(0, 0, 0, 1);
     vec3 direction = normalize(worldPos - cameraPos.xyz);
@@ -372,24 +367,6 @@ void main()
             color4 = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z);
             color = color4.xyz;
             alpha = color4.w;
-            if(alpha < 0){
-                vec3 srcPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
-                vec4 cameraPos = vec4(Cp.cp, 1.0);
-                //vec4 cameraPos = cam.viewInverse * vec4(0.0, 0.0, 0.0, 1.0);
-                vec3 direction = normalize(srcPos - cameraPos.xyz);
-                prdBlend.hit = false;
-                prdBlend.color = pushC.clearColor.xyz;
-                prdBlend.pos = srcPos;
-                prdBlend.isMiss = false;
-                for(uint j = 0; j < 0; j++){
-                    traceRayEXT(topLevelAS, gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, 1, 32, 1, srcPos, 0.01, direction, 100, 2);
-                    color = prdBlend.color;
-                    if(prdBlend.hit == true || prdBlend.isMiss == true){
-                        break;
-                    }
-                    srcPos = prdBlend.pos;
-                }
-            }
         //}
     }
   }
