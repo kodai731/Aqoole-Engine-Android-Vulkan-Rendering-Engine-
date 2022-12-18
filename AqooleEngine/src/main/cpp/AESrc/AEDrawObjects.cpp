@@ -3489,8 +3489,8 @@ constructor
 z
 
 */
-AEWaterSurface::AEWaterSurface(float seaBase, float leftX, float rightX, float topZ, float bottomZ, glm::vec3 color, float poolbottom,
-                               bool surfaceOnly, float inLength)
+AEWaterSurface::AEWaterSurface(float seaBase, float leftX, float rightX, float topZ,
+                               float bottomZ, glm::vec3 color, float poolbottom, bool surfaceOnly, float inLength)
     : AEDrawObjectBase3D(), mRand(16, 24)
 {
     //initialize
@@ -3813,7 +3813,7 @@ destructor
 */
 AEWaterSurface::~AEWaterSurface()
 {
-
+    mComputePipeline.release();
 }
 
 /*
@@ -4055,4 +4055,113 @@ float AEWaterSurface::Wave(float x)
         return -powf(t, 3.0f) - t + 1;
 }
 
+/*
+ * dispatch wave
+ */
+void AEWaterSurface::DispatchWave(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
+                                  AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore,
+                                  double time, AEEvent* event)
+{
+    //update buffer
+    WaveUBO wu = {};
+    wu.amp = mAmp;
+    wu.dz = mDz;
+    wu.freq = mFreq;
+    wu.paddle = 1.5f;
+    wu.seabase = mSeaBase;
+    wu.speed = mSpeed;
+    wu.time = (float)time;
+    wu.top = mTop;
+    wu.right = mRight;
+    mWaveUniformBuffer->CopyData((void*)&wu, sizeof(WaveUBO));
+    //command record for each joint
+    AECommand::BeginCommand(command);
+    //prepare event
+    vkCmdResetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    AECommand::BindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, mComputePipeline.get());
+    uint32_t threads = mVertices.size();
+    AECommand::BindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                  mComputePipeline->GetPipelineLayout(),
+                                  1, mDSs[0]->GetDescriptorSet());
+    //dispatch
+    //each work groups
+    uint32_t groups = (threads / 1024) + 1;
+    vkCmdDispatch(*command->GetCommandBuffer(), groups, 1, 1);
+    vkCmdSetEvent(*command->GetCommandBuffer(), *event->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    //each local thread
+    //vkCmdDispatch(*command->GetCommandBuffer(), 740, 1, 1);
+    AECommand::EndCommand(command);
+    //submit
+    VkSubmitInfo submit_info = {};
+    VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+    if(waitSemaphore != nullptr) {
+        submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = waitSemaphore,
+                .pWaitDstStageMask = 0,
+                .commandBufferCount = 1,
+                .pCommandBuffers = command->GetCommandBuffer(),
+                .signalSemaphoreCount = 0,
+                .pSignalSemaphores = nullptr};
+    } else if(signalSemaphore != nullptr){
+        submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = waitSemaphore,
+                .pWaitDstStageMask = 0,
+                .commandBufferCount = 1,
+                .pCommandBuffers = command->GetCommandBuffer(),
+                .signalSemaphoreCount = 1,
+                .pSignalSemaphores = signalSemaphore};
+    }else{
+        submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .waitSemaphoreCount = 0,
+                .pWaitSemaphores = nullptr,
+                .pWaitDstStageMask = 0,
+                .commandBufferCount = 1,
+                .pCommandBuffers = command->GetCommandBuffer(),
+                .signalSemaphoreCount = 0,
+                .pSignalSemaphores = nullptr};
+    }
+    if(fence != nullptr) {
+        vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, *fence->GetFence());
+    }
+    else{
+        vkQueueSubmit(queue->GetQueue(0), 1, &submit_info, VK_NULL_HANDLE);
+    }
+}
 
+/*
+ * wave prepare
+ */
+void AEWaterSurface::WavePrepare(android_app *app, AELogicalDevice *device, std::vector<const char *> &shaders,
+                 AEBufferBase **buffer, AEDeviceQueue *queue, AECommandPool *commandPool,
+                 AEDescriptorPool *descriptorPool)
+{   //compute pipeline
+    AEDescriptorSetLayout cl(device);
+    cl.AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                     VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
+    cl.AddDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                     VK_SHADER_STAGE_COMPUTE_BIT, 1,
+                                     nullptr);
+    cl.CreateDescriptorSetLayout();
+    mComputePipeline = std::make_unique<AEComputePipeline>(device, shaders, &cl, app);
+    //uniform buffer
+    mWaveUniformBuffer = std::make_unique<AEBufferUniform>(device, sizeof(WaveUBO));
+    WaveUBO wu = {};
+    mWaveUniformBuffer->CreateBuffer();
+    mWaveUniformBuffer->CopyData((void*)&wu, sizeof(WaveUBO));
+    //descriptor set
+    std::unique_ptr<AEDescriptorSet> ds = std::make_unique<AEDescriptorSet>(device, &cl, descriptorPool);
+    if(buffer != nullptr){
+        ds->BindDescriptorBuffer(0, buffer[0]->GetBuffer(), GetVertexBufferSize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        ds->BindDescriptorBuffer(0, mWaveUniformBuffer->GetBuffer(), sizeof(WaveUBO), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        mDSs.emplace_back(std::move(ds));
+    } else {
+        __android_log_print(ANDROID_LOG_DEBUG, "aqoole wave", "wave descriptor error %c", 0);
+        throw std::runtime_error("fail to create desctiptor set at wave");
+    }
+}

@@ -1,0 +1,46 @@
+#version 460
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_nonuniform_qualifier : enable
+#include "07_raycommon.glsl"
+
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+
+layout(binding = 0, set = 0, scalar) buffer VerticesobjDst {Vertex3DObj vobjDst[];} verticesobjDst[];
+layout(binding = 1, set = 0, scalar) uniform WaveUniform {WaveUBO wu;} WU;
+
+
+void main()
+{
+  uint index = gl_WorkGroupID.x * 1024 + gl_LocalInvocationIndex;
+  float freq = WU.wu.freq;
+  float speed = WU.wu.speed;
+  float time = WU.wu.time;
+  float amp = WU.wu.amp;
+  vec3 pos = verticesobjDst[0].vobjDst[index].pos;
+  float sign = -1.0;
+  pos.y = WU.wu.seabase;
+    for(float ff = -1.0; ff <= 1.0f; ff = ff + WU.wu.dz){
+      vec3 origin = vec3(WU.wu.right * ff, WU.wu.seabase, WU.wu.top * WU.wu.paddle + 0.1 * sign * WU.wu.top);
+      vec3 v = pos - origin;
+      float d = length(v);
+      float d2 = dot(v, v);
+      vec3 waveVector = normalize(v);
+      //float f = glm::dot(waveVector, pos) * freq - speed * time;
+      float x = d * freq - speed * time;
+      //float dy = (amp * cos(f)) / (1 + d + time * time);
+      float dy = (amp * cos(x)) / (1 + d);
+      //float dy = (amp * Wave(f)) / (1 + d2);
+      //lambda
+      //float lambda = speed * (1.0f / freq);
+      if(time * speed > d) {
+        if (dy < 0)
+          verticesobjDst[0].vobjDst[index].pos.y += dy * 1.0f;
+        else
+        //pos.y += dy * 0.2f;
+          verticesobjDst[0].vobjDst[index].pos.y += dy * 1.0f;
+      }
+      sign *= -1.0;
+  }
+}

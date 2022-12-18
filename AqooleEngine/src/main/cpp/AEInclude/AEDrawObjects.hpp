@@ -535,6 +535,10 @@ class AEWaterSurface : public AEDrawObjectBase3D
     float mFreq;
     float mAmp;
     float mDz;
+    AELogicalDevice* mDevice;
+    std::vector<std::unique_ptr<AEDescriptorSet>> mDSs;
+    std::unique_ptr<AEComputePipeline> mComputePipeline;
+    std::unique_ptr<AEBufferUniform> mWaveUniformBuffer;
     void CalcSeaLevel(uint32_t mod, float time, uint32_t threadNum);
     void Gerstner(uint32_t index, glm::vec3 waveVector, float amp, float freq, float speed, float steep, float time);
     void OneWave(glm::vec3& pos, glm::vec3 origin, float speed, float freq, float amp, float time);
@@ -544,8 +548,8 @@ class AEWaterSurface : public AEDrawObjectBase3D
     uint32_t FindClosestPoint(glm::vec3 pos);
     float Wave(float x);
     public:
-    AEWaterSurface(float seaBase, float leftX, float rightX, float topZ, float bottomZ, glm::vec3 color, float poolbottom = 0.0f,
-                   bool surfaceOnly = false, float length = 0.04);
+    AEWaterSurface(float seaBase, float leftX, float rightX, float topZ,
+                   float bottomZ, glm::vec3 color, float poolbottom = 0.0f, bool surfaceOnly = false, float inLength = 0.04);
     AEWaterSurface(float seaBase, float leftX, float rightX, float topZ, float bottomZ, glm::vec3 color, glm::vec3 cameraPos);
     ~AEWaterSurface();
     void SeaLevel(float time);
@@ -558,7 +562,12 @@ class AEWaterSurface : public AEDrawObjectBase3D
     void SetWaveSpeed(float speed){mSpeed = speed;}
     void SetWaveFreq(float freq){mFreq = freq;}
     void SetWaveAmp(float amp){mAmp = amp;}
-    
+    void WavePrepare(android_app *app, AELogicalDevice *device, std::vector<const char *> &shaders,
+                     AEBufferBase **buffer, AEDeviceQueue *queue, AECommandPool *commandPool,
+                     AEDescriptorPool *descriptorPool);
+    void DispatchWave(AELogicalDevice* device, AECommandBuffer* command, AEDeviceQueue* queue, AECommandPool* commandPool,
+                      AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore,
+                      double time, AEEvent* event);
 };
 
 #endif

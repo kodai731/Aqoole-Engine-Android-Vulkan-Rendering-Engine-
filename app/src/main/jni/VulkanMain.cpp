@@ -446,7 +446,11 @@ bool CreateBuffers(void) {
                                          gQueue, gCommandPool, gDescriptorPool);
       }
   }
-  //offset
+  //wave calc
+  std::vector<const char*> waveShader = {"shaders/07_waveComp.spv"};
+  AEBufferBase* waveVertexBuffer[1] = {gvbWater.get()};
+  gWater->WavePrepare(androidAppCtx, gDevice, waveShader, waveVertexBuffer, gQueue, gCommandPool, gDescriptorPool);
+    //offset
 //  gWomanOffset = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 //  gWomanOffset->CreateBuffer();
 //  gWomanOffset->CopyData((void*)gWomanCollada->GetOffsetAll().data(), 0, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), gQueue, gCommandPool);
@@ -625,8 +629,10 @@ bool InitVulkan(android_app* app) {
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, planeY, top), glm::vec3(left, planeY, bottom),
                                        glm::vec3(right, planeY, bottom), glm::vec3(right, planeY, top), glm::vec3(0.0f, 0.2f, 0.0f));
   //water
+  std::vector<const char*> waveShader = {"shaders/07_waveComp.spv"};
+  AEBufferBase* waveVertexBuffer[1] = {gvbWater.get()};
   gWater = std::make_unique<AEWaterSurface>(planeY, left, right, top, bottom,
-                                            glm::vec3((float)223/255, (float)225/255, (float)188/255), 5.0f, 1.0f);
+                                            glm::vec3((float)223/255, (float)225/255, (float)188/255), 5.0f, 2.0f);
   gWater->SetWaveAmp(0.5f);
   gWater->SetWaveSpeed(1.0f);
   //woman
@@ -1027,7 +1033,9 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   if(isGltf){
     aslsWoman->Update(&gltfModelView, gQueue, gCommandPool);
   }
-  gWater->SeaLevel(passedTime);
+//  gWater->DispatchWave(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool, nullptr, nullptr,
+//                       nullptr, passedTime, gComputeEvent.get());
+  gWater->SeaLevel((float)passedTime);
   gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue, gCommandPool);
   aslsPlane->Update(&modelview, gQueue, gCommandPool);
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;

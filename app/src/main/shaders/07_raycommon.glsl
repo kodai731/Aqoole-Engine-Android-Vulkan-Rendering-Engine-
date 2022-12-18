@@ -43,6 +43,18 @@ struct GltfMaterial{
   float alphaCutoff;
 };
 
+struct WaveUBO{
+  float seabase;
+  float dz;
+  float top;
+  float right;
+  float paddle;
+  float speed;
+  float freq;
+  float amp;
+  float time;
+};
+
 float nAir = 1.000;
 float nWater = 1.333;
 float nGlass = 1.55;
