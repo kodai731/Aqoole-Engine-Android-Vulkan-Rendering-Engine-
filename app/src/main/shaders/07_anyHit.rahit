@@ -55,7 +55,7 @@ layout(push_constant) uniform Constants
 
 void main()
 {
-  if(gl_InstanceCustomIndexEXT == 1){
+  if(gl_InstanceCustomIndexEXT == 2){
     const vec3 barycentricCoords = vec3(1.0f - attribs.x - attribs.y, attribs.x, attribs.y);
     ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 1],   //

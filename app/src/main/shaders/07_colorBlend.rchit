@@ -81,14 +81,13 @@ void main()
     //normal = normalize(vec3(cam.normalMatrix * vec4(normal, 1.0)));
     vec3 normal = cross(v1.pos - v0.pos, v2.pos - v0.pos);
     normal = normalize(normal);
-    vec3 color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;
+    vec3 color = texture(texSampler[1], vec2(barycentricCoords.x, barycentricCoords.y)).xyz;
     prdBlend.pos = worldPos;
-    prdBlend.hit = false;
+    prdBlend.hit = true;
     prdBlend.color = color;
     prdBlend.normal = normal;
   }
-  /*
-  else if(objId == 1)          //cube
+  else if(objId == 1)          //cube or water
   {
     ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
                       indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 1],   //
@@ -105,7 +104,6 @@ void main()
     prdBlend.color = color;
     prdBlend.hit = false;
   }
-  */
   else //woman
   {
     ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //

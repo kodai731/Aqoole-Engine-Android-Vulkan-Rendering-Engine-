@@ -68,7 +68,7 @@ layout(push_constant) uniform Constants
 }pushC;
 
 //const uint NODE = 126;
-const uint NODE = 14;
+const uint NODE = 6;
 //const uint NODE = 254;
 //const uint NODE = 2;
 
@@ -142,7 +142,7 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
   reflectMiss = !isShadowed;
   reflectPlane = prdBlend.hit;
   //refract
-  InitPayLoad(pos, vec3(1.0, 1.0, 1.0));
+  InitPayLoad(pos, vec3(0.0, 1.0, 0.0));
   vec3 refractD = refract(incident, normal, refractIndex);
   isAllReflect = false;
   if(length(refractD) == 0.0)
@@ -162,6 +162,7 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
     refractNormal = prdBlend.normal;
     refractColor = prdBlend.color;
     refractPlane = prdBlend.hit;
+    /*
     if(refractPlane)
     {
       //caustics
@@ -197,6 +198,7 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
           }
         }
         */
+        /*
         //dot point light
         if(length(waterV) > 0.1)
         {
@@ -212,7 +214,8 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
         //waterAlpha *= 1.0 + (length(refractPos - waterSurface) / 10000.0);
       }
     }
-    reflectance = (ReflectanceP(incident, normal, n0, n1) * 0.5) + (ReflectanceS(incident, normal, n0, n1) * 0.5) * 10.0;
+    */
+    reflectance = (ReflectanceP(incident, normal, n0, n1) * 0.5) + (ReflectanceS(incident, normal, n0, n1) * 0.5);
   }
 }
 
@@ -298,7 +301,6 @@ void main()
   vec3 color = vec3(0.0);
   vec4 color4 = vec4(0.0);
   float alpha = 1.0;
-  /*
   if(objId == 0)
   {
     //plane
@@ -309,12 +311,12 @@ void main()
     Vertex3D v1 = vertices[nonuniformEXT(objId)].v[ind.y];
     Vertex3D v2 = vertices[nonuniformEXT(objId)].v[ind.z];
     vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
-    color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;
+    //color = v0.color * barycentricCoords.x + v1.color * barycentricCoords.y + v2.color * barycentricCoords.z;
+    color = texture(texSampler[1], vec2(barycentricCoords.x, barycentricCoords.y)).xyz;
   }
-  */
-  if(objId == 0)
+  if(objId == 1)
   {
-    //cube
+    //cube or water
     ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
                       indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 1],   //
                       indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 2]);  //

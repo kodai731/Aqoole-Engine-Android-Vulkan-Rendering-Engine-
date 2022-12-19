@@ -139,7 +139,7 @@ uniform
 glm::vec3 gLookAtPoint(0.0f, 0.01f, 0.0f);
 //ModelView modelView;
 //glm::vec3 cameraPos(0.0f, -1.0f, -1.0f);
-const glm::vec3 firstCameraPos(0.0f, -5.0f, -10.0f);
+const glm::vec3 firstCameraPos(0.0f, -2.0f, -15.0f);
 glm::vec3 cameraPos = firstCameraPos;
 glm::vec3 cameraDirection = glm::normalize(cameraPos - gLookAtPoint);
 //glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(0.0f, 0.0f, -1.0f)));
@@ -155,6 +155,7 @@ glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
 MyImgui* gImgui;
 std::unique_ptr<AERayTracingASBottom> aslsCubes;
 std::unique_ptr<AERayTracingASBottom> aslsPlane;
+std::unique_ptr<AERayTracingASBottom> aslsWater;
 std::unique_ptr<AERayTracingASBottom> aslsWoman;
 std::unique_ptr<AERayTracingASBottom> aslsWoman1;
 std::unique_ptr<AERayTracingASTop> astop;
@@ -189,6 +190,7 @@ std::string phoenixGltfPath("phoenix-bird/phoenix.glb");
 std::string computeShaderPath("shaders/07_animationComp.spv");
 std::string cowboyGltfPath("cowboy/cowboy.glb");
 std::string yardGrassGltfPath("yard_grass/yard_grass.glb");
+std::string sandPath("sand/sand.jpg");
 std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
 std::unique_ptr<AECommandBuffer> gComputeCommandBuffer;
@@ -205,6 +207,7 @@ std::vector<VkImageView> imageViews;
 std::vector<VkSampler> samplers;
 std::unique_ptr<AETextureImage> gltfTextureImage;
 std::unique_ptr<AEBufferUniform> cameraPosBuffer;
+std::unique_ptr<AETextureImage> sand;
 
 std::string gTargetModelPath = cowboyPath;
 bool isAnimation = true;
@@ -464,7 +467,8 @@ bool CreateBuffers(void) {
 //  gIndexBuffer->CopyData((void*)gCube->GetIndexAddress().data(), 0, sizeof(uint32_t) * gCube->GetIndexSize(), gQueue, gCommandPool);
   BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(),
                                 *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
-  BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(), *gvbPlane->GetBuffer(), *gibPlane->GetBuffer()};
+  BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(),
+                                *gvbPlane->GetBuffer(), *gibPlane->GetBuffer()};
   BLASGeometryInfo waterInfo = {sizeof(Vertex3D), gWater->GetVertexSize(), gWater->GetIndexSize(),
                                 *gvbWater->GetBuffer(), *gibWater->GetBuffer()};
   BLASGeometryInfo womanInfo0{};
@@ -479,13 +483,15 @@ bool CreateBuffers(void) {
                     *gvbModelGltf->GetBuffer(), *gibModelGltf->GetBuffer()};
   }
   std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
-  std::vector<BLASGeometryInfo> geometryPlane = {/*planeInfo*/waterInfo};
+  std::vector<BLASGeometryInfo> geometryPlane = {planeInfo};
   std::vector<BLASGeometryInfo> geometryWoman0 = {womanInfo0};
+  std::vector<BLASGeometryInfo> geometryWater = {waterInfo};
   aslsPlane = std::make_unique<AERayTracingASBottom>(gDevice, geometryPlane, &modelview, gQueue, gCommandPool);
   aslsCubes = std::make_unique<AERayTracingASBottom>(gDevice, geometryCubes, &modelview, gQueue, gCommandPool);
   aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman0, &gltfModelView, gQueue, gCommandPool);
+  aslsWater = std::make_unique<AERayTracingASBottom>(gDevice, geometryWater, &modelview, gQueue, gCommandPool);
   //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
-  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsWoman.get()/*, aslsWoman1.get()*/};
+  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsWater.get(), aslsWoman.get()/*, aslsWoman1.get()*/};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
   return true;
 }
@@ -530,7 +536,7 @@ VkResult CreateGraphicsPipeline() {
                                                       gWomanCollada->GetTextureCount(),nullptr);
   if(isGltf)
     gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
-                                                        1,nullptr);
+                                                        2,nullptr);
   if(!isGltf && gWomanCollada->GetTextureCount() == 0)
       gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1,
                                                           nullptr);
@@ -625,16 +631,18 @@ bool InitVulkan(android_app* app) {
   float right = 20.0f;
   float top = 10.0f;
   float bottom = -10.0f;
-  float planeY = 0.5f;
+  float planeWater = 0.5f;
+  float planeY = planeWater + 0.1f;
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, planeY, top), glm::vec3(left, planeY, bottom),
                                        glm::vec3(right, planeY, bottom), glm::vec3(right, planeY, top), glm::vec3(0.0f, 0.2f, 0.0f));
   //water
   std::vector<const char*> waveShader = {"shaders/07_waveComp.spv"};
   AEBufferBase* waveVertexBuffer[1] = {gvbWater.get()};
-  gWater = std::make_unique<AEWaterSurface>(planeY, left, right, top, bottom,
+  gWater = std::make_unique<AEWaterSurface>(planeWater, left, right, top, bottom,
                                             glm::vec3((float)223/255, (float)225/255, (float)188/255), 5.0f, 2.0f);
   gWater->SetWaveAmp(0.5f);
   gWater->SetWaveSpeed(1.0f);
+  gWater->SetWaveFreq(1.0f);
   //woman
   std::vector<const char *> c;
   c.emplace_back(computeShaderPath.c_str());
@@ -758,11 +766,11 @@ bool InitVulkan(android_app* app) {
 //  gDescriptorSet->BindDescriptorBuffers(4, {*gibWater->GetBuffer(), *gIndexBuffer->GetBuffer()},
 //                                        {gWater->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
 //                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffers(3, {*gvbWater->GetBuffer()},
-                                        {gWater->GetVertexBufferSize()},
+  gDescriptorSet->BindDescriptorBuffers(3, {*gvbPlane->GetBuffer(), *gvbWater->GetBuffer()},
+                                        {gXZPlane->GetVertexBufferSize(), gWater->GetVertexBufferSize()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffers(4, {*gibWater->GetBuffer()},
-                                        {gWater->GetIndexBufferSize()},
+  gDescriptorSet->BindDescriptorBuffers(4, {*gibPlane->GetBuffer(), *gibWater->GetBuffer()},
+                                        {gXZPlane->GetIndexBufferSize(), gWater->GetIndexBufferSize()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   if(isCollada) {
     gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(),
@@ -797,11 +805,14 @@ bool InitVulkan(android_app* app) {
                                             imageViews,
                                             samplers);
   }
+  sand = std::make_unique<AETextureImage>(gDevice, sandPath.c_str(), gCommandPool, gQueue, androidAppCtx);
   if(isGltf){
     imageViews.emplace_back(*gltfTextureImage->GetImageView());
+    imageViews.emplace_back(*sand->GetImageView());
     samplers.emplace_back(*gltfTextureImage->GetSampler());
+    samplers.emplace_back(*sand->GetSampler());
     gWomanTextureSets->BindDescriptorImages(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                            1,
+                                            2,
                                             imageViews,
                                             samplers);
   }
@@ -1220,7 +1231,7 @@ void Look(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm::vec2* to
     float theta = acos(glm::dot(firstTouchView, d)) * 0.035f;   //return radian
     if(theta > M_PI / 4.0f)
     {
-      __android_log_print(ANDROID_LOG_DEBUG, "Look big theta", (std::string("theta = ") + std::to_string(theta)).c_str(), 10);
+      __android_log_print(ANDROID_LOG_DEBUG, "aqoole camera", (std::string("theta = ") + std::to_string(theta)).c_str(), 10);
       return;
     }
     auto base = glm::cross(firstTouchView, d);
