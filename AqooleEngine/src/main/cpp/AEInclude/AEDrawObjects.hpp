@@ -384,6 +384,7 @@ protected:
     };
     struct Geometry{
         std::vector<glm::vec3> positions;
+        std::vector<glm::vec3> normals;
         std::vector<uint32_t> indices;
         std::vector<glm::vec2> texCoords;
         std::vector<uint32_t> influences;
@@ -554,14 +555,15 @@ class AEWaterSurface : public AEDrawObjectBase3D
     ~AEWaterSurface();
     void SeaLevel(float time);
     //get
-    float* GetWaveSpeed(){return &mSpeed;}
-    float* GetWaveFreq(){return &mFreq;}
-    float* GetWaveAmp(){return &mAmp;}
-    float* GetWaveDz(){return &mDz;}
+    float GetWaveSpeed(){return mSpeed;}
+    float GetWaveFreq(){return mFreq;}
+    float GetWaveAmp(){return mAmp;}
+    float GetWaveDz(){return mDz;}
     //set
     void SetWaveSpeed(float speed){mSpeed = speed;}
     void SetWaveFreq(float freq){mFreq = freq;}
     void SetWaveAmp(float amp){mAmp = amp;}
+    void SetWaveDz(float dz){mDz = dz;}
     void WavePrepare(android_app *app, AELogicalDevice *device, std::vector<const char *> &shaders,
                      AEBufferBase **buffer, AEDeviceQueue *queue, AECommandPool *commandPool,
                      AEDescriptorPool *descriptorPool);

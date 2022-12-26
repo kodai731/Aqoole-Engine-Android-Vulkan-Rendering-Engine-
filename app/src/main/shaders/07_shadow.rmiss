@@ -19,7 +19,7 @@ layout(push_constant) uniform Constants
 void main()
 {
   isShadowed = false;
-  prdBlend.color = pushC.clearColor.xyz;
+  prdBlend.color = WATER_COLOR;
   prdBlend.hit = false;
   prdBlend.isMiss = true;
 }

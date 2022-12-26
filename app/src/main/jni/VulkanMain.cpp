@@ -139,7 +139,7 @@ uniform
 glm::vec3 gLookAtPoint(0.0f, 0.01f, 0.0f);
 //ModelView modelView;
 //glm::vec3 cameraPos(0.0f, -1.0f, -1.0f);
-const glm::vec3 firstCameraPos(0.0f, -2.0f, -15.0f);
+const glm::vec3 firstCameraPos(0.0f, -3.0f, -10.0f);
 glm::vec3 cameraPos = firstCameraPos;
 glm::vec3 cameraDirection = glm::normalize(cameraPos - gLookAtPoint);
 //glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(0.0f, 0.0f, -1.0f)));
@@ -491,7 +491,7 @@ bool CreateBuffers(void) {
   aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman0, &gltfModelView, gQueue, gCommandPool);
   aslsWater = std::make_unique<AERayTracingASBottom>(gDevice, geometryWater, &modelview, gQueue, gCommandPool);
   //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
-  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsWater.get(), aslsWoman.get()/*, aslsWoman1.get()*/};
+  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsWater.get(), aslsWoman.get()};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
   return true;
 }
@@ -543,9 +543,9 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   std::vector<const char*>paths =
-          {"shaders/07_raygenRgen.spv","shaders/07_rayRmiss.spv","shaders/07_shadowRmiss.spv",
+          {"shaders/07_raygenRgen.spv","shaders/07_rayRmiss.spv","shaders/07_shadowRmiss.spv", "shaders/07_waterRmiss.spv",
            "shaders/07_rayRchit.spv","shaders/07_colorBlendRchit.spv", "shaders/07_anyHitRahit.spv"};
-  std::vector<std::vector<uint32_t>> hitIndices = {{0}, {1}, {2}, {3, 5},{4, 5}};
+  std::vector<std::vector<uint32_t>> hitIndices = {{0}, {1}, {2}, {3}, {4, 6},{5, 6}};
   gPipelineRT = std::make_unique<AEPipelineRaytracing>(gDevice, paths, hitIndices,&gLayouts, androidAppCtx);
     return VK_SUCCESS;
 }
@@ -631,8 +631,8 @@ bool InitVulkan(android_app* app) {
   float right = 20.0f;
   float top = 10.0f;
   float bottom = -10.0f;
-  float planeWater = 0.5f;
-  float planeY = planeWater + 0.1f;
+  float planeWater = 1.0f;
+  float planeY = planeWater + 2.0f;
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, planeY, top), glm::vec3(left, planeY, bottom),
                                        glm::vec3(right, planeY, bottom), glm::vec3(right, planeY, top), glm::vec3(0.0f, 0.2f, 0.0f));
   //water
@@ -640,9 +640,10 @@ bool InitVulkan(android_app* app) {
   AEBufferBase* waveVertexBuffer[1] = {gvbWater.get()};
   gWater = std::make_unique<AEWaterSurface>(planeWater, left, right, top, bottom,
                                             glm::vec3((float)223/255, (float)225/255, (float)188/255), 5.0f, 2.0f);
-  gWater->SetWaveAmp(0.5f);
+  gWater->SetWaveAmp(2.5f);
   gWater->SetWaveSpeed(1.0f);
   gWater->SetWaveFreq(1.0f);
+  gWater->SetWaveDz(0.99f);
   //woman
   std::vector<const char *> c;
   c.emplace_back(computeShaderPath.c_str());
@@ -819,17 +820,17 @@ bool InitVulkan(android_app* app) {
   gDescriptorSets.push_back(gWomanTextureSets);
   //create binding table buffer
   raygenSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 0, gQueue, gCommandPool);
-  missSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 1, 2, gQueue, gCommandPool);
-  chitSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 3, 2, gQueue, gCommandPool);
+  missSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 1, 3, gQueue, gCommandPool);
+  chitSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 4, 2, gQueue, gCommandPool);
   gSbts.push_back(raygenSBT.get());
   gSbts.push_back(missSBT.get());
   gSbts.push_back(chitSBT.get());
   //push constants
   ConstantsRT constantRT{};
   constantRT.clearColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-  constantRT.lightPosition = glm::vec3(0.0f, -40.0f, 5.0f);
+  constantRT.lightPosition = glm::vec3(0.0f, -50.0f, 0.0f);
   constantRT.lightType = 0;
-  constantRT.lightIntensity = 300.0f;
+  constantRT.lightIntensity = 30.0f;
   // -----------------------------------------------
   // Create a pool of command buffers to allocate command buffer from
   render.cmdBufferLen_ = swapchain.swapchainLength_;
@@ -1049,6 +1050,7 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   gWater->SeaLevel((float)passedTime);
   gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue, gCommandPool);
   aslsPlane->Update(&modelview, gQueue, gCommandPool);
+  aslsWater->Update(&modelview, gQueue, gCommandPool);
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSemaphore waitSemaphores = render.semaphore_;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};

@@ -34,8 +34,8 @@ void main()
       vec3 v1 = vec3(morph.mor[indexf], morph.mor[indexf + 1], morph.mor[indexf + 2]);
       float cw = weight.w[weightoffset + j];
       float nw = weight.w[weightoffsetNext + j];
-      //v3 += (cw + (nw - cw) * interval) * v1;
-      v3 += cw * v1;
+      v3 += (cw + (nw - cw) * interval) * v1;
+      //v3 += cw * v1;
     }
     //v3 += v1 + ((v2 - v1) * ((animationUniforms.au.time - keyFrames.kf[animationUniforms.au.animNum]) * interval));
     verticesobjDst[0].vobjDst[ii].pos = animationUniforms.au.scale * v3;

@@ -75,6 +75,7 @@ float K3 = 1.899;
 float L3 = 1.552 * 0.01;
 const float WIDTH = 1920.0;
 const float HEIGHT = 1080.0;
+const vec3 WATER_COLOR = vec3(0.0, 0.5, 96.0 / 255.0);
 
 float Sellmeire(float lambda)
 {

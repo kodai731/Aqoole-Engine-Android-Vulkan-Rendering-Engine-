@@ -2181,15 +2181,6 @@ glm::mat4 AEDrawObjectBaseGltf::r2m(const glm::vec4& r)
     a[2][0] = 2.0f * (qxz + qyw);
     a[2][1] = 2.0f * (qyz - qxw);
     a[2][2] = 1.0f - 2.0f * (qxx + qyy);
-//    a[0][0] = 2.0f * (qxx + qyy) - 1.0f;
-//    a[0][1] = 2.0f * (qyz + qxw);
-//    a[0][2] = 2.0f * (qyw - qxz);
-//    a[1][0] = 2.0f * (qyz - qxw);
-//    a[1][1] = 2.0f * (qxx + qzz) - 1.0f;
-//    a[1][2] = 2.0f * (qzw + qxy);
-//    a[2][0] = 2.0f * (qyw + qxz);
-//    a[2][1] = 2.0f * (qzw - qxy);
-//    a[2][2] = 2.0f * (qxx + qzz) - 1.0f;
     return a;
 }
 
@@ -2428,6 +2419,7 @@ void AEDrawObjectBaseGltf::MakeVertices()
         for (uint32_t j = 0; j < mGeometries[i].positions.size(); j++) {
             v.pos = mGeometries[i].positions[j];
             v.texcoord =mGeometries[i].texCoords[j];
+            v.normal = mGeometries[i].normals[j];
             mVertices.emplace_back(v);
         }
     }
@@ -2474,6 +2466,14 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
                 const auto *indexSrc = reinterpret_cast<const uint16_t *>(&(model.buffers[indexBufView.buffer].data[indexOffsetByte]));
                 for (uint32_t i = 0; i < indexAccr.count; i++)
                     geo.indices.emplace_back((uint32_t) indexSrc[i]);
+            }
+            //normal
+            if (std::regex_search(attName, std::regex("normal", std::regex::icase))) {
+                const auto& accr = model.accessors[attr.second];
+                std::vector<glm::vec3> tmpNormals(accr.count);
+                ReadBuffer(model, attr.second, sizeof(glm::vec3), tmpNormals.data());
+                for(uint32_t i = 0; i < tmpNormals.size(); i++)
+                    geo.normals.emplace_back(tmpNormals[i]);
             }
             //texture coord
             if (std::regex_search(attName, std::regex("texcoord", std::regex::icase))) {

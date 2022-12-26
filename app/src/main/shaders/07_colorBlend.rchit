@@ -86,6 +86,7 @@ void main()
     prdBlend.hit = true;
     prdBlend.color = color;
     prdBlend.normal = normal;
+    prdBlend.isMiss = false;
   }
   else if(objId == 1)          //cube or water
   {
@@ -103,8 +104,9 @@ void main()
     prdBlend.normal = normal;
     prdBlend.color = color;
     prdBlend.hit = false;
+    prdBlend.isMiss = false;
   }
-  else //woman
+  else if(objId == 2)//woman
   {
     ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 1],   //
@@ -121,6 +123,7 @@ void main()
     prdBlend.normal = normal;
     prdBlend.color = color4.xyz;
     prdBlend.hit = true;
+    prdBlend.isMiss = false;
   }
   
 }

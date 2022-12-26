@@ -67,8 +67,9 @@ layout(push_constant) uniform Constants
   int lightType;
 }pushC;
 
+//2^(n + 1) - 2
 //const uint NODE = 126;
-const uint NODE = 6;
+const uint NODE = 2;
 //const uint NODE = 254;
 //const uint NODE = 2;
 
@@ -83,7 +84,6 @@ float[NODE] reflectance;
 float dotNL;
 
 float reflectionOld = ((nAir - nWater)/(nAir + nWater)) * ((nAir - nWater)/(nAir + nWater));
-vec3 waterColor = vec3(0.0, 0.5, 96.0 / 255.0);
 float waterAlpha = 0.1;
 
 vec3[6] normals = vec3[]
@@ -112,13 +112,60 @@ void InitPayLoad(vec3 pos, vec3 color)
   prdBlend.normal = vec3(0.0);
   prdBlend.color = color;
   prdBlend.hit = false;
-  isShadowed = true;
+  prdBlend.isMiss = true;
+}
+
+void Caustics(vec3 planePos, inout vec3 refractColor)
+{
+  uint causticFlags = gl_RayFlagsNoneEXT | gl_RayFlagsTerminateOnFirstHitEXT;
+  InitPayLoad(vec3(0.0), WATER_COLOR);
+  traceRayEXT(topLevelAS, causticFlags, 0xFF, 1, 0, 2, planePos, 0.00001, vec3(0.0, -1.0, 0.0), 10.0, 2);
+  vec3 waterSurface = prdBlend.pos;
+  if(true){
+    vec3 waterNormal = prdBlend.normal;
+    vec3 waterV = refract(vec3(0.0, -1.0, 0.0), -waterNormal, nWater/nAir);
+    vec3 normalWaterV = normalize(waterV);
+    //parallel rays
+    /*
+    float dotLight = dot(normalize(waterV), normalize(vec3(0.0, -1.0, 1.0)));
+    if( dotLight > 0.76)
+    {
+      refractColor += mix(vec3(dotLight), WATER_COLOR, 0.85);
+    }
+    */
+    //sun map
+    /*
+    if(length(waterV) > 0.1)
+    {
+      float t = (pushC.lightPosition.y - waterSurface.y) / waterV.y;
+      vec3 sunMapPoint = waterSurface + t * waterV;
+      float dotLight = pushC.lightIntensity / (1.0 + length(sunMapPoint - pushC.lightPosition));
+      float sunmapIntensity = dotLight / length(t * waterV);
+      if(sunmapIntensity > 1.0)
+      {
+        refractColor += mix(vec3(sunmapIntensity),WATER_COLOR,0.1);
+      }
+    }
+    */
+    //dot point light
+
+    if(length(waterV) > 0.1)
+    {
+      float t = (pushC.lightPosition.y - waterSurface.y) / normalWaterV.y;
+      float dotLight = clamp(0.0, 1.0, dot(normalWaterV, normalize(pushC.lightPosition - waterSurface)));
+      float sunmapIntensity = pushC.lightIntensity * dotLight / length(t * normalWaterV);
+      sunmapIntensity = smoothstep(0.0, 1.0, sunmapIntensity);
+      refractColor += mix(vec3(sunmapIntensity),WATER_COLOR,0.8);
+    }
+
+    //water alpha
+    //waterAlpha *= 1.0 + (length(refractPos - waterSurface) / 10000.0);
+  }
 }
 
 void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractIndex, out vec3 reflectPos, out bool reflectMiss, out vec3 reflectNormal, out vec3 reflectColor,
   out bool reflectPlane, out vec3 refractPos, out bool refractMiss, out vec3 refractNormal, out vec3 refractColor, out bool refractPlane, out bool isAllReflect, out float reflectance)
 {
-  isShadowed = true;
   float n0 = nAir;
   float n1 = nWater;
   reflectance = 1.0;
@@ -135,14 +182,14 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
   //reflect
   InitPayLoad(pos, vec3(1.0, 1.0, 1.0));
   vec3 reflectD = reflect(incident, normal);
-  traceRayEXT(topLevelAS, flags, 0xFF, 1, 0, 1, pos, tMin, reflectD, tMax, 2);
+  traceRayEXT(topLevelAS, flags, 0xFF, 1, 0, 2, pos, tMin, reflectD, tMax, 2);
   reflectPos = prdBlend.pos;
   reflectNormal = prdBlend.normal;
   reflectColor = prdBlend.color;
-  reflectMiss = !isShadowed;
+  reflectMiss = prdBlend.isMiss;
   reflectPlane = prdBlend.hit;
   //refract
-  InitPayLoad(pos, vec3(0.0, 1.0, 0.0));
+  InitPayLoad(pos, WATER_COLOR);
   vec3 refractD = refract(incident, normal, refractIndex);
   isAllReflect = false;
   if(length(refractD) == 0.0)
@@ -150,71 +197,21 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
     isAllReflect = true;
     refractColor = vec3(0.0, 0.0, 1.0);
     refractPlane = false;
-    refractMiss = false;
+    refractMiss = true;
     refractPos = pos;
   }
   if(!isAllReflect)
   {
     isShadowed = true;
-    traceRayEXT(topLevelAS, flags, 0xFF, 1, 0, 1, pos, tMin, refractD, tMax, 2);
+    traceRayEXT(topLevelAS, flags, 0xFF, 1, 0, 2, pos, tMin, refractD, tMax, 2);
     refractPos = prdBlend.pos;
-    refractMiss = !isShadowed;
+    refractMiss = prdBlend.isMiss;
     refractNormal = prdBlend.normal;
     refractColor = prdBlend.color;
     refractPlane = prdBlend.hit;
-    /*
-    if(refractPlane)
-    {
-      //caustics
-      uint causticFlags = gl_RayFlagsNoneEXT | gl_RayFlagsTerminateOnFirstHitEXT;
-      InitPayLoad(vec3(0.0), vec3(1.0));
-      traceRayEXT(topLevelAS, causticFlags, 0xFF, 1, 0, 1, refractPos, 0.001, vec3(0.0, -1.0, 0.0), 10.0, 2);
-      vec3 waterSurface = prdBlend.pos;
-      if(isShadowed)
-      {
-        vec3 waterNormal = prdBlend.normal;
-        vec3 waterV = refract(vec3(0.0, -1.0, 0.0), -waterNormal, nWater/nAir);
-        vec3 normalWaterV = normalize(waterV);
-        //parallel rays
-        /*
-        float dotLight = dot(normalize(waterV), normalize(vec3(0.0, -1.0, 1.0)));
-        if( dotLight > 0.76)
-        {
-          refractColor += mix(vec3(dotLight), waterColor, 0.85);
-        }
-        */
-        
-        //sun map
-        /*
-        if(length(waterV) > 0.1)
-        {
-          float t = (pushC.lightPosition.y - waterSurface.y) / waterV.y;
-          vec3 sunMapPoint = waterSurface + t * waterV;
-          float dotLight = pushC.lightIntensity / (1.0 + length(sunMapPoint - pushC.lightPosition));
-          float sunmapIntensity = dotLight / length(t * waterV);
-          if(sunmapIntensity > 1.0)
-          {
-            refractColor += mix(vec3(sunmapIntensity),waterColor,0.1);
-          }
-        }
-        */
-        /*
-        //dot point light
-        if(length(waterV) > 0.1)
-        {
-          float t = (pushC.lightPosition.y - waterSurface.y) / normalWaterV.y;
-          float dotLight = dot(normalWaterV, normalize(pushC.lightPosition - waterSurface));
-          if(dotLight > 0.98)
-          {
-            float sunmapIntensity = pushC.lightIntensity * dotLight / length(t * normalWaterV);
-            refractColor += mix(vec3(sunmapIntensity),waterColor,0.8);
-          }
-        }
-        //water alpha
-        //waterAlpha *= 1.0 + (length(refractPos - waterSurface) / 10000.0);
-      }
+    if(refractPlane){
+        Caustics(refractPos, refractColor);
     }
-    */
     reflectance = (ReflectanceP(incident, normal, n0, n1) * 0.5) + (ReflectanceS(incident, normal, n0, n1) * 0.5);
   }
 }
@@ -223,20 +220,16 @@ vec3 ColorBlend(float reflection, vec3 ownColor, bool isPlane, bool reflectMiss,
 {
   if(isPlane)
     return ownColor;
+  if(isAllReflect)
+    return vec3(1.0, 0.0, 0.0);
   if(reflectMiss && refractMiss)
-    return vec3(0.0, 0.0, 1.0);
-  if(reflectMiss)
-  {
-    if(isAllReflect)
-      return mix(ownColor, waterColor, waterAlpha);
-    else 
-      return refractColor;
+    return WATER_COLOR;
+  if(reflectMiss){
+    return refractColor;
   }
   if(refractMiss)
     return reflectColor;
   //both hit
-  if(isAllReflect)
-    return reflectColor;
   else
   {
     vec3 traceColor = mix(refractColor,reflectColor,reflection);
@@ -244,62 +237,57 @@ vec3 ColorBlend(float reflection, vec3 ownColor, bool isPlane, bool reflectMiss,
   }
 }
 
-
 vec3 ColorBlendALL(vec3 surfaceColor, float reflectanceOrigin, inout bool[NODE] isPlane, inout bool[NODE] isMiss, inout vec3[NODE] colors, inout bool[NODE] isAllReflect,
    inout float[NODE] reflectance)
 {
   /*
-  for(uint i = 14; i < 30; i++)
-  {
-    uint reflectIndex = 2 * i + 2;
-    uint refractIndex = 2 * i + 3;
-    colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
-  }
-
-  for(uint i = 6; i < 14; i++)
-  {
-    uint reflectIndex = 2 * i + 2;
-    uint refractIndex = 2 * i + 3;
-    colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
-  }
-  for(uint i = 2; i < 6; i++)
-  {
-    uint reflectIndex = 2 * i + 2;
-    uint refractIndex = 2 * i + 3;
-    colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
-  }
-  
-  for(uint i = 0; i < 2; i++)
-  {
-    uint reflectIndex = 2 * i + 2;
-    uint refractIndex = 2 * i + 3;
-    colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
-  }
+  count are  2, 6, 14, 30, ... (2^(n + 1) - 2)
   */
-  uint totalindex = 0;
-  uint nexttotal = totalindex * 2 + 2;
-  while(nexttotal < NODE){
-    for(uint i = totalindex; i < nexttotal; i++){
+  uint e = uint(sqrt(NODE + 2) - 1) - 1;
+  uint endindex = NODE;
+  uint startindex = uint(pow(2, e) - 2);
+  while(e > 0){
+    for(uint i = startindex; i < endindex; i++){
         uint reflectIndex = 2 * i + 2;
         uint refractIndex = 2 * i + 3;
         colors[i] = ColorBlend(reflectance[i], colors[i], isPlane[i], isMiss[reflectIndex], colors[reflectIndex], isMiss[refractIndex], colors[refractIndex], isAllReflect[refractIndex]);
     }
-    totalindex = nexttotal;
-    nexttotal = totalindex * 2 + 2;
+    e = e - 1;
+    endindex = uint(pow(2, e + 1) - 2);
+    startindex = uint(pow(2, e) - 2);
   }
   vec3 traceColor = ColorBlend(reflectanceOrigin, surfaceColor, false, isMiss[0], colors[0], isMiss[1], colors[1], isAllReflect[1]);
-  return mix(traceColor, surfaceColor, 0.2);
+  return mix(traceColor, surfaceColor, 0.05);
 }
 
+void Lighting(inout vec3 color, vec3 pos, vec3 normal)
+{
+    color *= dot(normal, normalize(pushC.lightPosition - pos));
+    float li = pushC.lightIntensity / (1.0 + length(pushC.lightPosition - pos));
+    color *= clamp(0.0, 1.0, li);
+}
+
+void InitArrays()
+{
+    for(uint i = 0; i < NODE; i++){
+        reflectPos[i] = vec3(0.0);
+        reflectNormal[i] = vec3(0.0);
+        reflectMiss[i] = false;
+        reflectColor[i] = WATER_COLOR;
+        isAllReflect[i] = false;
+        isPlane[i] = false;
+    }
+}
 
 void main()
 {
+  InitArrays();
   //obj Id
   //uint objId = scnDesc.i[gl_InstanceCustomIndexEXT].objId;
   uint objId = gl_InstanceCustomIndexEXT;
   const vec3 barycentricCoords = vec3(1.0f - attribs.x - attribs.y, attribs.x, attribs.y);
-  vec3 color = vec3(0.0);
-  vec4 color4 = vec4(0.0);
+  vec3 color = vec3(0.0, 1.0, 0.0);
+  vec4 color4 = vec4(1.0);
   float alpha = 1.0;
   if(objId == 0)
   {
@@ -351,9 +339,10 @@ void main()
         reflectColor[2 * i + 3], isPlane[2 * i + 3], isAllReflect[2 * i + 3], reflectance[i]);
     }
     //color = ColorBlend(reflection, color, false, reflectMiss[0], color0, reflectMiss[1], color1, isAllReflect[1]);
-    color = ColorBlendALL(waterColor, reflectanceOrigin, isPlane, reflectMiss, reflectColor, isAllReflect, reflectance);
+    color = ColorBlendALL(WATER_COLOR, reflectanceOrigin, isPlane, reflectMiss, reflectColor, isAllReflect, reflectance);
+    Lighting(color, worldPos, normal);
   }
-  else
+  else if(objId == 2)
   {
     //woman
     ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
@@ -363,11 +352,14 @@ void main()
     Vertex3DObj v1 = verticesobj[0].vobj[ind.y];
     Vertex3DObj v2 = verticesobj[0].vobj[ind.z];
     uint offset = 3 * gl_PrimitiveID;
+    vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
+    vec3 normal = v0.normal * barycentricCoords.x + v1.normal * barycentricCoords.y + v2.normal * barycentricCoords.z;
     for(uint i = 0; i < textureCount.tc; i++){
         //TODO : multi texture in gltf model
         //if(offset < geometryIndices[0].gi[i]){
             color4 = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z);
             color = color4.xyz;
+            //Lighting(color, worldPos, normal);
             alpha = color4.w;
         //}
     }
