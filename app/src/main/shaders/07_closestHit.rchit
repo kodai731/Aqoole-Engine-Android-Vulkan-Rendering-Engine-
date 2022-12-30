@@ -56,14 +56,13 @@ layout(binding = 7, set = 0) buffer GeometryIndices {uint gi[];} geometryIndices
 layout(binding = 8, set = 0) uniform TextureCount {uint tc;} textureCount;
 layout(binding = 9, set = 0) uniform Material {GltfMaterial gm;} Gm;
 layout(binding = 10, set = 0) uniform CPOS {vec3 cp;} Cp;
+layout(binding = 11, set = 0) uniform LIGHT {Light l;} light;
 
 layout(binding = 0, set = 1) uniform sampler2D texSampler[];
 
 layout(push_constant) uniform Constants
 {
   vec4 clearColor;
-  vec3 lightPosition;
-  float lightIntensity;
   int lightType;
 }pushC;
 
@@ -262,8 +261,8 @@ vec3 ColorBlendALL(vec3 surfaceColor, float reflectanceOrigin, inout bool[NODE] 
 
 void Lighting(inout vec3 color, vec3 pos, vec3 normal)
 {
-    color *= dot(normal, normalize(pushC.lightPosition - pos));
-    float li = pushC.lightIntensity / (1.0 + length(pushC.lightPosition - pos));
+    color *= dot(normal, normalize(light.l.lightPosition - pos));
+    float li = light.l.intensity / (1.0 + length(light.l.lightPosition - pos));
     color *= clamp(0.0, 1.0, li);
 }
 

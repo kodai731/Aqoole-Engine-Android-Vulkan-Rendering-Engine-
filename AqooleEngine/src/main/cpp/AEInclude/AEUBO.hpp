@@ -332,6 +332,7 @@ struct Light
 	glm::vec3 lightPosition;
 	glm::vec3 eyeDirection;
 	glm::vec3 ambientColor;
+    float intensity;
 };
 
 struct LightStrength
@@ -366,8 +367,6 @@ struct UBORT
 struct ConstantsRT
 {
 	glm::vec4 clearColor;
-	glm::vec3 lightPosition;
-	float lightIntensity;
 	int lightType;
 };
 

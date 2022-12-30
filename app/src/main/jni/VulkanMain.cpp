@@ -208,6 +208,8 @@ std::vector<VkSampler> samplers;
 std::unique_ptr<AETextureImage> gltfTextureImage;
 std::unique_ptr<AEBufferUniform> cameraPosBuffer;
 std::unique_ptr<AETextureImage> sand;
+std::unique_ptr<Light> light;
+std::unique_ptr<AEBufferUniform> lightBuffer;
 
 std::string gTargetModelPath = cowboyPath;
 bool isAnimation = true;
@@ -527,6 +529,8 @@ VkResult CreateGraphicsPipeline() {
                                                       VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                                                       VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(11, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                                        VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
@@ -639,7 +643,7 @@ bool InitVulkan(android_app* app) {
   std::vector<const char*> waveShader = {"shaders/07_waveComp.spv"};
   AEBufferBase* waveVertexBuffer[1] = {gvbWater.get()};
   gWater = std::make_unique<AEWaterSurface>(planeWater, left, right, top, bottom,
-                                            glm::vec3((float)223/255, (float)225/255, (float)188/255), 5.0f, 2.0f);
+                                            glm::vec3((float)223/255, (float)225/255, (float)188/255), planeWater + 1.0f,  true, 2.0f);
   gWater->SetWaveAmp(2.5f);
   gWater->SetWaveSpeed(1.0f);
   gWater->SetWaveFreq(1.0f);
@@ -755,6 +759,13 @@ bool InitVulkan(android_app* app) {
   if(isGltf)
     tc = 1;
   gTextureCountBuffer->CopyData((void*)&tc, sizeof(uint32_t));
+  //light buffer
+  light = std::make_unique<Light>();
+  light->lightPosition = glm::vec3(0.0f, -200.0f, 0.0f);
+  light->intensity = 200.0f;
+  lightBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(Light));
+  lightBuffer->CreateBuffer();
+  lightBuffer->CopyData((void*)light.get(), sizeof(Light));
   //descriptor set
   gDescriptorSet = new AEDescriptorSet(gDevice, gLayouts[0], gDescriptorPool);
   gDescriptorSet->BindAccelerationStructure(0, astop.get());
@@ -793,6 +804,7 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorBuffer(8, gTextureCountBuffer->GetBuffer(), sizeof(uint32_t), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(9, gPhoenixGltf->GetMaterialUniform()->GetBuffer(), sizeof(GltfMaterial), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(10, cameraPosBuffer->GetBuffer(), sizeof(glm::vec3), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(11, lightBuffer->GetBuffer(), sizeof(Light), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
@@ -828,9 +840,7 @@ bool InitVulkan(android_app* app) {
   //push constants
   ConstantsRT constantRT{};
   constantRT.clearColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-  constantRT.lightPosition = glm::vec3(0.0f, -50.0f, 0.0f);
   constantRT.lightType = 0;
-  constantRT.lightIntensity = 30.0f;
   // -----------------------------------------------
   // Create a pool of command buffers to allocate command buffer from
   render.cmdBufferLen_ = swapchain.swapchainLength_;
@@ -1358,7 +1368,13 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
   ImGui::Text("frame = %u", gAnimationIndex);
   ImGui::SameLine();
   ImGui::End();
-  ImGui::Render();
+  ImGui::Begin("Light Intensity");
+  ImGui::SliderFloat("float", &light->intensity, 0.0f, 500.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+  ImGui::SameLine();
+  ImGui::End();
+  //copy buffer
+
+  // ImGui::Render();
   ImDrawData* drawData = ImGui::GetDrawData();
   ImGui_ImplVulkan_RenderDrawData(drawData, *cb);
   vkCmdEndRenderPass(*cb);

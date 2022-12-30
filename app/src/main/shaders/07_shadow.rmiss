@@ -11,9 +11,7 @@ layout(location = 2) rayPayloadInEXT PayroadBlend prdBlend;
 layout(push_constant) uniform Constants
 {
   vec4 clearColor;
-  vec3 lightPosition;
   float lightIntensity;
-  int lightType;
 }pushC;
 
 void main()

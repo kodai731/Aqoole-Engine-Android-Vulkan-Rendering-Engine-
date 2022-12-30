@@ -736,7 +736,7 @@ AEPipelineRaytracing::AEPipelineRaytracing(AELogicalDevice const* device, std::v
 	//push constants
 	VkPushConstantRange pushConstant{};
 	pushConstant.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR |
-							  VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+							  VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 	pushConstant.offset = 0;
 	pushConstant.size = sizeof(ConstantsRT);
 	std::vector<VkPushConstantRange> pushConstants = {pushConstant};

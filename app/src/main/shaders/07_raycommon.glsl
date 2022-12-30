@@ -55,6 +55,13 @@ struct WaveUBO{
   float time;
 };
 
+struct Light{
+  vec3 lightPosition;
+  vec3 eyeDirection;
+  vec3 ambientColor;
+  float intensity;
+};
+
 float nAir = 1.000;
 float nWater = 1.333;
 float nGlass = 1.55;
