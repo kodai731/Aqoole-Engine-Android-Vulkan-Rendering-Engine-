@@ -237,6 +237,7 @@ void PrintVector2(glm::vec2* vectors, uint32_t size);
 static double GetTime();
 void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTouched);
 bool isTouchButton(glm::vec2* touchPos, ImVec2 buttonPos, ImVec2 buttonRegion);
+bool isTouchSlider(glm::vec2* touchPos, ImVec2 sliderPos, ImVec2 sliderRegion, void* value, float range);
 /*
  * setImageLayout():
  *    Helper function to transition color buffer layout
@@ -1354,7 +1355,7 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
   ImGui::SetNextWindowPos(pauseButtonPos, ImGuiCond_FirstUseEver);
   ImGui::Begin("button2");
   ImGui::Button("pause", buttonSize);
-  if (isTouchButton(touchPositions, pauseButtonPos, buttonSize))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+  if (isTouchButton(touchPositions, pauseButtonPos, buttonSize))        // Buttons return true when clicked (most widgets return true when edited/activated)
   {
       isPaused = !isPaused;
       gWomanCollada->Animation();
@@ -1363,18 +1364,27 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
   }
   ImGui::SameLine();
   ImGui::End();
+  ImVec2 frameButtonPos(380 * 2, gSwapchain->GetExtents()[0].height - 150);
+  ImGui::SetNextWindowPos(frameButtonPos, ImGuiCond_FirstUseEver);
   ImGui::Begin("button3");
-  ImGui::Button("frame", buttonSize);
+  ImGui::Button("frame", ImVec2(buttonSize.x - 50, buttonSize.y));
   ImGui::Text("frame = %u", gAnimationIndex);
   ImGui::SameLine();
   ImGui::End();
+  //light intensity
+  ImVec2 lightIntensitySliderPos(5, gSwapchain->GetExtents()[0].height - 300);
+  ImGui::SetNextWindowPos(lightIntensitySliderPos, ImGuiCond_FirstUseEver);
+  ImVec2 sliderWindow(450, 50);
+  ImGui::SetNextWindowSize(sliderWindow);
   ImGui::Begin("Light Intensity");
   ImGui::SliderFloat("float", &light->intensity, 0.0f, 500.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+  isTouchSlider(touchPositions, lightIntensitySliderPos, sliderWindow, &light->intensity, 500);
+  ImGui::Text("light intensity");
   ImGui::SameLine();
   ImGui::End();
   //copy buffer
 
-  // ImGui::Render();
+  ImGui::Render();
   ImDrawData* drawData = ImGui::GetDrawData();
   ImGui_ImplVulkan_RenderDrawData(drawData, *cb);
   vkCmdEndRenderPass(*cb);
@@ -1386,6 +1396,17 @@ bool isTouchButton(glm::vec2* touchPos, ImVec2 buttonPos, ImVec2 buttonRegion)
   if(buttonPos.x < touchPos[0].x && touchPos[0].x < buttonPos.x + buttonRegion.x)
     if(buttonPos.y < touchPos[0].y && touchPos[0].y < buttonPos.y + buttonRegion.y)
       return true;
+  return false;
+}
+
+bool isTouchSlider(glm::vec2* touchPos, ImVec2 sliderPos, ImVec2 sliderRegion, void* value, float range)
+{
+  if(sliderPos.x < touchPos[0].x && touchPos[0].x < sliderPos.x + sliderRegion.x)
+    if(sliderPos.y < touchPos[0].y && touchPos[0].y < sliderPos.y + sliderRegion.y) {
+      float f = range * ((touchPos[0].x - sliderPos.x) / sliderRegion.x);
+      *(float*)value = f;
+      return true;
+    }
   return false;
 }
 

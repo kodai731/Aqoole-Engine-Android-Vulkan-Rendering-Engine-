@@ -136,9 +136,9 @@ void Caustics(vec3 planePos, inout vec3 refractColor)
     /*
     if(length(waterV) > 0.1)
     {
-      float t = (pushC.lightPosition.y - waterSurface.y) / waterV.y;
+      float t = (light.l.lightPosition.y - waterSurface.y) / waterV.y;
       vec3 sunMapPoint = waterSurface + t * waterV;
-      float dotLight = pushC.lightIntensity / (1.0 + length(sunMapPoint - pushC.lightPosition));
+      float dotLight = light.l.lightIntensity / (1.0 + length(sunMapPoint - light.l.lightPosition));
       float sunmapIntensity = dotLight / length(t * waterV);
       if(sunmapIntensity > 1.0)
       {
@@ -150,9 +150,9 @@ void Caustics(vec3 planePos, inout vec3 refractColor)
 
     if(length(waterV) > 0.1)
     {
-      float t = (pushC.lightPosition.y - waterSurface.y) / normalWaterV.y;
-      float dotLight = clamp(0.0, 1.0, dot(normalWaterV, normalize(pushC.lightPosition - waterSurface)));
-      float sunmapIntensity = pushC.lightIntensity * dotLight / length(t * normalWaterV);
+      float t = (light.l.lightPosition.y - waterSurface.y) / normalWaterV.y;
+      float dotLight = clamp(0.0, 1.0, dot(normalWaterV, normalize(light.l.lightPosition - waterSurface)));
+      float sunmapIntensity = light.l.intensity * dotLight / length(t * normalWaterV);
       sunmapIntensity = smoothstep(0.0, 1.0, sunmapIntensity);
       refractColor += mix(vec3(sunmapIntensity),WATER_COLOR,0.8);
     }
