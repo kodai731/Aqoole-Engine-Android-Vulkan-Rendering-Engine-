@@ -530,8 +530,6 @@ VkResult CreateGraphicsPipeline() {
                                                       VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                                                       VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(11, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                                        VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
@@ -762,8 +760,8 @@ bool InitVulkan(android_app* app) {
   gTextureCountBuffer->CopyData((void*)&tc, sizeof(uint32_t));
   //light buffer
   light = std::make_unique<Light>();
-  light->lightPosition = glm::vec3(0.0f, -200.0f, 0.0f);
-  light->intensity = 200.0f;
+  light->lightPosition = glm::vec3(0.0f, -50.0f, 0.0f);
+  light->intensity = 100.0f;
   lightBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(Light));
   lightBuffer->CreateBuffer();
   lightBuffer->CopyData((void*)light.get(), sizeof(Light));
@@ -802,10 +800,9 @@ bool InitVulkan(android_app* app) {
                                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   }
   gDescriptorSet->BindDescriptorBuffer(7, gGeometryIndices->GetBuffer(), sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(8, gTextureCountBuffer->GetBuffer(), sizeof(uint32_t), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(8, lightBuffer->GetBuffer(), sizeof(Light), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(9, gPhoenixGltf->GetMaterialUniform()->GetBuffer(), sizeof(GltfMaterial), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   gDescriptorSet->BindDescriptorBuffer(10, cameraPosBuffer->GetBuffer(), sizeof(glm::vec3), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(11, lightBuffer->GetBuffer(), sizeof(Light), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
@@ -971,11 +968,6 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     LookByGravity(currentFrame, isTouched, isFocused, gravityData, lastGravityData);
     if (!isTouched & !isPositionInitialized) {
       //initialization
-//    float index1Value = -100000.0f;
-//    lastPositions[0] = glm::vec2(-100.0f);
-//    lastPositions[1] = glm::vec2(index1Value);
-//    touchPositions[0] = glm::vec2(-0.1f);
-//    touchPositions[1] = glm::vec2(index1Value);
       lastPositions[0] = touchPositions[0];
       lastPositions[1] = touchPositions[1];
       isPositionInitialized = true;
@@ -1006,11 +998,6 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     uboRT.normalMatrix = modelViewInverse;
     gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
     cameraPosBuffer->CopyData((void*)&cameraPos, sizeof(glm::vec3));
-    //update AS
-    //aslsPlane->Update(&modelview, gQueue, gCommandPool);
-    //aslsCubes->Update(&modelview, gQueue, gCommandPool);
-    //aslsWoman->Update(&modelview, gQueue, gCommandPool);
-    //aslsWoman1->Update(&modelview, gQueue, gCommandPool);
   }
 //  astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
   //debug position
@@ -1379,6 +1366,7 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
   ImGui::Begin("Light Intensity");
   ImGui::SliderFloat("float", &light->intensity, 0.0f, 500.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
   isTouchSlider(touchPositions, lightIntensitySliderPos, sliderWindow, &light->intensity, 500);
+  lightBuffer->CopyData((void*)light.get(), sizeof(Light));
   ImGui::Text("light intensity");
   ImGui::SameLine();
   ImGui::End();

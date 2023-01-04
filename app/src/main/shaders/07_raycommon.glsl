@@ -57,8 +57,6 @@ struct WaveUBO{
 
 struct Light{
   vec3 lightPosition;
-  vec3 eyeDirection;
-  vec3 ambientColor;
   float intensity;
 };
 

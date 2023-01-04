@@ -53,10 +53,9 @@ layout(binding = 4, set = 0) buffer Indices {uint i[];} indices[];
 layout(binding = 5, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} verticesobj[];
 layout(binding = 6, set = 0) buffer Indicesobj {uint iobj[];} indicesobj[];
 layout(binding = 7, set = 0) buffer GeometryIndices {uint gi[];} geometryIndices[];
-layout(binding = 8, set = 0) uniform TextureCount {uint tc;} textureCount;
+layout(binding = 8, set = 0) uniform LIGHT {Light l;} light;
 layout(binding = 9, set = 0) uniform Material {GltfMaterial gm;} Gm;
 layout(binding = 10, set = 0) uniform CPOS {vec3 cp;} Cp;
-layout(binding = 11, set = 0) uniform LIGHT {Light l;} light;
 
 layout(binding = 0, set = 1) uniform sampler2D texSampler[];
 
@@ -353,7 +352,7 @@ void main()
     uint offset = 3 * gl_PrimitiveID;
     vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
     vec3 normal = v0.normal * barycentricCoords.x + v1.normal * barycentricCoords.y + v2.normal * barycentricCoords.z;
-    for(uint i = 0; i < textureCount.tc; i++){
+    for(uint i = 0; i < 1; i++){
         //TODO : multi texture in gltf model
         //if(offset < geometryIndices[0].gi[i]){
             color4 = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z);
