@@ -34,7 +34,14 @@
 #extension GL_GOOGLE_include_directive : enable
 #include "07_raycommon.glsl"
 
-layout(location = 2) rayPayloadInEXT PayroadBlend prdBlend;
+/*
+locations:
+0 : raygen payload
+1 : miss payload
+2 : opaque payload
+3 : no opaque payload
+*/
+layout(location = 3) rayPayloadInEXT PayroadBlend prdBlend;
 hitAttributeEXT vec2 attribs;
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;

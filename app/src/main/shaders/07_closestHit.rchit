@@ -35,10 +35,17 @@
 #extension GL_GOOGLE_include_directive : enable
 #include "07_raycommon.glsl"
 
+/*
+locations:
+0 : raygen payload
+1 : miss payload
+2 : opaque payload
+3 : no opaque payload
+*/
 layout(location = 0) rayPayloadInEXT vec4 pld;
 hitAttributeEXT vec2 attribs;
 layout(location = 1) rayPayloadEXT bool isShadowed;
-layout(location = 2) rayPayloadEXT PayroadBlend prdBlend;
+layout(location = 3) rayPayloadEXT PayroadBlend prdBlend;
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 2, set = 0) uniform CameraProperties 
@@ -117,7 +124,7 @@ void Caustics(vec3 planePos, inout vec3 refractColor)
 {
   uint causticFlags = gl_RayFlagsNoneEXT | gl_RayFlagsTerminateOnFirstHitEXT;
   InitPayLoad(vec3(0.0), WATER_COLOR);
-  traceRayEXT(topLevelAS, causticFlags, 0xFF, 1, 0, 2, planePos, 0.00001, vec3(0.0, -1.0, 0.0), 10.0, 2);
+  traceRayEXT(topLevelAS, causticFlags, 0xFF, 1, 0, 2, planePos, 0.00001, vec3(0.0, -1.0, 0.0), 10.0, 3);
   vec3 waterSurface = prdBlend.pos;
   if(true){
     vec3 waterNormal = prdBlend.normal;
@@ -180,7 +187,7 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
   //reflect
   InitPayLoad(pos, vec3(1.0, 1.0, 1.0));
   vec3 reflectD = reflect(incident, normal);
-  traceRayEXT(topLevelAS, flags, 0xFF, 1, 0, 2, pos, tMin, reflectD, tMax, 2);
+  traceRayEXT(topLevelAS, flags, 0xFF, 1, 0, 2, pos, tMin, reflectD, tMax, 3);
   reflectPos = prdBlend.pos;
   reflectNormal = prdBlend.normal;
   reflectColor = prdBlend.color;
@@ -201,7 +208,7 @@ void traceReflectRefract(vec3 pos, vec3 incident, vec3 normal, float refractInde
   if(!isAllReflect)
   {
     isShadowed = true;
-    traceRayEXT(topLevelAS, flags, 0xFF, 1, 0, 2, pos, tMin, refractD, tMax, 2);
+    traceRayEXT(topLevelAS, flags, 0xFF, 1, 0, 2, pos, tMin, refractD, tMax, 3);
     refractPos = prdBlend.pos;
     refractMiss = prdBlend.isMiss;
     refractNormal = prdBlend.normal;

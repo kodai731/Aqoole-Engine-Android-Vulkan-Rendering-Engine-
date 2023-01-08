@@ -24,7 +24,7 @@
 layout(location = 0) rayPayloadInEXT vec4 pld;
 hitAttributeEXT vec2 attribs;
 layout(location = 1) rayPayloadEXT bool isShadowed;
-layout(location = 2) rayPayloadEXT PayroadBlend prdBlend;
+layout(location = 3) rayPayloadEXT PayroadBlend prdBlend;
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 2, set = 0) uniform CameraProperties 
