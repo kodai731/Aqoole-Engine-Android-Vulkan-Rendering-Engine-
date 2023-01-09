@@ -56,8 +56,10 @@ layout(binding = 3, set = 0, scalar) buffer Vertices {Vertex3D v[];} vertices[];
 layout(binding = 4, set = 0) buffer Indices {uint i[];} indices[];
 layout(binding = 5, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} verticesobj[];
 layout(binding = 6, set = 0) buffer Indicesobj {uint iobj[];} indicesobj[];
-layout(binding = 7, set = 0) buffer IndicesOffset {uint ioff[];} indicesoff[];
-layout(binding = 9, set = 0) uniform Material {GltfMaterial gm;} Gm;
+layout(binding = 7, set = 0) uniform LIGHT {Light l;} light;
+layout(binding = 8, set = 0) uniform Material {GltfMaterial gm;} Gm;
+layout(binding = 9, set = 0, scalar) buffer VNoOpaque {Vertex3D vno[];} vnoopaque[];
+layout(binding = 10, set = 0) buffer INoOpaque {uint ino[];} inoopaque[];
 
 layout(binding = 0, set = 1) uniform sampler2D texSampler[];
 
@@ -95,12 +97,12 @@ void main()
   }
   else if(objId == 1)          //cube or water
   {
-    ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
-                      indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 1],   //
-                      indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 2]);  //
-    Vertex3D v0 = vertices[nonuniformEXT(objId)].v[ind.x];
-    Vertex3D v1 = vertices[nonuniformEXT(objId)].v[ind.y];
-    Vertex3D v2 = vertices[nonuniformEXT(objId)].v[ind.z];
+    ivec3 ind = ivec3(inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 0],   //
+                      inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 1],   //
+                      inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 2]);  //
+    Vertex3D v0 = vnoopaque[nonuniformEXT(0)].vno[ind.x];
+    Vertex3D v1 = vnoopaque[nonuniformEXT(0)].vno[ind.y];
+    Vertex3D v2 = vnoopaque[nonuniformEXT(0)].vno[ind.z];
     vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;                         //object coordinates
     vec3 normal = cross(v1.pos - v0.pos, v2.pos - v0.pos);
     normal = normalize(normal);

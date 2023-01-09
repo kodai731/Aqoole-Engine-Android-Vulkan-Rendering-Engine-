@@ -154,8 +154,8 @@ AEDescriptorSet* gDescriptorSet;
 glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
 MyImgui* gImgui;
 std::unique_ptr<AERayTracingASBottom> aslsCubes;
-std::unique_ptr<AERayTracingASBottom> aslsPlane;
-std::unique_ptr<AERayTracingASBottom> aslsWater;
+std::unique_ptr<AERayTracingASBottom> aslsOpaque;
+std::unique_ptr<AERayTracingASBottom> aslsNoOpaque;
 std::unique_ptr<AERayTracingASBottom> aslsWoman;
 std::unique_ptr<AERayTracingASBottom> aslsWoman1;
 std::unique_ptr<AERayTracingASTop> astop;
@@ -210,6 +210,9 @@ std::unique_ptr<AEBufferUniform> cameraPosBuffer;
 std::unique_ptr<AETextureImage> sand;
 std::unique_ptr<Light> light;
 std::unique_ptr<AEBufferUniform> lightBuffer;
+std::vector<BLASGeometryInfo> geometryOpaque;
+std::vector<BLASGeometryInfo> geometryNoOpaque;
+
 
 std::string gTargetModelPath = cowboyPath;
 bool isAnimation = true;
@@ -461,13 +464,6 @@ bool CreateBuffers(void) {
 //  gWomanOffset->CreateBuffer();
 //  gWomanOffset->CopyData((void*)gWomanCollada->GetOffsetAll().data(), 0, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), gQueue, gCommandPool);
   //prepare ray tracing objects
-//  gCube = std::make_unique<AECube>(2.0f, glm::vec3(-1.0f, 0.0f, -1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-//  gVertexBuffer = new AEBufferAS(gDevice, sizeof(Vertex3D) * gCube->GetVertexSize(), (VkBufferUsageFlagBits)0);
-//  gVertexBuffer->CreateBuffer();
-//  gVertexBuffer->CopyData((void*)gCube->GetVertexAddress().data(), 0, sizeof(Vertex3D) * gCube->GetVertexSize(), gQueue, gCommandPool);
-//  gIndexBuffer = new AEBufferAS(gDevice, sizeof(uint32_t) * gCube->GetIndexSize(), (VkBufferUsageFlagBits)0);
-//  gIndexBuffer->CreateBuffer();
-//  gIndexBuffer->CopyData((void*)gCube->GetIndexAddress().data(), 0, sizeof(uint32_t) * gCube->GetIndexSize(), gQueue, gCommandPool);
   BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(),
                                 *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
   BLASGeometryInfo planeInfo = {sizeof(Vertex3D), gXZPlane->GetVertexSize(), gXZPlane->GetIndexSize(),
@@ -485,16 +481,14 @@ bool CreateBuffers(void) {
                     (uint32_t) gPhoenixGltf->GetIndexAddress(0).size(),
                     *gvbModelGltf->GetBuffer(), *gibModelGltf->GetBuffer()};
   }
-  std::vector<BLASGeometryInfo> geometryCubes = {cubesInfo};
-  std::vector<BLASGeometryInfo> geometryPlane = {planeInfo};
+  geometryOpaque = {cubesInfo, planeInfo};
   std::vector<BLASGeometryInfo> geometryWoman0 = {womanInfo0};
-  std::vector<BLASGeometryInfo> geometryWater = {waterInfo};
-  aslsPlane = std::make_unique<AERayTracingASBottom>(gDevice, geometryPlane, &modelview, gQueue, gCommandPool);
-  aslsCubes = std::make_unique<AERayTracingASBottom>(gDevice, geometryCubes, &modelview, gQueue, gCommandPool);
+  geometryNoOpaque = {waterInfo};
+  aslsOpaque = std::make_unique<AERayTracingASBottom>(gDevice, geometryOpaque, &modelview, gQueue, gCommandPool);
   aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman0, &gltfModelView, gQueue, gCommandPool);
-  aslsWater = std::make_unique<AERayTracingASBottom>(gDevice, geometryWater, &modelview, gQueue, gCommandPool);
+  aslsNoOpaque = std::make_unique<AERayTracingASBottom>(gDevice, geometryNoOpaque, &modelview, gQueue, gCommandPool);
   //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
-  std::vector<AERayTracingASBottom*> bottoms= {aslsPlane.get(), aslsWater.get(), aslsWoman.get()};
+  std::vector<AERayTracingASBottom*> bottoms= {aslsOpaque.get(), aslsNoOpaque.get(), aslsWoman.get()};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
   return true;
 }
@@ -515,21 +509,25 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                                                       VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 2, nullptr);
+                                                      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+                                                      geometryOpaque.size(), nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 2, nullptr);
+                                                      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+                                                      geometryOpaque.size(), nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                                       VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                                       VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                                                       VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(8, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                                                       VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(9, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                                      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
-  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                                      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                                      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+                                                      geometryNoOpaque.size(), nullptr);
+  gDescriptorSetLayout->AddDescriptorSetLayoutBinding(10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                                      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+                                                      geometryNoOpaque.size(), nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
@@ -761,7 +759,7 @@ bool InitVulkan(android_app* app) {
   //light buffer
   light = std::make_unique<Light>();
   light->lightPosition = glm::vec3(0.0f, -50.0f, 0.0f);
-  light->intensity = 100.0f;
+  light->intensity = 25.0f;
   lightBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(Light));
   lightBuffer->CreateBuffer();
   lightBuffer->CopyData((void*)light.get(), sizeof(Light));
@@ -777,11 +775,11 @@ bool InitVulkan(android_app* app) {
 //  gDescriptorSet->BindDescriptorBuffers(4, {*gibWater->GetBuffer(), *gIndexBuffer->GetBuffer()},
 //                                        {gWater->GetIndexBufferSize(), sizeof(uint32_t) * gCubes[0]->GetIndexSize() * gCubes.size()},
 //                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffers(3, {*gvbPlane->GetBuffer(), *gvbWater->GetBuffer()},
-                                        {gXZPlane->GetVertexBufferSize(), gWater->GetVertexBufferSize()},
+  gDescriptorSet->BindDescriptorBuffers(3, {*gVertexBuffer->GetBuffer(), *gvbPlane->GetBuffer()},
+                                        {gCubes[0]->GetVertexBufferSize(), gXZPlane->GetVertexBufferSize()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffers(4, {*gibPlane->GetBuffer(), *gibWater->GetBuffer()},
-                                        {gXZPlane->GetIndexBufferSize(), gWater->GetIndexBufferSize()},
+  gDescriptorSet->BindDescriptorBuffers(4, {*gIndexBuffer->GetBuffer(), *gibPlane->GetBuffer()},
+                                        {gCubes[0]->GetIndexBufferSize(), gXZPlane->GetIndexBufferSize()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   if(isCollada) {
     gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(),
@@ -799,10 +797,14 @@ bool InitVulkan(android_app* app) {
                                          gPhoenixGltf->GetIndexBufferSize(0),
                                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   }
-  gDescriptorSet->BindDescriptorBuffer(7, gGeometryIndices->GetBuffer(), sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(8, lightBuffer->GetBuffer(), sizeof(Light), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(9, gPhoenixGltf->GetMaterialUniform()->GetBuffer(), sizeof(GltfMaterial), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  gDescriptorSet->BindDescriptorBuffer(10, cameraPosBuffer->GetBuffer(), sizeof(glm::vec3), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(7, lightBuffer->GetBuffer(), sizeof(Light), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+  gDescriptorSet->BindDescriptorBuffer(8, gPhoenixGltf->GetMaterialUniform()->GetBuffer(), sizeof(GltfMaterial), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+  gDescriptorSet->BindDescriptorBuffers(9, {*gvbWater->GetBuffer()},
+                                        {gWater->GetVertexBufferSize()},
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  gDescriptorSet->BindDescriptorBuffers(10, {*gibWater->GetBuffer()},
+                                        {gWater->GetIndexBufferSize()},
+                                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   gDescriptorSets.push_back(gDescriptorSet);
   //woman texture images
   gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
@@ -1047,8 +1049,8 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
 //                       nullptr, passedTime, gComputeEvent.get());
   gWater->SeaLevel((float)passedTime);
   gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue, gCommandPool);
-  aslsPlane->Update(&modelview, gQueue, gCommandPool);
-  aslsWater->Update(&modelview, gQueue, gCommandPool);
+  aslsOpaque->Update(&modelview, gQueue, gCommandPool);
+  aslsNoOpaque->Update(&modelview, gQueue, gCommandPool);
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSemaphore waitSemaphores = render.semaphore_;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};

@@ -59,10 +59,10 @@ layout(binding = 3, set = 0, scalar) buffer Vertices {Vertex3D v[];} vertices[];
 layout(binding = 4, set = 0) buffer Indices {uint i[];} indices[];
 layout(binding = 5, set = 0, scalar) buffer Verticesobj {Vertex3DObj vobj[];} verticesobj[];
 layout(binding = 6, set = 0) buffer Indicesobj {uint iobj[];} indicesobj[];
-layout(binding = 7, set = 0) buffer GeometryIndices {uint gi[];} geometryIndices[];
-layout(binding = 8, set = 0) uniform LIGHT {Light l;} light;
-layout(binding = 9, set = 0) uniform Material {GltfMaterial gm;} Gm;
-layout(binding = 10, set = 0) uniform CPOS {vec3 cp;} Cp;
+layout(binding = 7, set = 0) uniform LIGHT {Light l;} light;
+layout(binding = 8, set = 0) uniform Material {GltfMaterial gm;} Gm;
+layout(binding = 9, set = 0, scalar) buffer VNoOpaque {Vertex3D vno[];} vnoopaque[];
+layout(binding = 10, set = 0) buffer INoOpaque {uint ino[];} inoopaque[];
 
 layout(binding = 0, set = 1) uniform sampler2D texSampler[];
 
@@ -310,12 +310,12 @@ void main()
   if(objId == 1)
   {
     //cube or water
-    ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
-                      indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 1],   //
-                      indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 2]);  //
-    Vertex3D v0 = vertices[nonuniformEXT(objId)].v[ind.x];
-    Vertex3D v1 = vertices[nonuniformEXT(objId)].v[ind.y];
-    Vertex3D v2 = vertices[nonuniformEXT(objId)].v[ind.z];
+    ivec3 ind = ivec3(inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 0],   //
+                      inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 1],   //
+                      inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 2]);  //
+    Vertex3D v0 = vnoopaque[nonuniformEXT(0)].vno[ind.x];
+    Vertex3D v1 = vnoopaque[nonuniformEXT(0)].vno[ind.y];
+    Vertex3D v2 = vnoopaque[nonuniformEXT(0)].vno[ind.z];
     vec3 worldPos = v0.pos * barycentricCoords.x + v1.pos * barycentricCoords.y + v2.pos * barycentricCoords.z;
     float refractRatio = nAir / nWater;
     prdBlend.hit = false;
@@ -361,12 +361,10 @@ void main()
     vec3 normal = v0.normal * barycentricCoords.x + v1.normal * barycentricCoords.y + v2.normal * barycentricCoords.z;
     for(uint i = 0; i < 1; i++){
         //TODO : multi texture in gltf model
-        //if(offset < geometryIndices[0].gi[i]){
-            color4 = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z);
-            color = color4.xyz;
-            //Lighting(color, worldPos, normal);
-            alpha = color4.w;
-        //}
+        color4 = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z);
+        color = color4.xyz;
+        //Lighting(color, worldPos, normal);
+        alpha = color4.w;
     }
   }
   pld = vec4(color, alpha);
