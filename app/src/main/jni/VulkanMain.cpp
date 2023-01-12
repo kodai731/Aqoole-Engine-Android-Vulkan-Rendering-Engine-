@@ -226,7 +226,7 @@ double startTime;
 double passedTime = 0.0;
 uint32_t gAnimationIndex = 0;
 
-std::vector<AECube*> gCubes;
+std::vector<std::unique_ptr<AECube>> gCubes;
 bool isPaused = false;
 
 bool isContinuedTouch = false;
@@ -241,6 +241,9 @@ static double GetTime();
 void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTouched);
 bool isTouchButton(glm::vec2* touchPos, ImVec2 buttonPos, ImVec2 buttonRegion);
 bool isTouchSlider(glm::vec2* touchPos, ImVec2 sliderPos, ImVec2 sliderRegion, void* value, float range);
+void MakeCubes();
+glm::vec4 Camera2TouchScreen(glm::vec2* touchPos);
+bool isTouchObject(glm::vec2* touchPos, glm::vec3 objectPos);
 /*
  * setImageLayout():
  *    Helper function to transition color buffer layout
@@ -605,28 +608,9 @@ bool InitVulkan(android_app* app) {
           };
   gDescriptorPool = new AEDescriptorPool(gDevice, poolSizeRT.size(), poolSizeRT.data());
   //create objects
-  //cubes
-  float offsetX = -1.0f;
-  float offsetY = 1.0f;
-  float offsetZ = 0.0f;
-  float cubeLength = 1.0f;
-  float nextPosition = cubeLength * 1.5f + 5.0f;
-  for(uint32_t i = 0; i < 2; i++)
-  {
-    offsetY = -1.0f;
-    for(uint32_t j = 0; j < 2; j++)
-    {
-      offsetX = -5.0f;
-      for(uint32_t k = 0; k < 2; k++)
-      {
-        AECube* cube = new AECube(cubeLength, glm::vec3(offsetX, offsetY, offsetZ), glm::vec3(0.1f, 0.1f, 0.1f));
-        gCubes.push_back(cube);
-        offsetX += nextPosition;
-      }
-      offsetY += nextPosition;
-    }
-    offsetZ += nextPosition;
-  }
+  //first cube
+  std::unique_ptr<AECube> cube = std::make_unique<AECube>(0.2f, glm::vec3(-0.1f, -5.1f, -0.1f), glm::vec3(1.0f, 1.0f, 1.0f));
+  gCubes.emplace_back(std::move(cube));
   //plane
   float left = -20.0f;
   float right = 20.0f;
@@ -694,7 +678,8 @@ bool InitVulkan(android_app* app) {
                         0.1f, 100.0f);
   gltfModelView.view = glm::mat4(1.0f);
   AEMatrix::View(gltfModelView.view, cameraPos, cameraDirection, cameraUp);
-  CreateBuffers();  // create vertex
+  //create buffers
+  CreateBuffers();
   //create camera buffer
   cameraPosBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(glm::vec3));
   cameraPosBuffer->CreateBuffer();
@@ -758,8 +743,8 @@ bool InitVulkan(android_app* app) {
   gTextureCountBuffer->CopyData((void*)&tc, sizeof(uint32_t));
   //light buffer
   light = std::make_unique<Light>();
-  light->lightPosition = glm::vec3(0.0f, -50.0f, 0.0f);
-  light->intensity = 25.0f;
+  light->lightPosition = glm::vec3(0.0f, -5.0f, 0.0f);
+  light->intensity = 1.0f;
   lightBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(Light));
   lightBuffer->CreateBuffer();
   lightBuffer->CopyData((void*)light.get(), sizeof(Light));
@@ -975,10 +960,9 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
       isPositionInitialized = true;
     } else if (isTouched) {
       uint32_t fingers = DetectFingers(currentFrame, isTouched, isFocused, touchPositions);
-      if (fingers == 1)
-        //Look(currentFrame, isTouched, isFocused, touchPositions);
-//          ResetCamera();  //=> will reposition to imgui later
-        ;
+      if (fingers == 1){
+        isTouchObject(touchPositions, light->lightPosition);
+      }
       else if (fingers == 2)
         Zoom(currentFrame, isTouched, isFocused, touchPositions);
       isPositionInitialized = false;
@@ -1372,8 +1356,6 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
   ImGui::Text("light intensity");
   ImGui::SameLine();
   ImGui::End();
-  //copy buffer
-
   ImGui::Render();
   ImDrawData* drawData = ImGui::GetDrawData();
   ImGui_ImplVulkan_RenderDrawData(drawData, *cb);
@@ -1408,4 +1390,56 @@ uint32_t SelectKeyframe(double frac, std::vector<float>& keyFrames)
           return i;
   }
   return keyFrameSize - 1;
+}
+
+void MakeCubes()
+{
+//    float offsetX = -1.0f;
+//    float offsetY = 1.0f;
+//    float offsetZ = 0.0f;
+//    float cubeLength = 1.0f;
+//    float nextPosition = cubeLength * 1.5f + 5.0f;
+//    for(uint32_t i = 0; i < 2; i++)
+//    {
+//        offsetY = -1.0f;
+//        for(uint32_t j = 0; j < 2; j++)
+//        {
+//            offsetX = -5.0f;
+//            for(uint32_t k = 0; k < 2; k++)
+//            {
+//                AECube* cube = new AECube(cubeLength, glm::vec3(offsetX, offsetY, offsetZ), glm::vec3(0.1f, 0.1f, 0.1f));
+//                gCubes.push_back(cube);
+//                offsetX += nextPosition;
+//            }
+//            offsetY += nextPosition;
+//        }
+//        offsetZ += nextPosition;
+//    }
+}
+
+glm::vec4 Camera2TouchScreen(glm::vec2* touchPos)
+{
+  //touch position to view port
+  float x = touchPos[0].x / gSwapchain->GetExtents()[0].width;
+  float y = touchPos[0].y / gSwapchain->GetExtents()[0].height;
+  //view potr to clip
+  x = x * 2.0f - 1.0f;
+  y = y * 2.0f - 1.0f;
+  //clip to view
+  glm::mat4 invp = glm::inverse(modelview.proj);
+  glm::vec4 sview = invp * glm::vec4(x, y, 1.0f, 1.0f);
+  return glm::inverse(modelview.view) * glm::normalize(glm::vec4(glm::vec3(sview), 0.0f));
+}
+
+bool isTouchObject(glm::vec2* touchPos, glm::vec3 objectPos)
+{
+  //check the degree between camera-touchpos and camera-object
+  glm::vec4 worldD = Camera2TouchScreen(touchPos);
+  glm::vec3 w3 = glm::normalize(glm::vec3(worldD));
+  glm::vec3 a = glm::normalize(objectPos - cameraPos);
+  float dot = glm::dot(w3, a);
+  if(dot > 0.999f){
+      return true;
+  }
+  return false;
 }
