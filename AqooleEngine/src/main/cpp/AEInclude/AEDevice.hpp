@@ -231,7 +231,7 @@ class AERayTracingASBase
 	std::vector<VkAccelerationStructureGeometryKHR> mGeometries;
 	VkAccelerationStructureBuildSizesInfoKHR mSizeInfo;
 	std::vector<VkAccelerationStructureBuildRangeInfoKHR> mRangeInfos;
-	VkTransformMatrixKHR mTransformMatrix;
+	std::vector<VkTransformMatrixKHR> mTransformMatrices;
 	//functions
 	AERayTracingASBase(AELogicalDevice* device);
 	virtual ~AERayTracingASBase();
@@ -242,7 +242,7 @@ class AERayTracingASBase
 	PFN_vkCmdBuildAccelerationStructuresKHR pfnCmdBuildAccelerationStructuresKHR;
 	PFN_vkGetAccelerationStructureDeviceAddressKHR pfnGetAccelerationStructureDeviceAddressKHR;
 	PFN_vkDestroyAccelerationStructureKHR pfnDestroyAccelerationStructureKHR;
-	void SetTransformMatrix(glm::mat4 const &m);
+	VkTransformMatrixKHR MakeTransformMatrix(glm::mat4 const &m);
 	public:
 	//getter
 	VkAccelerationStructureKHR* GetAS(){return &mAS;}
@@ -253,22 +253,24 @@ class AERayTracingASBase
 class AERayTracingASBottom : public AERayTracingASBase
 {
 	private:
-	std::unique_ptr<AEBufferAS> mTransFormBuffer;
+	std::vector<std::unique_ptr<AEBufferAS>> mTransFormBuffers;
 	//functions
 	void GetASProperties(VkPhysicalDeviceAccelerationStructurePropertiesKHR& prop);
 	void GetSupportedVertexFormat();
 	public:
-	AERayTracingASBottom(AELogicalDevice* device, uint32_t oneVertexSize, uint32_t maxVertex, uint32_t indicesCount,
-		VkBuffer vertexBuffer, VkBuffer indexBuffer, ModelView const* modelView, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
-	AERayTracingASBottom(AELogicalDevice* device, std::vector<BLASGeometryInfo> const& geometries, ModelView const* modelView,
+//	AERayTracingASBottom(AELogicalDevice* device, uint32_t oneVertexSize, uint32_t maxVertex, uint32_t indicesCount,
+//		VkBuffer vertexBuffer, VkBuffer indexBuffer, ModelView const* modelView, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
+	AERayTracingASBottom(AELogicalDevice* device, std::vector<BLASGeometryInfo> const& geometries, std::vector<ModelView> const& modelViews,
 		AEDeviceQueue* commandQueue, AECommandPool* commandPool);
 	~AERayTracingASBottom();
 	//getter
-	AEBufferAS* GetTransformBuffer(){return mTransFormBuffer.get();}
-	VkTransformMatrixKHR* GetTransformMatrix(){return &mTransformMatrix;}
+	AEBufferAS* GetTransformBuffer(uint32_t index){return mTransFormBuffers[index].get();}
+	VkTransformMatrixKHR* GetTransformMatrix(uint32_t index){return &mTransformMatrices[index];}
 	VkDeviceAddress GetDeviceAddress(){return mDeviceAddress;}
+	uint32_t GetGeometryCount(){return mTransFormBuffers.size();}
 	//update transform matrix
-	void Update(ModelView const* m, AEDeviceQueue* queue, AECommandPool* commandPool);
+	void Update(uint32_t index, ModelView const* m, AEDeviceQueue* queue, AECommandPool* commandPool);
+    void Update(std::vector<ModelView> const&mvs, AEDeviceQueue* queue, AECommandPool* commandPool);
 };
 
 //top level AS class
@@ -282,7 +284,7 @@ class AERayTracingASTop : public AERayTracingASBase
 	AERayTracingASTop(AELogicalDevice* device, std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView,
 		AEDeviceQueue* commandQueue, AECommandPool* commandPool);
 	~AERayTracingASTop();
-	void Update(std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
+	void Update(uint32_t index, std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
 };
 #endif
 

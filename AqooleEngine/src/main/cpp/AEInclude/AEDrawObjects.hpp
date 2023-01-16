@@ -476,10 +476,13 @@ public:
 class AECube : public AEDrawObjectBase3D
 {
     private:
+    float mLen;
+    glm::vec3 mColor;
     //function
     public:
     AECube(float len, glm::vec3 const& min, glm::vec3 const& color);
     ~AECube();
+    void Update(glm::vec3 min);
 };
 
 class AEPyramid : public AEDrawObjectBase3D

@@ -3278,7 +3278,9 @@ AECube::AECube(float len, glm::vec3 const& min, glm::vec3 const& color)
 {
     Vertex3D v3d;
     v3d.color = color;
-    float half = len / 2.0f;
+    mLen = len;
+    mColor = color;
+    float half = mLen / 2.0f;
     glm::vec3 center = glm::vec3(min.x + half, min.y + half, min.z + half);
     //vertex
     //upper
@@ -3318,7 +3320,43 @@ AECube::~AECube()
 
 }
 
-
+/*
+ * update
+ */
+void AECube::Update(glm::vec3 min)
+{
+    Vertex3D v3d;
+    float half = mLen / 2.0f;
+    glm::vec3 center = glm::vec3(min.x + half, min.y + half, min.z + half);
+    //vertex
+    //upper
+    v3d.normal = glm::normalize(min - center);
+    v3d.pos = min;
+    v3d.color = mColor;
+    mVertices[0] = v3d;
+    v3d.pos = glm::vec3(min.x + mLen, min.y, min.z);
+    v3d.normal = glm::normalize(glm::vec3(min.x + mLen, min.y, min.z) - center);
+    mVertices[1] = v3d;
+    v3d.pos = glm::vec3(min.x + mLen, min.y, min.z + mLen);
+    v3d.normal = glm::normalize(v3d.pos - center);
+    mVertices[2] = v3d;
+    v3d.pos = glm::vec3(min.x, min.y, min.z + mLen);
+    v3d.normal = glm::normalize(v3d.pos - center);
+    mVertices[3] = v3d;
+    //floor
+    v3d.pos = glm::vec3(min.x, min.y + mLen, min.z);
+    v3d.normal = glm::normalize(v3d.pos - center);
+    mVertices[4] = v3d;
+    v3d.pos = glm::vec3(min.x + mLen, min.y + mLen, min.z);
+    v3d.normal = glm::normalize(v3d.pos - center);
+    mVertices[5] = v3d;
+    v3d.pos = glm::vec3(min.x + mLen, min.y + mLen, min.z + mLen);
+    v3d.normal = glm::normalize(v3d.pos - center);
+    mVertices[6] = v3d;
+    v3d.pos = glm::vec3(min.x, min.y + mLen, min.z + mLen);
+    v3d.normal = glm::normalize(v3d.pos - center);
+    mVertices[7] = v3d;
+}
 
 //=====================================================================
 //AE pyramid

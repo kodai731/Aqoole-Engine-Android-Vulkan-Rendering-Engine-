@@ -773,14 +773,15 @@ VkDeviceAddress AERayTracingASBase::GetBufferDeviceAddress(VkBuffer buffer)
 /*
 set mat4 to tranform matrix
 */
-void AERayTracingASBase::SetTransformMatrix(glm::mat4 const &m)
+VkTransformMatrixKHR AERayTracingASBase::MakeTransformMatrix(glm::mat4 const &m)
 {
 	glm::mat4 mt = glm::transpose(m);
 	glm::mat3x4 affine = glm::mat3x4(mt[0], mt[1], mt[2]);
-	mTransformMatrix = {};
+    VkTransformMatrixKHR vkm = {};
 	for(uint32_t i = 0; i < 3; i++)
 		for(uint32_t j = 0; j < 4; j++)
-			mTransformMatrix.matrix[i][j] = affine[i][j];
+			vkm.matrix[i][j] = affine[i][j];
+    return vkm;
 }
 
 
@@ -790,6 +791,7 @@ void AERayTracingASBase::SetTransformMatrix(glm::mat4 const &m)
 /*
 constructor
 */
+/*
 AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, uint32_t oneVertexSize, uint32_t maxVertex, uint32_t indicesCount,
 		VkBuffer vertexBuffer, VkBuffer indexBuffer, ModelView const* modelView, AEDeviceQueue* commandQueue, AECommandPool* commandPool)
 		: AERayTracingASBase(device)
@@ -816,9 +818,9 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, uint32_t one
 	VkDeviceOrHostAddressConstKHR transformDataDeviceAddress{};
 	//make transform matrix
 	SetTransformMatrix(modelView->translate * modelView->rotate * modelView->scale);
-	mTransFormBuffer = std::make_unique<AEBufferAS>(mDevice, sizeof(VkTransformMatrixKHR), (VkBufferUsageFlagBits)0);
-	mTransFormBuffer->CreateBuffer();
-	mTransFormBuffer->CopyData((void*)&mTransformMatrix, 0, sizeof(VkTransformMatrixKHR), commandQueue, commandPool);
+//	mTransFormBuffer = std::make_unique<AEBufferAS>(mDevice, sizeof(VkTransformMatrixKHR), (VkBufferUsageFlagBits)0);
+//	mTransFormBuffer->CreateBuffer();
+//	mTransFormBuffer->CopyData((void*)&mTransformMatrix, 0, sizeof(VkTransformMatrixKHR), commandQueue, commandPool);
 	transformDataDeviceAddress.deviceAddress = GetBufferDeviceAddress(*mTransFormBuffer->GetBuffer());
 	VkAccelerationStructureGeometryKHR mGeometry = {};
 	mGeometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -888,11 +890,12 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, uint32_t one
 	mGeometries.push_back(mGeometry);
 	mRangeInfos.push_back(mRangeInfo);
 }
+*/
 
 /*
 constructor v2
 */
-AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, std::vector<BLASGeometryInfo> const& geometries, ModelView const* modelView,
+AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, std::vector<BLASGeometryInfo> const& geometries, std::vector<ModelView> const& modelViews,
 	AEDeviceQueue* commandQueue, AECommandPool* commandPool)
 	: AERayTracingASBase(device)
 {
@@ -912,19 +915,29 @@ AERayTracingASBottom::AERayTracingASBottom(AELogicalDevice* device, std::vector<
 	// uint32_t primitiveCount = indicesCount / 3;
 	std::vector<uint32_t> primitiveCounts;
 	//make transform matrix
+    /*
 	SetTransformMatrix(modelView->translate * modelView->rotate * modelView->scale);
 	mTransFormBuffer = std::make_unique<AEBufferAS>(mDevice, sizeof(VkTransformMatrixKHR), (VkBufferUsageFlagBits)0);
 	mTransFormBuffer->CreateBuffer();
 	mTransFormBuffer->CopyData((void*)&mTransformMatrix, 0, sizeof(VkTransformMatrixKHR), commandQueue, commandPool);
+     */
 	//geometries
 	for(uint32_t i = 0; i < geometries.size(); i++)
 	{
+        //modelviews and buffer
+        VkTransformMatrixKHR vtm = MakeTransformMatrix(modelViews[i].translate * modelViews[i].rotate * modelViews[i].scale);
+		mTransformMatrices.emplace_back(vtm);
+        std::unique_ptr<AEBufferAS> trb = std::make_unique<AEBufferAS>(mDevice, sizeof(VkTransformMatrixKHR), (VkBufferUsageFlagBits)0);
+        trb->CreateBuffer();
+        trb->CopyData((void*)&mTransformMatrices[i], 0, sizeof(VkTransformMatrixKHR), commandQueue, commandPool);
+        mTransFormBuffers.emplace_back(std::move(trb));
+        //geometry
 		VkDeviceOrHostAddressConstKHR vertexDataDeviceAddress{};
 		vertexDataDeviceAddress.deviceAddress = GetBufferDeviceAddress(geometries[i].vertexBuffer);
 		VkDeviceOrHostAddressConstKHR indexDataDeviceAddress{};
 		indexDataDeviceAddress.deviceAddress = GetBufferDeviceAddress(geometries[i].indexBuffer);
 		VkDeviceOrHostAddressConstKHR transformDataDeviceAddress{};
-		transformDataDeviceAddress.deviceAddress = GetBufferDeviceAddress(*mTransFormBuffer->GetBuffer());
+		transformDataDeviceAddress.deviceAddress = GetBufferDeviceAddress(*mTransFormBuffers[i]->GetBuffer());
 		VkAccelerationStructureGeometryKHR oneGeometry = {};
 		oneGeometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
 		oneGeometry.geometryType = VkGeometryTypeKHR::VK_GEOMETRY_TYPE_TRIANGLES_KHR;
@@ -1010,7 +1023,8 @@ destructor
 AERayTracingASBottom
 ::~AERayTracingASBottom()
 {
-	mTransFormBuffer.reset();
+    for(auto& a : mTransFormBuffers)
+	    a.reset();
 }
 
 /*
@@ -1041,11 +1055,11 @@ void AERayTracingASBottom
 /*
 get transform matrix form modelview
 */
-void AERayTracingASBottom::Update(ModelView const* m, AEDeviceQueue* queue, AECommandPool* commandPool)
+void AERayTracingASBottom::Update(uint32_t index, ModelView const* m, AEDeviceQueue* queue, AECommandPool* commandPool)
 {
 	//update tranform buffer
-	SetTransformMatrix(m->translate * m->rotate * m->scale);
-	mTransFormBuffer->CopyData((void*)&mTransformMatrix, 0, sizeof(VkTransformMatrixKHR), queue, commandPool);
+	VkTransformMatrixKHR vtm = MakeTransformMatrix(m->translate * m->rotate * m->scale);
+	mTransFormBuffers[index]->CopyData((void*)&vtm, 0, sizeof(VkTransformMatrixKHR), queue, commandPool);
 	//scratch buffer
 	AEBufferAS scratchBuffer(mDevice, mSizeInfo.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	scratchBuffer.CreateBuffer();
@@ -1061,6 +1075,33 @@ void AERayTracingASBottom::Update(ModelView const* m, AEDeviceQueue* queue, AECo
 	AECommand::BeginSingleTimeCommands(&commandBuffer);
 	pfnCmdBuildAccelerationStructuresKHR(*commandBuffer.GetCommandBuffer(), 1, &mBuildCommandGeometryInfo, buildRangeInfos.data());
 	AECommand::EndSingleTimeCommands(&commandBuffer, queue);
+}
+
+/*
+ * update all modelview
+ */
+void AERayTracingASBottom::Update(std::vector<ModelView> const& mvs, AEDeviceQueue* queue, AECommandPool* commandPool)
+{
+    for(uint32_t i = 0; i < mvs.size(); i++) {
+        VkTransformMatrixKHR vtm = MakeTransformMatrix(mvs[i].translate * mvs[i].rotate * mvs[i].scale);
+        mTransFormBuffers[i]->CopyData((void *) &vtm, 0, sizeof(VkTransformMatrixKHR), queue,
+                                           commandPool);
+    }
+    //scratch buffer
+    AEBufferAS scratchBuffer(mDevice, mSizeInfo.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    scratchBuffer.CreateBuffer();
+    //modify buildGeometryInfo for update
+    mBuildCommandGeometryInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
+    mBuildCommandGeometryInfo.srcAccelerationStructure = mAS;
+//	mBuildCommandGeometryInfo.scratchData.deviceAddress = AEBuffer::GetBufferDeviceAddress(mDevice, *scratchBuffer.GetBuffer());
+    mBuildCommandGeometryInfo.scratchData.deviceAddress = GetBufferDeviceAddress(*scratchBuffer.GetBuffer());
+    //range info
+    std::vector<VkAccelerationStructureBuildRangeInfoKHR*> buildRangeInfos = {mRangeInfos.data()};
+    //command
+    AECommandBuffer commandBuffer(mDevice, commandPool);
+    AECommand::BeginSingleTimeCommands(&commandBuffer);
+    pfnCmdBuildAccelerationStructuresKHR(*commandBuffer.GetCommandBuffer(), 1, &mBuildCommandGeometryInfo, buildRangeInfos.data());
+    AECommand::EndSingleTimeCommands(&commandBuffer, queue);
 }
 
 /*
@@ -1096,22 +1137,24 @@ AERayTracingASTop::AERayTracingASTop(AELogicalDevice* device, std::vector<AERayT
 	: AERayTracingASBase(device)
 {
 	//transform matrix
-	SetTransformMatrix(glm::mat4(1.0f));
+	VkTransformMatrixKHR vtm = MakeTransformMatrix(glm::mat4(1.0f));
+	mTransformMatrices.emplace_back(vtm);
 	//AS instance
 	//uint32_t bottomLevelGeometryCount = bottom->GetGeometryCount();
 	uint32_t bottomLevelGeometryCount = bottoms.size();
 	std::vector<VkDeviceOrHostAddressConstKHR> instanceDeviceAddresses;
-	for(uint32_t i = 0; i < bottomLevelGeometryCount; i++)
-	{
-		VkAccelerationStructureInstanceKHR instance{};
-		instance.transform = *bottoms[i]->GetTransformMatrix();
-		instance.instanceCustomIndex = (uint16_t)i;
-		instance.mask = 0xFF;
-		instance.instanceShaderBindingTableRecordOffset = 0;
-		instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-		instance.accelerationStructureReference = bottoms[i]->GetDeviceAddress();
-		//use instance as member
-		mInstances.push_back(instance);
+	for(uint32_t i = 0; i < bottomLevelGeometryCount; i++){
+		for(uint32_t j = 0; j < bottoms[i]->GetGeometryCount(); j++) {
+			VkAccelerationStructureInstanceKHR instance{};
+			instance.transform = *bottoms[i]->GetTransformMatrix(j);
+			instance.instanceCustomIndex = (uint16_t) i;
+			instance.mask = 0xFF;
+			instance.instanceShaderBindingTableRecordOffset = 0;
+			instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+			instance.accelerationStructureReference = bottoms[i]->GetDeviceAddress();
+			//use instance as member
+			mInstances.emplace_back(instance);
+		}
 	}
 	//create buffer containing all instances
 	mInstanceBuffer = std::make_unique<AEBufferAS>(mDevice, sizeof(VkAccelerationStructureInstanceKHR) * mInstances.size(), (VkBufferUsageFlagBits)0);
@@ -1197,13 +1240,13 @@ AERayTracingASTop::~AERayTracingASTop()
 /*
 update transform matrix
 */
-void AERayTracingASTop::Update(std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView, AEDeviceQueue* commandQueue,
+void AERayTracingASTop::Update(uint32_t index, std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView, AEDeviceQueue* commandQueue,
 	AECommandPool* commandPool)
 {
 	//rebuild needed to update tranform matrix
-	SetTransformMatrix(glm::mat4(1.0f));
+	VkTransformMatrixKHR vtm = MakeTransformMatrix(glm::mat4(1.0f));
 	for(uint32_t i = 0; i < mInstances.size(); i++)
-		mInstances[i].transform = *bottoms[i]->GetTransformMatrix();
+		mInstances[i].transform = *bottoms[i]->GetTransformMatrix(index);
 	mInstanceBuffer->CopyData((void*)mInstances.data(), 0, sizeof(VkAccelerationStructureInstanceKHR) * mInstances.size(), commandQueue, commandPool);
 	// VkDeviceOrHostAddressConstKHR instanceDeviceAddress{};
 	// instanceDeviceAddress.deviceAddress = AEBuffer::GetBufferDeviceAddress(mDevice, *mInstanceBuffer->GetBuffer());

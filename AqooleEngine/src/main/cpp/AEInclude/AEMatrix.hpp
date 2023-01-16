@@ -28,6 +28,7 @@ namespace AEMatrix
     void Perspective(glm::mat4 &proj, float angle, float aspect, float near, float far);
     void View(glm::mat4 &view, glm::vec3 const& camera, glm::vec3 const& look, glm::vec3 const& up);
     void Rodrigues(glm::mat3 &rotate, float c, float s, glm::vec3 const& n);
+    glm::vec3 Ortho(glm::vec3 base1, glm::vec3 base2, glm::vec3 obj);
 #ifndef __ANDROID__
     glm::vec3 TestMult(glm::mat3 const& m, glm::vec3 const& v);
     void KeyEventRotate(GLFWwindow *window, glm::mat4 &rotate, float angle);

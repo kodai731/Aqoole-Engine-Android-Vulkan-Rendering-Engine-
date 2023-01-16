@@ -82,6 +82,17 @@ void AEMatrix::Rodrigues(glm::mat3 &rotate, float c, float s, glm::vec3 const& n
 	return;
 }
 
+/*
+ * ortho vec3 to plane
+ * https://python.atelierkobato.com/projection/
+ */
+glm::vec3 AEMatrix::Ortho(glm::vec3 base1, glm::vec3 base2, glm::vec3 obj)
+{
+    glm::mat2x3 a(base1, base2);
+    glm::mat3x2 ta = glm::transpose(a);
+    return (a * glm::inverse(ta * a) * ta) * obj;
+}
+
 #ifndef __ANDROID__
 /*
 test multiple vector of matrix

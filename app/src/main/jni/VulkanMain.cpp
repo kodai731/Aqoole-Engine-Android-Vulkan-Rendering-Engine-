@@ -132,6 +132,9 @@ AECommandPool* gCommandPool;
 ModelView modelview = {};
 ModelView phoenixModelView = {};
 ModelView gltfModelView = {};
+ModelView cubeMV = {};
+ModelView planeMV = {};
+ModelView waterMV = {};
 /*
 uniform
  */
@@ -153,11 +156,9 @@ AEDescriptorPool* gDescriptorPool;
 AEDescriptorSet* gDescriptorSet;
 glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
 MyImgui* gImgui;
-std::unique_ptr<AERayTracingASBottom> aslsCubes;
 std::unique_ptr<AERayTracingASBottom> aslsOpaque;
 std::unique_ptr<AERayTracingASBottom> aslsNoOpaque;
 std::unique_ptr<AERayTracingASBottom> aslsWoman;
-std::unique_ptr<AERayTracingASBottom> aslsWoman1;
 std::unique_ptr<AERayTracingASTop> astop;
 std::unique_ptr<AEPipelineRaytracing> gPipelineRT;
 std::unique_ptr<AEStorageImage> gStorageImage;
@@ -244,6 +245,8 @@ bool isTouchSlider(glm::vec2* touchPos, ImVec2 sliderPos, ImVec2 sliderRegion, v
 void MakeCubes();
 glm::vec4 Camera2TouchScreen(glm::vec2* touchPos);
 bool isTouchObject(glm::vec2* touchPos, glm::vec3 objectPos);
+void MoveObject(glm::vec2* touchPos);
+void InitModelView(ModelView* mv);
 /*
  * setImageLayout():
  *    Helper function to transition color buffer layout
@@ -487,9 +490,12 @@ bool CreateBuffers(void) {
   geometryOpaque = {cubesInfo, planeInfo};
   std::vector<BLASGeometryInfo> geometryWoman0 = {womanInfo0};
   geometryNoOpaque = {waterInfo};
-  aslsOpaque = std::make_unique<AERayTracingASBottom>(gDevice, geometryOpaque, &modelview, gQueue, gCommandPool);
-  aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman0, &gltfModelView, gQueue, gCommandPool);
-  aslsNoOpaque = std::make_unique<AERayTracingASBottom>(gDevice, geometryNoOpaque, &modelview, gQueue, gCommandPool);
+  aslsOpaque = std::make_unique<AERayTracingASBottom>(gDevice, geometryOpaque,
+                                                      std::vector<ModelView>{cubeMV, planeMV}, gQueue, gCommandPool);
+  aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman0,
+                                                     std::vector<ModelView>{gltfModelView}, gQueue, gCommandPool);
+  aslsNoOpaque = std::make_unique<AERayTracingASBottom>(gDevice, geometryNoOpaque,
+                                                        std::vector<ModelView>{waterMV}, gQueue, gCommandPool);
   //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
   std::vector<AERayTracingASBottom*> bottoms= {aslsOpaque.get(), aslsNoOpaque.get(), aslsWoman.get()};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
@@ -649,35 +655,12 @@ bool InitVulkan(android_app* app) {
   //gltf model
   gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(yardGrassGltfPath.c_str(), app, gDevice, gScale);
   gltfTextureImage = std::make_unique<AETextureImage>(gDevice, "yard_grass/material_baseColor.png", gCommandPool, gQueue, androidAppCtx);
-  modelview.rotate = glm::mat4(1.0f);
-  modelview.scale = glm::mat4(1.0f);
-  modelview.translate = glm::mat4(1.0f);
-  modelview.proj = glm::mat4(1.0f);
-  AEMatrix::Perspective(modelview.proj, 90.0f,
-                        (float)gSwapchain->GetExtents()[0].width / (float)gSwapchain->GetExtents()[0].height,
-                        0.1f, 100.0f);
-  modelview.view = glm::mat4(1.0f);
-  AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
-  //collada model modelview
-  phoenixModelView.rotate = glm::rotate(glm::mat4(1.0f), (float)M_PI * 0.25f, glm::vec3(1.0f, 0.0f, 0.0f));
-  phoenixModelView.scale = glm::mat4(1.0f);
-  phoenixModelView.translate = glm::mat4(1.0f);
-  phoenixModelView.proj = glm::mat4(1.0f);
-  AEMatrix::Perspective(phoenixModelView.proj, 90.0f,
-                        (float)gSwapchain->GetExtents()[0].width / (float)gSwapchain->GetExtents()[0].height,
-                        0.1f, 100.0f);
-  phoenixModelView.view = glm::mat4(1.0f);
-  AEMatrix::View(phoenixModelView.view, cameraPos, cameraDirection, cameraUp);
-  //GLTF model modelview
-  gltfModelView.rotate = glm::mat4(1.0f);
-  gltfModelView.scale = glm::mat4(1.0f);
-  gltfModelView.translate = glm::mat4(1.0f);
-  gltfModelView.proj = glm::mat4(1.0f);
-  AEMatrix::Perspective(gltfModelView.proj, 90.0f,
-                        (float)gSwapchain->GetExtents()[0].width / (float)gSwapchain->GetExtents()[0].height,
-                        0.1f, 100.0f);
-  gltfModelView.view = glm::mat4(1.0f);
-  AEMatrix::View(gltfModelView.view, cameraPos, cameraDirection, cameraUp);
+  InitModelView(&modelview);
+  InitModelView(&phoenixModelView);
+  InitModelView(&gltfModelView);
+  InitModelView(&cubeMV);
+  InitModelView(&planeMV);
+  InitModelView(&waterMV);
   //create buffers
   CreateBuffers();
   //create camera buffer
@@ -961,7 +944,10 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     } else if (isTouched) {
       uint32_t fingers = DetectFingers(currentFrame, isTouched, isFocused, touchPositions);
       if (fingers == 1){
-        isTouchObject(touchPositions, light->lightPosition);
+        if(isTouchObject(touchPositions, light->lightPosition)){
+          MoveObject(touchPositions);
+          lightBuffer->CopyData(light.get(), sizeof(Light));
+        }
       }
       else if (fingers == 2)
         Zoom(currentFrame, isTouched, isFocused, touchPositions);
@@ -1024,17 +1010,17 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     //gWomanCollada->DebugWeights(gQueue, gCommandPool);
   }
   if(isCollada) {
-    aslsWoman->Update(&phoenixModelView, gQueue, gCommandPool);
+    aslsWoman->Update(0, &phoenixModelView, gQueue, gCommandPool);
   }
   if(isGltf){
-    aslsWoman->Update(&gltfModelView, gQueue, gCommandPool);
+    aslsWoman->Update(0, &gltfModelView, gQueue, gCommandPool);
   }
 //  gWater->DispatchWave(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool, nullptr, nullptr,
 //                       nullptr, passedTime, gComputeEvent.get());
   gWater->SeaLevel((float)passedTime);
   gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue, gCommandPool);
-  aslsOpaque->Update(&modelview, gQueue, gCommandPool);
-  aslsNoOpaque->Update(&modelview, gQueue, gCommandPool);
+  aslsOpaque->Update({cubeMV, planeMV}, gQueue, gCommandPool);
+  aslsNoOpaque->Update({modelview}, gQueue, gCommandPool);
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSemaphore waitSemaphores = render.semaphore_;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};
@@ -1442,4 +1428,36 @@ bool isTouchObject(glm::vec2* touchPos, glm::vec3 objectPos)
       return true;
   }
   return false;
+}
+
+void MoveObject(glm::vec2* touchPos)
+{
+    glm::vec3 orgC2L = light->lightPosition - cameraPos;
+    glm::vec3 nCameraD = glm::normalize(-cameraDirection);
+    float dotLight = glm::dot(nCameraD, glm::normalize(orgC2L));
+    float degreeLight = acos(dotLight);
+    float d = glm::distance(orgC2L, glm::vec3(0.0));
+    float dl = d * cos(degreeLight);
+    glm::vec3 newC2L = Camera2TouchScreen(touchPos);
+    float dotNewLight = glm::dot(nCameraD, glm::normalize(newC2L));
+    float degreeNewLight = acos(dotNewLight);
+    float dnl = d * cos(dotNewLight);
+    float diff = dnl - dl;
+    glm::vec3 b = AEMatrix::Ortho(glm::cross(cameraUp, cameraDirection), cameraUp, newC2L - orgC2L);
+    glm::vec3 newLightPos = light->lightPosition + diff * glm::normalize(b);
+    cubeMV.translate *= glm::translate(modelview.translate, glm::vec3(0.2f, 0.0f, 0.0f));
+    //update postitions
+//    light->lightPosition = newLightPos;
+//    gCubes[0]->Update(light->lightPosition);
+//    gVertexBuffer->CopyData((void*)gCubes[0]->GetVertexAddress().data(), 0, gCubes[0]->GetVertexBufferSize(),
+//                            gQueue, gCommandPool);
+}
+
+void InitModelView(ModelView* mv)
+{
+    mv->InitModelView();
+    AEMatrix::Perspective(mv->proj, 90.0f,
+                          (float)gSwapchain->GetExtents()[0].width / (float)gSwapchain->GetExtents()[0].height,
+                          0.1f, 100.0f);
+    AEMatrix::View(mv->view, cameraPos, cameraDirection, cameraUp);
 }

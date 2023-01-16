@@ -325,6 +325,15 @@ struct ModelView
 	glm::mat4 view;
 	//normal matrix
 	glm::mat3 normalMatrix;
+    void InitModelView()
+    {
+        translate = glm::mat4(1.0f);
+        rotate = glm::mat4(1.0f);
+        scale = glm::mat4(1.0f);
+        proj = glm::mat4(1.0f);
+        view = glm::mat4(1.0f);
+        normalMatrix = glm::mat3(1.0f);
+    }
 };
 
 struct Light
