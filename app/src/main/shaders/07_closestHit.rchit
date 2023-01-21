@@ -296,7 +296,7 @@ void main()
   float alpha = 1.0;
   if(objId == 0)
   {
-    //plane
+    //cube or plane
     ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
                       indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 1],   //
                       indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 2]);  //
@@ -309,7 +309,7 @@ void main()
   }
   if(objId == 1)
   {
-    //cube or water
+    //water
     ivec3 ind = ivec3(inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 0],   //
                       inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 1],   //
                       inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 2]);  //

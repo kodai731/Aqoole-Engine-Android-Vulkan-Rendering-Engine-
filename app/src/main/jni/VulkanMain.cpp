@@ -226,6 +226,7 @@ double lastTime;
 double startTime;
 double passedTime = 0.0;
 uint32_t gAnimationIndex = 0;
+const glm::vec3 LIGHT_ORIGIN(0.0f, -5.0f, 0.0f);
 
 std::vector<std::unique_ptr<AECube>> gCubes;
 bool isPaused = false;
@@ -726,7 +727,7 @@ bool InitVulkan(android_app* app) {
   gTextureCountBuffer->CopyData((void*)&tc, sizeof(uint32_t));
   //light buffer
   light = std::make_unique<Light>();
-  light->lightPosition = glm::vec3(0.0f, -5.0f, 0.0f);
+  light->lightPosition = LIGHT_ORIGIN;
   light->intensity = 1.0f;
   lightBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(Light));
   lightBuffer->CreateBuffer();
@@ -1414,7 +1415,7 @@ glm::vec4 Camera2TouchScreen(glm::vec2* touchPos)
   //clip to view
   glm::mat4 invp = glm::inverse(modelview.proj);
   glm::vec4 sview = invp * glm::vec4(x, y, 1.0f, 1.0f);
-  return glm::inverse(modelview.view) * glm::normalize(glm::vec4(glm::vec3(sview), 0.0f));
+  return glm::inverse(modelview.view) * glm::vec4(glm::vec3(sview), 0.0f);
 }
 
 bool isTouchObject(glm::vec2* touchPos, glm::vec3 objectPos)
@@ -1424,7 +1425,7 @@ bool isTouchObject(glm::vec2* touchPos, glm::vec3 objectPos)
   glm::vec3 w3 = glm::normalize(glm::vec3(worldD));
   glm::vec3 a = glm::normalize(objectPos - cameraPos);
   float dot = glm::dot(w3, a);
-  if(dot > 0.999f){
+  if(dot > 0.995f){
       return true;
   }
   return false;
@@ -1432,25 +1433,17 @@ bool isTouchObject(glm::vec2* touchPos, glm::vec3 objectPos)
 
 void MoveObject(glm::vec2* touchPos)
 {
-    glm::vec3 orgC2L = light->lightPosition - cameraPos;
-    glm::vec3 nCameraD = glm::normalize(-cameraDirection);
-    float dotLight = glm::dot(nCameraD, glm::normalize(orgC2L));
-    float degreeLight = acos(dotLight);
-    float d = glm::distance(orgC2L, glm::vec3(0.0));
-    float dl = d * cos(degreeLight);
-    glm::vec3 newC2L = Camera2TouchScreen(touchPos);
-    float dotNewLight = glm::dot(nCameraD, glm::normalize(newC2L));
-    float degreeNewLight = acos(dotNewLight);
-    float dnl = d * cos(dotNewLight);
-    float diff = dnl - dl;
-    glm::vec3 b = AEMatrix::Ortho(glm::cross(cameraUp, cameraDirection), cameraUp, newC2L - orgC2L);
-    glm::vec3 newLightPos = light->lightPosition + diff * glm::normalize(b);
-    cubeMV.translate *= glm::translate(modelview.translate, glm::vec3(0.2f, 0.0f, 0.0f));
-    //update postitions
-//    light->lightPosition = newLightPos;
-//    gCubes[0]->Update(light->lightPosition);
-//    gVertexBuffer->CopyData((void*)gCubes[0]->GetVertexAddress().data(), 0, gCubes[0]->GetVertexBufferSize(),
-//                            gQueue, gCommandPool);
+    //camera direction length
+    float dotLight = glm::dot(-cameraDirection, glm::normalize(light->lightPosition - cameraPos));
+    float nLength = dotLight * glm::length(light->lightPosition - cameraPos);
+    glm::vec3 c2t = Camera2TouchScreen(touchPos);
+    float dot = glm::dot(-cameraDirection, glm::normalize(c2t));
+    float newLength = nLength / dot;
+    glm::vec3 touch = cameraPos + newLength * glm::normalize(c2t);
+    cubeMV.translate = glm::translate(cubeMV.translate,
+                                      touch - light->lightPosition);
+    //update positions
+    light->lightPosition = glm::vec3((cubeMV.translate * cubeMV.rotate * cubeMV.scale) * glm::vec4(LIGHT_ORIGIN, 1.0f));
 }
 
 void InitModelView(ModelView* mv)
