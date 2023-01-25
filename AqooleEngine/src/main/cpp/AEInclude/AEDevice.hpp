@@ -277,6 +277,7 @@ class AERayTracingASBottom : public AERayTracingASBase
 class AERayTracingASTop : public AERayTracingASBase
 {
 	private:
+    std::vector<AERayTracingASBottom*> mBottoms;
 	std::vector<VkAccelerationStructureInstanceKHR> mInstances;
 	std::unique_ptr<AEBufferAS> mInstanceBuffer;
 	//functions
@@ -284,7 +285,7 @@ class AERayTracingASTop : public AERayTracingASBase
 	AERayTracingASTop(AELogicalDevice* device, std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView,
 		AEDeviceQueue* commandQueue, AECommandPool* commandPool);
 	~AERayTracingASTop();
-	void Update(uint32_t index, std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView, AEDeviceQueue* commandQueue, AECommandPool* commandPool);
+	void Update(AEDeviceQueue* commandQueue, AECommandPool* commandPool);
 };
 #endif
 

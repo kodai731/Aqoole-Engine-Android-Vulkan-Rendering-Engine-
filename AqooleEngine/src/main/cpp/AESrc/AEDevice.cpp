@@ -1136,6 +1136,7 @@ AERayTracingASTop::AERayTracingASTop(AELogicalDevice* device, std::vector<AERayT
 	AEDeviceQueue* commandQueue, AECommandPool* commandPool)
 	: AERayTracingASBase(device)
 {
+    mBottoms = bottoms;
 	//transform matrix
 	VkTransformMatrixKHR vtm = MakeTransformMatrix(glm::mat4(1.0f));
 	mTransformMatrices.emplace_back(vtm);
@@ -1240,13 +1241,17 @@ AERayTracingASTop::~AERayTracingASTop()
 /*
 update transform matrix
 */
-void AERayTracingASTop::Update(uint32_t index, std::vector<AERayTracingASBottom*> bottoms, ModelView const* modelView, AEDeviceQueue* commandQueue,
-	AECommandPool* commandPool)
+void AERayTracingASTop::Update(AEDeviceQueue* commandQueue, AECommandPool* commandPool)
 {
 	//rebuild needed to update tranform matrix
-	VkTransformMatrixKHR vtm = MakeTransformMatrix(glm::mat4(1.0f));
-	for(uint32_t i = 0; i < mInstances.size(); i++)
-		mInstances[i].transform = *bottoms[i]->GetTransformMatrix(index);
+//	VkTransformMatrixKHR vtm = MakeTransformMatrix(glm::mat4(1.0f));
+	uint32_t count = 0;
+	for(uint32_t i = 0; i < mBottoms.size(); i++) {
+		for(uint32_t j = 0; j < mBottoms[i]->GetGeometryCount(); j++) {
+			mInstances[count].transform = *mBottoms[i]->GetTransformMatrix(j);
+			count++;
+		}
+	}
 	mInstanceBuffer->CopyData((void*)mInstances.data(), 0, sizeof(VkAccelerationStructureInstanceKHR) * mInstances.size(), commandQueue, commandPool);
 	// VkDeviceOrHostAddressConstKHR instanceDeviceAddress{};
 	// instanceDeviceAddress.deviceAddress = AEBuffer::GetBufferDeviceAddress(mDevice, *mInstanceBuffer->GetBuffer());

@@ -35,7 +35,7 @@ void AEMatrix::Perspective(glm::mat4 &proj, float angle, float aspect, float nea
 	float transZ = -2.0f * near * far * baseZ;
 	proj = glm::mat4(scaleX, 0.0f, 0.0f, 0.0f, 0.0f, scaleY, 0.0f, 0.0f,
 					 0.0f, 0.0f, scaleZ, -1.0f, 0.0f, 0.0f, transZ, 0.0f);
-	return;
+    //proj = glm::perspective(angle, aspect, near, far);
 }
 
 void AEMatrix::View(glm::mat4 &view, glm::vec3 const& camera, glm::vec3 const& direction, glm::vec3 const& up)
@@ -54,9 +54,8 @@ void AEMatrix::View(glm::mat4 &view, glm::vec3 const& camera, glm::vec3 const& d
 						   glm::vec4(nX.z, nY.z, nZ.z, 0.0f), glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 	//translate matrix
 	glm::mat4 translate(glm::vec4(1.0f, 0.0f, 0.0f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 0.0f),
-						glm::vec4(0.0f, 0.0f, 1.0f, 0.0f), glm::vec4((-1.0f * camera), 1.0f));
+						glm::vec4(0.0f, 0.0f, 1.0f, 0.0f), glm::vec4(-camera, 1.0f));
 	view = orientation * translate;
-	return;
 }
 
 /*

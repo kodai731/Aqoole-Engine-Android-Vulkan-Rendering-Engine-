@@ -213,6 +213,7 @@ std::unique_ptr<Light> light;
 std::unique_ptr<AEBufferUniform> lightBuffer;
 std::vector<BLASGeometryInfo> geometryOpaque;
 std::vector<BLASGeometryInfo> geometryNoOpaque;
+std::vector<AERayTracingASBottom*> bottoms;
 
 
 std::string gTargetModelPath = cowboyPath;
@@ -226,7 +227,7 @@ double lastTime;
 double startTime;
 double passedTime = 0.0;
 uint32_t gAnimationIndex = 0;
-const glm::vec3 LIGHT_ORIGIN(0.0f, -5.0f, 0.0f);
+const glm::vec3 LIGHT_ORIGIN(1.8f, -12.0f, 3.7f);
 
 std::vector<std::unique_ptr<AECube>> gCubes;
 bool isPaused = false;
@@ -498,7 +499,7 @@ bool CreateBuffers(void) {
   aslsNoOpaque = std::make_unique<AERayTracingASBottom>(gDevice, geometryNoOpaque,
                                                         std::vector<ModelView>{waterMV}, gQueue, gCommandPool);
   //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
-  std::vector<AERayTracingASBottom*> bottoms= {aslsOpaque.get(), aslsNoOpaque.get(), aslsWoman.get()};
+  bottoms= {aslsOpaque.get(), aslsNoOpaque.get(), aslsWoman.get()};
   astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
   return true;
 }
@@ -616,7 +617,7 @@ bool InitVulkan(android_app* app) {
   gDescriptorPool = new AEDescriptorPool(gDevice, poolSizeRT.size(), poolSizeRT.data());
   //create objects
   //first cube
-  std::unique_ptr<AECube> cube = std::make_unique<AECube>(0.2f, glm::vec3(-0.1f, -5.1f, -0.1f), glm::vec3(1.0f, 1.0f, 1.0f));
+  std::unique_ptr<AECube> cube = std::make_unique<AECube>(0.2f, LIGHT_ORIGIN- glm::vec3(0.1f), glm::vec3(1.0f, 1.0f, 1.0f));
   gCubes.emplace_back(std::move(cube));
   //plane
   float left = -20.0f;
@@ -971,6 +972,7 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     uboRT.normalMatrix = modelViewInverse;
     gUboRTBuffer->CopyData(&uboRT, sizeof(UBORT));
     cameraPosBuffer->CopyData((void*)&cameraPos, sizeof(glm::vec3));
+    cubeMV.view = modelview.view;
   }
 //  astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
   //debug position
@@ -1022,6 +1024,7 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue, gCommandPool);
   aslsOpaque->Update({cubeMV, planeMV}, gQueue, gCommandPool);
   aslsNoOpaque->Update({modelview}, gQueue, gCommandPool);
+  astop->Update(gQueue, gCommandPool);
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSemaphore waitSemaphores = render.semaphore_;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};
