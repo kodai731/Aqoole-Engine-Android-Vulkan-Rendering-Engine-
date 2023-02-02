@@ -398,6 +398,17 @@ void AEBufferBase::CopyData(void *data, VkDeviceSize dataSize)
     return;
 }
 
+/*
+ * back data
+ */
+void AEBufferBase::BackData(void *data, VkDeviceSize offset, VkDeviceSize dataSize, AEDeviceQueue* queue,
+                                 AECommandPool* commandPool)
+{
+    //gpu memory to staging memory
+    //AEBuffer::CopyBuffer(mBuffer, mStagingBuffer, mSize, mDevice, queue, commandPool);
+    //copy buffer to data
+    AEBuffer::BackData(mDevice, mBufferMemory, dataSize, data);
+}
 
 //=====================================================================
 //AE buffer vertex on GPU
@@ -455,18 +466,6 @@ void AEBufferUtilOnGPU::CopyData(void *data, VkDeviceSize offset, VkDeviceSize d
 void AEBufferUtilOnGPU::UpdateBuffer(AEDeviceQueue *queue, AECommandPool* commandPool)
 {
     AEBuffer::CopyBuffer(mStagingBuffer, mBuffer, mSize, mDevice, queue, commandPool);
-}
-
-/*
- * back data
- */
-void AEBufferUtilOnGPU::BackData(void *data, VkDeviceSize offset, VkDeviceSize dataSize, AEDeviceQueue* queue,
-              AECommandPool* commandPool)
-{
-    //gpu memory to staging memory
-    //AEBuffer::CopyBuffer(mBuffer, mStagingBuffer, mSize, mDevice, queue, commandPool);
-    //copy buffer to data
-    AEBuffer::BackData(mDevice, mBufferMemory, dataSize, data);
 }
 
 

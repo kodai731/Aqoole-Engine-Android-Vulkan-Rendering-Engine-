@@ -117,7 +117,9 @@ void InitPayLoad(vec3 pos, vec3 color)
   prdBlend.normal = vec3(0.0);
   prdBlend.color = color;
   prdBlend.hit = false;
-  prdBlend.isMiss = true;
+  prdBlend.isMiss = false;
+  prdBlend.objId = 99;
+  prdBlend.nonUniId = 99;
 }
 
 void Caustics(vec3 planePos, inout vec3 refractColor)
@@ -265,10 +267,19 @@ vec3 ColorBlendALL(vec3 surfaceColor, float reflectanceOrigin, inout bool[NODE] 
   return mix(traceColor, surfaceColor, 0.05);
 }
 
-void Lighting(inout vec3 color, vec3 pos, vec3 normal)
+void Lighting(inout vec3 color, in vec3 lightPos, in vec3 pos, in vec3 normal)
 {
-    color *= dot(normal, normalize(light.l.lightPosition - pos));
-    float li = light.l.intensity / (1.0 + length(light.l.lightPosition - pos));
+    //todo : shadow function needed
+    uint flags = gl_RayFlagsNoneEXT;
+    vec3 direction = normalize(lightPos - pos);
+    InitPayLoad(vec3(0.0), WATER_COLOR);
+    traceRayEXT(topLevelAS, flags, 0xFF, 1, 0, 2, pos, 0.01, direction, 1000.0, 3);
+    if(prdBlend.hit && (prdBlend.objId != 0 || prdBlend.nonUniId != 0)){
+        //shadow
+        color *= 0.1;
+    }
+    color *= dot(normal, direction);
+    float li = light.l.intensity / (1.0 + length(lightPos - pos));
     color *= clamp(0.0, 1.0, li);
 }
 
@@ -288,7 +299,6 @@ void main()
 {
   InitArrays();
   //obj Id
-  //uint objId = scnDesc.i[gl_InstanceCustomIndexEXT].objId;
   uint objId = gl_InstanceCustomIndexEXT;
   const vec3 barycentricCoords = vec3(1.0f - attribs.x - attribs.y, attribs.x, attribs.y);
   vec3 color = vec3(0.0, 1.0, 0.0);
@@ -345,11 +355,11 @@ void main()
     }
     //color = ColorBlend(reflection, color, false, reflectMiss[0], color0, reflectMiss[1], color1, isAllReflect[1]);
     color = ColorBlendALL(WATER_COLOR, reflectanceOrigin, isPlane, reflectMiss, reflectColor, isAllReflect, reflectance);
-    Lighting(color, worldPos, normal);
+    Lighting(color, light.l.lightPosition, worldPos, normal);
   }
   else if(objId == 2)
   {
-    //woman
+    //grass
     ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 1],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 2]);  //
@@ -363,7 +373,7 @@ void main()
         //TODO : multi texture in gltf model
         color4 = texture(texSampler[i], v0.texcoord * barycentricCoords.x + v1.texcoord * barycentricCoords.y + v2.texcoord * barycentricCoords.z);
         color = color4.xyz;
-        //Lighting(color, worldPos, normal);
+        Lighting(color, light.l.lightPosition, worldPos, normal);
         alpha = color4.w;
     }
   }

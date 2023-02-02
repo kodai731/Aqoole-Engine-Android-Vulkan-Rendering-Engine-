@@ -119,6 +119,8 @@ class AEBufferBase
     VkBuffer* GetBuffer(){return &mBuffer;}
     VkDeviceSize GetSize(){return mSize;}
     VkDeviceMemory GetBufferMemory(){return mBufferMemory;}
+    void BackData(void *data, VkDeviceSize offset, VkDeviceSize dataSize, AEDeviceQueue* queue,
+                  AECommandPool* commandPool);
 };
 
 class AEBufferUtilOnGPU : public AEBufferBase
@@ -137,8 +139,6 @@ class AEBufferUtilOnGPU : public AEBufferBase
         AECommandPool* commandPool);
     //update buffer
     void UpdateBuffer(AEDeviceQueue *queue, AECommandPool* commandPool);
-    void BackData(void *data, VkDeviceSize offset, VkDeviceSize dataSize, AEDeviceQueue* queue,
-                  AECommandPool* commandPool);
 };
 
 class AEBufferUniform : public AEBufferBase

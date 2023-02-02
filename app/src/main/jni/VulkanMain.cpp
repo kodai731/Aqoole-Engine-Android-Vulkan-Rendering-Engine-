@@ -147,6 +147,7 @@ glm::vec3 cameraPos = firstCameraPos;
 glm::vec3 cameraDirection = glm::normalize(cameraPos - gLookAtPoint);
 //glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, glm::vec3(0.0f, 0.0f, -1.0f)));
 const glm::vec3 firstCameraBasis(1.0f, 0.0f, 0.0f);
+glm::vec3 currentCameraBasis = firstCameraBasis;
 glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, firstCameraBasis));
 //glm::vec3 cameraUp = glm::vec3(0.0f, -1.0f, 0.0f);
 AEBufferUniform* gModelViewBuffer;
@@ -227,7 +228,7 @@ double lastTime;
 double startTime;
 double passedTime = 0.0;
 uint32_t gAnimationIndex = 0;
-const glm::vec3 LIGHT_ORIGIN(1.8f, -12.0f, 3.7f);
+const glm::vec3 LIGHT_ORIGIN(0.0f, -5.0f, 1.0f);
 
 std::vector<std::unique_ptr<AECube>> gCubes;
 bool isPaused = false;
@@ -620,10 +621,10 @@ bool InitVulkan(android_app* app) {
   std::unique_ptr<AECube> cube = std::make_unique<AECube>(0.2f, LIGHT_ORIGIN- glm::vec3(0.1f), glm::vec3(1.0f, 1.0f, 1.0f));
   gCubes.emplace_back(std::move(cube));
   //plane
-  float left = -20.0f;
-  float right = 20.0f;
-  float top = 10.0f;
-  float bottom = -10.0f;
+  float left = -40.0f;
+  float right = 40.0f;
+  float top = 20.0f;
+  float bottom = -20.0f;
   float planeWater = 1.0f;
   float planeY = planeWater + 2.0f;
   gXZPlane = std::make_unique<AEPlane>(glm::vec3(left, planeY, top), glm::vec3(left, planeY, bottom),
@@ -729,7 +730,7 @@ bool InitVulkan(android_app* app) {
   //light buffer
   light = std::make_unique<Light>();
   light->lightPosition = LIGHT_ORIGIN;
-  light->intensity = 1.0f;
+  light->intensity = 5.0f;
   lightBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(Light));
   lightBuffer->CreateBuffer();
   lightBuffer->CopyData((void*)light.get(), sizeof(Light));
@@ -809,7 +810,8 @@ bool InitVulkan(android_app* app) {
   gSbts.push_back(chitSBT.get());
   //push constants
   ConstantsRT constantRT{};
-  constantRT.clearColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+  //bgra
+  constantRT.clearColor = glm::vec4(1.0f - 245.0f / 255.0f, 1.0f - 235.0f / 255.0f, 1.0f - 230.0f / 255.0f, 1.0f);
   constantRT.lightType = 0;
   // -----------------------------------------------
   // Create a pool of command buffers to allocate command buffer from
@@ -948,7 +950,6 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
       if (fingers == 1){
         if(isTouchObject(touchPositions, light->lightPosition)){
           MoveObject(touchPositions);
-          lightBuffer->CopyData(light.get(), sizeof(Light));
         }
       }
       else if (fingers == 2)
@@ -974,7 +975,6 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
     cameraPosBuffer->CopyData((void*)&cameraPos, sizeof(glm::vec3));
     cubeMV.view = modelview.view;
   }
-//  astop->Update({aslsPlane.get(), aslsCubes.get()}, &modelview, gQueue, gCommandPool);
   //debug position
   if(gAnimationIndex == 1){
       gPhoenixGltf->OutputPosition(gAnimationIndex, gvbModelGltf.get(), gQueue, gCommandPool);
@@ -1240,6 +1240,8 @@ void LookByGravity(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm:
     //if first, return
     if(glm::length(*gravityData) < 0.1)
       return;
+    //todo : save camera basis
+    //calc direction
     glm::mat3 rotateX(1.0f);
     glm::mat3 rotateY(1.0f);
     glm::mat3 rotateZ(1.0f);
@@ -1248,7 +1250,7 @@ void LookByGravity(uint32_t currentFrame, bool& isTouched, bool& isFocused, glm:
     AEMatrix::Rodrigues(rotateY, cos(gravityData->y), sin(gravityData->y), glm::vec3(0.0f, -1.0f, 0.0f));
     AEMatrix::Rodrigues(rotateZ, cos(gravityData->z), sin(gravityData->z), glm::vec3(0.0f, 0.0f, 1.0f));
     cameraDirection = (rotateX * rotateY * rotateZ) * cameraDirection;
-    cameraUp = glm::normalize(glm::cross(cameraDirection, firstCameraBasis));
+    cameraUp = glm::normalize(glm::cross(cameraDirection, currentCameraBasis));
     AEMatrix::View(modelview.view, cameraPos, cameraDirection, cameraUp);
 }
 
@@ -1412,7 +1414,7 @@ glm::vec4 Camera2TouchScreen(glm::vec2* touchPos)
   //touch position to view port
   float x = touchPos[0].x / gSwapchain->GetExtents()[0].width;
   float y = touchPos[0].y / gSwapchain->GetExtents()[0].height;
-  //view potr to clip
+  //view port to clip
   x = x * 2.0f - 1.0f;
   y = y * 2.0f - 1.0f;
   //clip to view
@@ -1447,6 +1449,7 @@ void MoveObject(glm::vec2* touchPos)
                                       touch - light->lightPosition);
     //update positions
     light->lightPosition = glm::vec3((cubeMV.translate * cubeMV.rotate * cubeMV.scale) * glm::vec4(LIGHT_ORIGIN, 1.0f));
+    lightBuffer->CopyData(light.get(), sizeof(Light));
 }
 
 void InitModelView(ModelView* mv)

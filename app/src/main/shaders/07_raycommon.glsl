@@ -26,6 +26,8 @@ struct PayroadBlend
   vec3 normal;
   bool hit;
   bool isMiss;
+  uint objId;
+  uint nonUniId;
 };
 
 struct AnimationUniforms

@@ -6,7 +6,6 @@
 #include "07_raycommon.glsl"
 
 layout(location = 1) rayPayloadInEXT bool isShadowed;
-layout(location = 2) rayPayloadInEXT PayroadBlend prdBlend;
 
 layout(push_constant) uniform Constants
 {
@@ -17,7 +16,4 @@ layout(push_constant) uniform Constants
 void main()
 {
   isShadowed = false;
-  prdBlend.color = WATER_COLOR;
-  prdBlend.hit = false;
-  prdBlend.isMiss = true;
 }

@@ -74,7 +74,7 @@ void main()
   //obj Id
   uint objId = gl_InstanceCustomIndexEXT;
   const vec3 barycentricCoords = vec3(1.0f - attribs.x - attribs.y, attribs.x, attribs.y);
-  if(objId == 0)        //plane
+  if(objId == 0)        //plane or cube
   {
     ivec3 ind = ivec3(indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 0],   //
                       indices[nonuniformEXT(objId)].i[3 * gl_PrimitiveID + 1],   //
@@ -94,8 +94,10 @@ void main()
     prdBlend.color = color;
     prdBlend.normal = normal;
     prdBlend.isMiss = false;
+    prdBlend.objId = objId;
+    prdBlend.nonUniId = nonuniformEXT(objId);
   }
-  else if(objId == 1)          //cube or water
+  else if(objId == 1)          //water
   {
     ivec3 ind = ivec3(inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 0],   //
                       inoopaque[nonuniformEXT(0)].ino[3 * gl_PrimitiveID + 1],   //
@@ -112,8 +114,10 @@ void main()
     prdBlend.color = color;
     prdBlend.hit = false;
     prdBlend.isMiss = false;
+    prdBlend.objId = objId;
+    prdBlend.nonUniId = nonuniformEXT(objId);
   }
-  else if(objId == 2)//woman
+  else if(objId == 2)//grass
   {
     ivec3 ind = ivec3(indicesobj[0].iobj[3 * gl_PrimitiveID + 0],   //
                       indicesobj[0].iobj[3 * gl_PrimitiveID + 1],   //
@@ -131,6 +135,7 @@ void main()
     prdBlend.color = color4.xyz;
     prdBlend.hit = true;
     prdBlend.isMiss = false;
+    prdBlend.objId = objId;
+    prdBlend.nonUniId = nonuniformEXT(objId);
   }
-  
 }
