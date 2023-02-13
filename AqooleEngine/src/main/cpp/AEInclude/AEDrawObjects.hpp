@@ -325,7 +325,7 @@ public:
     std::vector<uint32_t>const& GetEachMapIndices(uint32_t index)const{return mMapIndices[index];}
     std::vector<std::vector<uint32_t>>const& GetMapIndices()const{return mMapIndices;}
     std::vector<glm::vec3>const& GetPositions(uint32_t index)const{return mPositions[index];}
-    uint32_t GetGeometrySize(){return mPositions.size();}
+    uint32_t GetGeometrySize()const{return mPositions.size();}
     uint32_t GetMaterialSize(){return mPositionIndices.size();}
     std::vector<float>const& GetKeyFrames()const{return mAnimationTime;}
     float GetMaxKeyFrame(){return mAnimationTime[mAnimationTime.size() - 1];}
@@ -465,6 +465,7 @@ public:
                            uint32_t animationNum, AEFence* fence, VkSemaphore *waitSemaphore, VkSemaphore* signalSemaphore, double time, AEEvent* event);
     void OutputPosition(uint32_t frameNum, AEBufferUtilOnGPU* buffer, AEDeviceQueue* const queue, AECommandPool* const commandpool);
     void DebugBuffer(AEDeviceQueue* const queue, AECommandPool* const commandpool);
+    uint32_t GetGeometrySize()const{return mGeometries.size();}
 };
 
 /*

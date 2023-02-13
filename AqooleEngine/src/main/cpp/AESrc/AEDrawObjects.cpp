@@ -1519,8 +1519,8 @@ void AEDrawObjectBaseCollada::Animation()
     //check vertices for each joint
     uint32_t i = 0;
     for(auto joint : mSkinJointsArray){
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("joint no = ") + std::to_string(i)).c_str(), 0);
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("joint name = ") + joint.jointName).c_str(), 0);
+//        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("joint no = ") + std::to_string(i)).c_str(), 0);
+//        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("joint name = ") + joint.jointName).c_str(), 0);
         std::string index;
         std::string weight;
         for(auto vw : joint.indexWeight){
@@ -1528,8 +1528,8 @@ void AEDrawObjectBaseCollada::Animation()
             index += std::string(" ");
             weight += (std::to_string(vw.second) + std::string(" "));
         }
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("vertex in joint = ") + index).c_str(), 0);
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("weight in joint = ") + weight).c_str(), 0);
+//        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("vertex in joint = ") + index).c_str(), 0);
+//        __android_log_print(ANDROID_LOG_DEBUG, "aqoole joint check", (std::string("weight in joint = ") + weight).c_str(), 0);
         i++;
     }
 }
@@ -2549,7 +2549,7 @@ void AEDrawObjectBaseGltf::ReadMesh(const tinygltf::Model &model)
     //apply joint information
     uint32_t totalInfluences = 0;
     for(uint32_t i = 0; i < mGeometries[0].positions.size(); i++){
-        __android_log_print(ANDROID_LOG_DEBUG, "aqoole gltf", (std::string("vertex = ") + std::to_string(i)).c_str(), 0);
+        //__android_log_print(ANDROID_LOG_DEBUG, "aqoole gltf", (std::string("vertex = ") + std::to_string(i)).c_str(), 0);
         //detect influence count
         uint32_t ic = 0;
         float total = 0.0f;

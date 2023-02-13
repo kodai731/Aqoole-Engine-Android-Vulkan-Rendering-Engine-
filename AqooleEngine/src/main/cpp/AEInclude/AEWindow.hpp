@@ -115,7 +115,7 @@ class AESwapchain
     AESurface *mSurface;
     //AEDeviceQueueBase const* mQueue;
     VkSwapchainKHR mSwapchain;
-    VkImage* mSwapchainImages;
+    std::vector<VkImage> mSwapchainImages;
     uint32_t mSize;
     //std::vector<VkFormat> mSwapchainImageFormats;
     VkFormat mFormat;
@@ -137,7 +137,7 @@ class AESwapchain
     ~AESwapchain();
     //iterator
     AELogicalDevice* GetDevice(){return mDevice;}
-    VkImage* GetImages(){return mSwapchainImages;}
+    VkImage* GetImages(){return mSwapchainImages.data();}
     VkImage* GetImageEdit(uint32_t imageIndex){return &mSwapchainImages[imageIndex];}
     //std::vector<VkFormat> const* GetFormats()const{return &mSwapchainImageFormats;}
     VkFormat GetFormat()const{return mFormat;}

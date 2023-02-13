@@ -153,8 +153,8 @@ void AEDescriptorPool::CreateDescriptorPool(uint32_t poolSizeCount,
 /*
 constructor
  */
-AEDescriptorSet::AEDescriptorSet(AELogicalDevice const* device,
-    std::unique_ptr<AEDescriptorSetLayout> const& layout, AEDescriptorPool const* pool)
+AEDescriptorSet::AEDescriptorSet(AELogicalDevice* device,
+    std::unique_ptr<AEDescriptorSetLayout>& layout, AEDescriptorPool* pool)
 {
     mDevice = device;
     mLayout = layout.get();
@@ -176,8 +176,8 @@ AEDescriptorSet::AEDescriptorSet(AELogicalDevice const* device,
     return;
 }
 
-AEDescriptorSet::AEDescriptorSet(AELogicalDevice const* device, AEDescriptorSetLayout const* layout,
-        AEDescriptorPool const* pool)
+AEDescriptorSet::AEDescriptorSet(AELogicalDevice* device, AEDescriptorSetLayout* layout,
+        AEDescriptorPool* pool)
 {
     mDevice = device;
     mLayout = layout;

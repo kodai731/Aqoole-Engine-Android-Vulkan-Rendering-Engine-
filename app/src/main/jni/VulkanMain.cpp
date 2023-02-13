@@ -73,20 +73,6 @@ struct VulkanDeviceInfo {
 };
 VulkanDeviceInfo device;
 
-struct VulkanSwapchainInfo {
-  VkSwapchainKHR swapchain_;
-  uint32_t swapchainLength_;
-
-  VkExtent2D displaySize_;
-  VkFormat displayFormat_;
-
-  // array of frame buffers and views
-  VkImage* displayImages_;
-  std::vector<VkImageView> displayViews_;
-  std::vector<VkFramebuffer> framebuffers_;
-};
-VulkanSwapchainInfo swapchain;
-
 struct VulkanBufferInfo {
   VkBuffer vertexBuf_;
 };
@@ -100,7 +86,7 @@ struct VulkanGfxPipelineInfo {
 VulkanGfxPipelineInfo gfxPipeline;
 
 struct VulkanRenderInfo {
-  VkRenderPass renderPass_;
+  VkRenderPass renderPass__;
   VkCommandPool cmdPool_;
   VkCommandBuffer* cmdBuffer_;
   uint32_t cmdBufferLen_;
@@ -114,21 +100,21 @@ VulkanRenderInfo render;
 android_app* androidAppCtx = nullptr;
 
 
-AEInstance* gInstance;
-AESurface *gSurface;
-AERenderPass* gRenderPass;
-AEPhysicalDevices *gPhysicalDevice;
-AEDeviceQueue* gQueue;
-AELogicalDevice* gDevice;
-AESwapchain* gSwapchain;
-std::vector<AEFrameBuffer*> gFrameBuffers;
-AESwapchainImageView* gSwapchainImageView;
-std::vector<AEDepthImage*> gDepthImages;
-std::vector<AECommandBuffer*> gCommandBuffers;
+std::unique_ptr<AEInstance> gInstance;
+std::unique_ptr<AESurface> gSurface;
+std::unique_ptr<AERenderPass> gRenderPass;
+std::unique_ptr<AEPhysicalDevices> gPhysicalDevice;
+std::unique_ptr<AEDeviceQueue> gQueue;
+std::unique_ptr<AELogicalDevice> gDevice;
+std::unique_ptr<AESwapchain> gSwapchain;
+std::vector<std::unique_ptr<AEFrameBuffer>> gFrameBuffers;
+std::unique_ptr<AESwapchainImageView> gSwapchainImageView;
+std::vector<std::unique_ptr<AEDepthImage>> gDepthImages;
+std::vector<std::unique_ptr<AECommandBuffer>> gCommandBuffers;
 //AEDepthImage* gDepthImage;
-AEBufferAS* gVertexBuffer;
-AEBufferAS* gIndexBuffer;
-AECommandPool* gCommandPool;
+std::unique_ptr<AEBufferAS> gVertexBuffer;
+std::unique_ptr<AEBufferAS> gIndexBuffer;
+std::unique_ptr<AECommandPool> gCommandPool;
 ModelView modelview = {};
 ModelView phoenixModelView = {};
 ModelView gltfModelView = {};
@@ -150,13 +136,12 @@ const glm::vec3 firstCameraBasis(1.0f, 0.0f, 0.0f);
 glm::vec3 currentCameraBasis = firstCameraBasis;
 glm::vec3 cameraUp = glm::normalize(glm::cross(cameraDirection, firstCameraBasis));
 //glm::vec3 cameraUp = glm::vec3(0.0f, -1.0f, 0.0f);
-AEBufferUniform* gModelViewBuffer;
+std::unique_ptr<AEBufferUniform> gModelViewBuffer;
 std::unique_ptr<AEDescriptorSetLayout> gDescriptorSetLayout;
 std::vector<std::unique_ptr<AEDescriptorSetLayout>> gLayouts;
-AEDescriptorPool* gDescriptorPool;
-AEDescriptorSet* gDescriptorSet;
+std::unique_ptr<AEDescriptorPool> gDescriptorPool;
 glm::vec2 lastPositions[2] = {glm::vec2(0.0f), glm::vec2(-100.0f)};
-MyImgui* gImgui;
+std::unique_ptr<MyImgui> gImgui;
 std::unique_ptr<AERayTracingASBottom> aslsOpaque;
 std::unique_ptr<AERayTracingASBottom> aslsNoOpaque;
 std::unique_ptr<AERayTracingASBottom> aslsWoman;
@@ -181,8 +166,7 @@ std::vector<std::unique_ptr<AEBufferAS>> gibWomans;
 std::unique_ptr<AEBufferAS> gmapVbWoman;
 std::unique_ptr<AEBufferAS> gmapIbWoman;
 std::vector<std::unique_ptr<AETextureImage>> gWomanTextures;
-std::vector<AEDescriptorSet*> gDescriptorSets;
-AEDescriptorSet* gWomanTextureSets;
+std::vector<std::unique_ptr<AEDescriptorSet>> gDescriptorSets;
 std::unique_ptr<AEBufferAS> gWomanOffset;
 std::string fuse1ObjPath("fuse-woman-1/source/woman.obj");
 std::string kokoneObjPath("kokone_obj_with_textures/kokone.obj");
@@ -193,10 +177,8 @@ std::string computeShaderPath("shaders/07_animationComp.spv");
 std::string cowboyGltfPath("cowboy/cowboy.glb");
 std::string yardGrassGltfPath("yard_grass/yard_grass.glb");
 std::string sandPath("sand/sand.jpg");
-std::unique_ptr<AEDrawObjectBaseCollada> gWomanCollada;
 std::unique_ptr<AETextureImage> gTmpImage;
 std::unique_ptr<AECommandBuffer> gComputeCommandBuffer;
-std::unique_ptr<AEDescriptorSet> gComputeDescriptor;
 std::unique_ptr<AEFence> gAnimationFence;
 std::unique_ptr<AESemaphore> gComputeSemaphore;
 std::unique_ptr<AEEvent> gComputeEvent;
@@ -296,61 +278,55 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
 
   // **********************************************************
   // Create the Vulkan instance
-  gInstance = new AEInstance(appInfo, instance_extension_s, true, layers_s);
+  gInstance = std::make_unique<AEInstance>(appInfo, instance_extension_s, true, layers_s);
   gInstance->SetupDebugMessage();
   device.instance_ = *gInstance->GetInstance();
-  gSurface = new AESurface(platformWindow, gInstance);
+  gSurface = std::make_unique<AESurface>(platformWindow, gInstance.get());
   device.surface_ = *gSurface->GetSurface();
-  gPhysicalDevice = new AEPhysicalDevices(gInstance);
+  gPhysicalDevice = std::make_unique<AEPhysicalDevices>(gInstance.get());
   device.gpuDevice_  = *gPhysicalDevice->GetPhysicalDevice(0);
-  gQueue = new AEDeviceQueue(device.gpuDevice_,VK_QUEUE_GRAPHICS_BIT, 0, 1);
-  gDevice = new AELogicalDevice(gPhysicalDevice, 0, gQueue);
-  gDevice->CreateDevice(device_extensions, gQueue);
-  device.device_ = *gDevice->GetDevice();
-  gQueue->CreateDeviceQueue(gDevice);
-  device.queue_ = gQueue->GetQueue(0);
-  device.queueFamilyIndex_ = gQueue->GetQueueFamilyIndex();
+  gQueue = std::make_unique<AEDeviceQueue>(device.gpuDevice_,VK_QUEUE_GRAPHICS_BIT, 0, 1);
+  gDevice = std::make_unique<AELogicalDevice>(gPhysicalDevice.get(), 0, gQueue.get());
+  gDevice->CreateDevice(device_extensions, gQueue.get());
+  device.device_ = *gDevice.get()->GetDevice();
+  gQueue->CreateDeviceQueue(gDevice.get());
+  device.queue_ = gQueue.get()->GetQueue(0);
+  device.queueFamilyIndex_ = gQueue.get()->GetQueueFamilyIndex();
 }
 
 void CreateSwapChain(void) {
-  LOGI("->createSwapChain");
-  memset(&swapchain, 0, sizeof(swapchain));
-//
-  // **********************************************************
-  // Get the surface capabilities because:
-  //   - It contains the minimal and max length of the chain, we will need it
-  //   - It's necessary to query the supported surface format (R8G8B8A8 for
-  //   instance ...)
-  gSwapchain = new AESwapchain(gDevice, gSurface, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-  swapchain.swapchain_ = *gSwapchain->GetSwapchain();
-  swapchain.displayFormat_ = gSwapchain->GetFormat();
-  swapchain.displaySize_ = gSwapchain->GetExtents()[0];
-  swapchain.swapchainLength_ = gSwapchain->GetSize();
-  LOGI("<-createSwapChain");
+    LOGI("->createSwapChain");
+    //
+    // **********************************************************
+    // Get the surface capabilities because:
+    //   - It contains the minimal and max length of the chain, we will need it
+    //   - It's necessary to query the supported surface format (R8G8B8A8 for
+    //   instance ...)
+    gSwapchain = std::make_unique<AESwapchain>(gDevice.get(), gSurface.get(), VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    gSwapchainImageView = std::make_unique<AESwapchainImageView>(gSwapchain.get());
+    gRenderPass = std::make_unique<AERenderPass>(gSwapchain.get(), true);
+    for (uint32_t i = 0; i < gSwapchain->GetSize(); i++) {
+        std::unique_ptr<AEDepthImage> depthImage(new AEDepthImage(gDevice.get(), gSwapchain.get()));
+        gDepthImages.emplace_back(std::move(depthImage));
+        std::unique_ptr<AEFrameBuffer> fb(new AEFrameBuffer(i, gSwapchainImageView.get(),
+                                                            gRenderPass.get(), gDepthImages[i].get()));
+        //swapchain.framebuffers_.emplace_back(*fb->GetFrameBuffer());
+        gFrameBuffers.emplace_back(std::move(fb));
+    }
+    LOGI("<-createSwapChain");
 }
 
 void DeleteSwapChain(void) {
-  for (int i = 0; i < swapchain.swapchainLength_; i++) {
-    vkDestroyFramebuffer(device.device_, swapchain.framebuffers_[i], nullptr);
-    vkDestroyImageView(device.device_, swapchain.displayViews_[i], nullptr);
-    vkDestroyImage(device.device_, swapchain.displayImages_[i], nullptr);
+  for (int i = 0; i < gSwapchain->GetSize(); i++) {
+    vkDestroyFramebuffer(device.device_, *gFrameBuffers[i]->GetFrameBuffer(), nullptr);
+//    vkDestroyImageView(device.device_, gSwapchainImageView->GetImageView()[i], nullptr);
+//    vkDestroyImage(device.device_, *gSwapchain->GetImages(), nullptr);
+    vkDestroyImage(*gDevice->GetDevice(), *gDepthImages[i]->GetImage(), nullptr);
   }
-  vkDestroySwapchainKHR(device.device_, swapchain.swapchain_, nullptr);
-}
-
-void CreateFrameBuffers(VkRenderPass& renderPass,
-                        VkImageView depthView = VK_NULL_HANDLE) {
-  swapchain.displayImages_ = gSwapchain->GetImages();
-  gSwapchainImageView = new AESwapchainImageView(gSwapchain);
-  swapchain.displayViews_ = *gSwapchainImageView->GetImageView();
-  // create a framebuffer from each swapchain image
-  for (uint32_t i = 0; i < swapchain.swapchainLength_; i++) {
-    AEDepthImage* depthImage = new AEDepthImage(gDevice, gSwapchain);
-    gDepthImages.push_back(depthImage);
-    AEFrameBuffer* fb = new AEFrameBuffer(i, gSwapchainImageView, gRenderPass, gDepthImages[i]);
-    swapchain.framebuffers_.push_back(*fb->GetFrameBuffer());
-    gFrameBuffers.push_back(fb);
-  }
+  //vkDestroySwapchainKHR(device.device_, swapchain.swapchain_, nullptr);
+  //swapchain imageview
+  gSwapchainImageView.release();
+  gSwapchain.release();
 }
 
 // A helper function
@@ -378,18 +354,18 @@ bool CreateBuffers(void) {
   // -----------------------------------------------
   // Create draw objects and its vertex buffer and index buffer
   size_t vertexSize = gCubes.size() * gCubes[0]->GetVertexSize() * sizeof(Vertex3D);
-  gVertexBuffer = new AEBufferAS(gDevice, vertexSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gVertexBuffer = std::make_unique<AEBufferAS>(gDevice.get(), vertexSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gVertexBuffer->CreateBuffer();
   size_t vertexOffset = 0;
   size_t oneVertexSize = sizeof(Vertex3D) * gCubes[0]->GetVertexSize();
   for(uint32_t i = 0; i < gCubes.size(); i++)
   {
-    gVertexBuffer->CopyData((void *) gCubes[i]->GetVertexAddress().data(), vertexOffset, oneVertexSize, gQueue,
-                            gCommandPool);
+    gVertexBuffer->CopyData((void *) gCubes[i]->GetVertexAddress().data(), vertexOffset, oneVertexSize, gQueue.get(),
+                            gCommandPool.get());
     vertexOffset += oneVertexSize;
   }
   size_t indexSize = gCubes.size() * gCubes[0]->GetIndexSize() * sizeof(uint32_t);
-  gIndexBuffer = new AEBufferAS(gDevice, indexSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gIndexBuffer = std::make_unique<AEBufferAS>(gDevice.get(), indexSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gIndexBuffer->CreateBuffer();
   size_t indexOffset = 0;
   uint32_t indexOffsetNumber = 0;
@@ -399,79 +375,59 @@ bool CreateBuffers(void) {
     std::vector<uint32_t> indices = gCubes[i]->GetIndexAddress();
     for(uint32_t i = 0; i < indices.size(); i++)
       indices[i] += indexOffsetNumber;
-    gIndexBuffer->CopyData((void *)indices.data(), indexOffset, oneIndexSize, gQueue,
-                           gCommandPool);
+    gIndexBuffer->CopyData((void *)indices.data(), indexOffset, oneIndexSize, gQueue.get(),
+                           gCommandPool.get());
     indexOffset += oneIndexSize;
     indexOffsetNumber += gCubes[0]->GetVertexSize();
   }
   //plane buffers
-  gvbPlane = std::make_unique<AEBufferAS>(gDevice, gXZPlane->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbPlane = std::make_unique<AEBufferAS>(gDevice.get(), gXZPlane->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gvbPlane->CreateBuffer();
-  gvbPlane->CopyData((void*)gXZPlane->GetVertexAddress().data(), 0, gXZPlane->GetVertexBufferSize(), gQueue, gCommandPool);
-  gibPlane = std::make_unique<AEBufferAS>(gDevice, gXZPlane->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbPlane->CopyData((void*)gXZPlane->GetVertexAddress().data(), 0, gXZPlane->GetVertexBufferSize(), gQueue.get(),
+                     gCommandPool.get());
+  gibPlane = std::make_unique<AEBufferAS>(gDevice.get(), gXZPlane->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gibPlane->CreateBuffer();
-  gibPlane->CopyData((void*)gXZPlane->GetIndexAddress().data(), 0, gXZPlane->GetIndexBufferSize(), gQueue, gCommandPool);
+  gibPlane->CopyData((void*)gXZPlane->GetIndexAddress().data(), 0, gXZPlane->GetIndexBufferSize(), gQueue.get(),
+                     gCommandPool.get());
   //water buffer
-  gvbWater = std::make_unique<AEBufferAS>(gDevice, gWater->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbWater = std::make_unique<AEBufferAS>(gDevice.get(), gWater->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gvbWater->CreateBuffer();
-  gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue, gCommandPool);
-  gibWater = std::make_unique<AEBufferAS>(gDevice, gWater->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue.get(), gCommandPool.get());
+  gibWater = std::make_unique<AEBufferAS>(gDevice.get(), gWater->GetIndexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gibWater->CreateBuffer();
-  gibWater->CopyData((void*)gWater->GetIndexAddress().data(), 0, gWater->GetIndexBufferSize(), gQueue, gCommandPool);
-  //woman buffers collada
-  gvbWoman = std::make_unique<AEBufferAS>(gDevice, gWomanCollada->GetVertexBufferSize(),
-                                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-  gvbWoman->CreateBuffer();
-  gvbWoman->CopyData((void*)gWomanCollada->GetVertexAddress().data(), 0, gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
-  //index buffer
-  for(uint32_t i = 0; i < 1; i++)
-  {
-    std::unique_ptr<AEBufferAS> ib(new AEBufferAS(gDevice, gWomanCollada->GetIndexBufferSize(),
-                                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
-    ib->CreateBuffer();
-    ib->CopyData((void *) gWomanCollada->GetIndexAddress().data(), 0,
-                 gWomanCollada->GetIndexBufferSize(), gQueue, gCommandPool);
-    gibWomans.emplace_back(std::move(ib));
-  }
+  gibWater->CopyData((void*)gWater->GetIndexAddress().data(), 0, gWater->GetIndexBufferSize(), gQueue.get(), gCommandPool.get());
   //GLTF model
   //vertex
-  gvbModelGltf = std::make_unique<AEBufferAS>(gDevice, gPhoenixGltf->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gvbModelGltf = std::make_unique<AEBufferAS>(gDevice.get(), gPhoenixGltf->GetVertexBufferSize(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gvbModelGltf->CreateBuffer();
-  gvbModelGltf->CopyData((void*)gPhoenixGltf->GetVertexAddress().data(), 0, gPhoenixGltf->GetVertexBufferSize(), gQueue, gCommandPool);
+  gvbModelGltf->CopyData((void*)gPhoenixGltf->GetVertexAddress().data(), 0, gPhoenixGltf->GetVertexBufferSize(), gQueue.get(), gCommandPool.get());
   //index
-  gibModelGltf = std::make_unique<AEBufferAS>(gDevice, gPhoenixGltf->GetIndexBufferSize(0), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+  gibModelGltf = std::make_unique<AEBufferAS>(gDevice.get(), gPhoenixGltf->GetIndexBufferSize(0), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
   gibModelGltf->CreateBuffer();
-  gibModelGltf->CopyData((void*)gPhoenixGltf->GetIndexAddress(0).data(), 0, gPhoenixGltf->GetIndexBufferSize(0), gQueue, gCommandPool);
+  gibModelGltf->CopyData((void*)gPhoenixGltf->GetIndexAddress(0).data(), 0, gPhoenixGltf->GetIndexBufferSize(0), gQueue.get(), gCommandPool.get());
   //compute pipeline shader
   std::vector<const char*> c;
   c.emplace_back(computeShaderPath.c_str());
   //create source buffer
-  gComputeCommandBuffer = std::make_unique<AECommandBuffer>(gDevice, gCommandPool);
+  gComputeCommandBuffer = std::make_unique<AECommandBuffer>(gDevice.get(), gCommandPool.get());
   AEBufferBase* registerBuffers[1] = {gvbWoman.get()};
   AEBufferBase* registerBuffersGltf[1] = {gvbModelGltf.get()};
-  if(isAnimation) {
-    gWomanCollada->AnimationPrepare(androidAppCtx, gDevice, c, registerBuffers,
-                                    gQueue, gCommandPool, gDescriptorPool);
-  }
   if(isGltf){
       std::vector<const char*> gltfShaders = {"shaders/07_animationGltfComp.spv"};
       if(isMorph){
           gltfShaders[0] = "shaders/07_animationGltfMorphComp.spv";
-          gPhoenixGltf->AnimationPrepareMorph(androidAppCtx, gDevice, gltfShaders, registerBuffersGltf,
-                                              gQueue, gCommandPool, gDescriptorPool);
+          gPhoenixGltf->AnimationPrepareMorph(androidAppCtx, gDevice.get(), gltfShaders, registerBuffersGltf,
+                                              gQueue.get(), gCommandPool.get(), gDescriptorPool.get());
       } else {
-          gPhoenixGltf->AnimationPrepare(androidAppCtx, gDevice, gltfShaders, registerBuffersGltf,
-                                         gQueue, gCommandPool, gDescriptorPool);
+          gPhoenixGltf->AnimationPrepare(androidAppCtx, gDevice.get(), gltfShaders, registerBuffersGltf,
+                                         gQueue.get(), gCommandPool.get(), gDescriptorPool.get());
       }
   }
   //wave calc
   std::vector<const char*> waveShader = {"shaders/07_waveComp.spv"};
   AEBufferBase* waveVertexBuffer[1] = {gvbWater.get()};
-  gWater->WavePrepare(androidAppCtx, gDevice, waveShader, waveVertexBuffer, gQueue, gCommandPool, gDescriptorPool);
-    //offset
-//  gWomanOffset = std::make_unique<AEBufferAS>(gDevice, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-//  gWomanOffset->CreateBuffer();
-//  gWomanOffset->CopyData((void*)gWomanCollada->GetOffsetAll().data(), 0, sizeof(uint32_t) * gWomanCollada->GetTextureCount(), gQueue, gCommandPool);
+  gWater->WavePrepare(androidAppCtx, gDevice.get(), waveShader, waveVertexBuffer,
+                      gQueue.get(), gCommandPool.get(), gDescriptorPool.get());
   //prepare ray tracing objects
   BLASGeometryInfo cubesInfo = {sizeof(Vertex3D), (uint32_t)gCubes.size() * gCubes[0]->GetVertexSize(), (uint32_t)gCubes.size() * gCubes[0]->GetIndexSize(),
                                 *gVertexBuffer->GetBuffer(), *gIndexBuffer->GetBuffer()};
@@ -480,11 +436,6 @@ bool CreateBuffers(void) {
   BLASGeometryInfo waterInfo = {sizeof(Vertex3D), gWater->GetVertexSize(), gWater->GetIndexSize(),
                                 *gvbWater->GetBuffer(), *gibWater->GetBuffer()};
   BLASGeometryInfo womanInfo0{};
-  if(isCollada) {
-      womanInfo0 = {sizeof(Vertex3DObj), gWomanCollada->GetVertexSize(),
-                    (uint32_t) gWomanCollada->GetIndexAddress().size(),
-                    *gvbWoman->GetBuffer(), *gibWomans[0]->GetBuffer()};
-  }
   if(isGltf){
       womanInfo0 = {sizeof(Vertex3DObj), gPhoenixGltf->GetVertexSize(),
                     (uint32_t) gPhoenixGltf->GetIndexAddress(0).size(),
@@ -493,15 +444,15 @@ bool CreateBuffers(void) {
   geometryOpaque = {cubesInfo, planeInfo};
   std::vector<BLASGeometryInfo> geometryWoman0 = {womanInfo0};
   geometryNoOpaque = {waterInfo};
-  aslsOpaque = std::make_unique<AERayTracingASBottom>(gDevice, geometryOpaque,
-                                                      std::vector<ModelView>{cubeMV, planeMV}, gQueue, gCommandPool);
-  aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman0,
-                                                     std::vector<ModelView>{gltfModelView}, gQueue, gCommandPool);
-  aslsNoOpaque = std::make_unique<AERayTracingASBottom>(gDevice, geometryNoOpaque,
-                                                        std::vector<ModelView>{waterMV}, gQueue, gCommandPool);
-  //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice, geometryWoman1, &phoenixModelView, gQueue, gCommandPool);
+  aslsOpaque = std::make_unique<AERayTracingASBottom>(gDevice.get(), geometryOpaque,
+                                                      std::vector<ModelView>{cubeMV, planeMV}, gQueue.get(), gCommandPool.get());
+  aslsWoman = std::make_unique<AERayTracingASBottom>(gDevice.get(), geometryWoman0,
+                                                     std::vector<ModelView>{gltfModelView}, gQueue.get(), gCommandPool.get());
+  aslsNoOpaque = std::make_unique<AERayTracingASBottom>(gDevice.get(), geometryNoOpaque,
+                                                        std::vector<ModelView>{waterMV}, gQueue.get(), gCommandPool.get());
+  //aslsWoman1 = std::make_unique<AERayTracingASBottom>(gDevice.get(), geometryWoman1, &phoenixModelView, gQueue.get(), gCommandPool.get());
   bottoms= {aslsOpaque.get(), aslsNoOpaque.get(), aslsWoman.get()};
-  astop = std::make_unique<AERayTracingASTop>(gDevice, bottoms, &modelview, gQueue, gCommandPool);
+  astop = std::make_unique<AERayTracingASTop>(gDevice.get(), bottoms, &modelview, gQueue.get(), gCommandPool.get());
   return true;
 }
 
@@ -513,7 +464,7 @@ void DeleteBuffers(void) {
 VkResult CreateGraphicsPipeline() {
   assert(androidAppCtx);
   //set = 0 for main pipeline
-  gDescriptorSetLayout = std::make_unique<AEDescriptorSetLayout>(gDevice);
+  gDescriptorSetLayout = std::make_unique<AEDescriptorSetLayout>(gDevice.get());
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
                                                     VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR, 1, nullptr);
   gDescriptorSetLayout->AddDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
@@ -543,14 +494,11 @@ VkResult CreateGraphicsPipeline() {
   gDescriptorSetLayout->CreateDescriptorSetLayout();
   gLayouts.push_back(std::move(gDescriptorSetLayout));
   //set = 1 for texture image
-  gDescriptorSetLayout = std::make_unique<AEDescriptorSetLayout>(gDevice);
-  if(isCollada)
-    gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
-                                                      gWomanCollada->GetTextureCount(),nullptr);
-  if(isGltf)
+  gDescriptorSetLayout = std::make_unique<AEDescriptorSetLayout>(gDevice.get());
+   if(isGltf)
     gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
                                                         2,nullptr);
-  if(!isGltf && gWomanCollada->GetTextureCount() == 0)
+  if(!isGltf)
       gDescriptorSetLayout->AddDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 1,
                                                           nullptr);
   gDescriptorSetLayout->CreateDescriptorSetLayout();
@@ -559,7 +507,7 @@ VkResult CreateGraphicsPipeline() {
           {"shaders/07_raygenRgen.spv","shaders/07_rayRmiss.spv","shaders/07_shadowRmiss.spv", "shaders/07_waterRmiss.spv",
            "shaders/07_rayRchit.spv","shaders/07_colorBlendRchit.spv", "shaders/07_anyHitRahit.spv"};
   std::vector<std::vector<uint32_t>> hitIndices = {{0}, {1}, {2}, {3}, {4, 6},{5, 6}};
-  gPipelineRT = std::make_unique<AEPipelineRaytracing>(gDevice, paths, hitIndices,&gLayouts, androidAppCtx);
+  gPipelineRT = std::make_unique<AEPipelineRaytracing>(gDevice.get(), paths, hitIndices,&gLayouts, androidAppCtx);
     return VK_SUCCESS;
 }
 
@@ -573,13 +521,16 @@ void DeleteGraphicsPipeline(void) {
 //   Initialize Vulkan Context when android application window is created
 //   upon return, vulkan is ready to draw frames
 bool InitVulkan(android_app* app) {
+  if(androidAppCtx != nullptr) {
+      //already initialized
+    device.initialized_ = true;
+    return true;
+  }
   androidAppCtx = app;
-
   if (!InitVulkan()) {
     LOGW("Vulkan is unavailable, install vulkan and re-start");
     return false;
   }
-
   VkApplicationInfo appInfo = {
       .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
       .pNext = nullptr,
@@ -597,13 +548,10 @@ bool InitVulkan(android_app* app) {
 
   // -----------------------------------------------------------------
   // Create render pass
-  gRenderPass = new AERenderPass(gSwapchain, true);
-  render.renderPass_ = *gRenderPass->GetRenderPass();
-  gCommandPool = new AECommandPool(gDevice, gQueue);
-  render.cmdPool_ = gCommandPool->GetCommandPool();
+  gCommandPool = std::make_unique<AECommandPool>(gDevice.get(), gQueue.get());
+  render.cmdPool_ = gCommandPool.get()->GetCommandPool();
   // -----------------------------------------------------------------
   // Create 2 frame buffers.
-  CreateFrameBuffers(render.renderPass_);
   //descriptor pool
   //descriptor pool
   std::vector<VkDescriptorPoolSize> poolSizeRT =
@@ -615,7 +563,7 @@ bool InitVulkan(android_app* app) {
                   {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 20},
                   {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 20}
           };
-  gDescriptorPool = new AEDescriptorPool(gDevice, poolSizeRT.size(), poolSizeRT.data());
+  gDescriptorPool = std::make_unique<AEDescriptorPool>(gDevice.get(), poolSizeRT.size(), poolSizeRT.data());
   //create objects
   //first cube
   std::unique_ptr<AECube> cube = std::make_unique<AECube>(0.2f, LIGHT_ORIGIN- glm::vec3(0.1f), glm::vec3(1.0f, 1.0f, 1.0f));
@@ -641,23 +589,9 @@ bool InitVulkan(android_app* app) {
   //woman
   std::vector<const char *> c;
   c.emplace_back(computeShaderPath.c_str());
-  gWomanCollada = std::make_unique<AEDrawObjectBaseCollada>(gTargetModelPath.c_str(), app,
-                                                            gDevice, c, gCommandPool, gQueue);
-  gWomanCollada->MakeAnimation();
-  gWomanCollada->Scale(gScale);
-  //woman texture
-  for (uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++) {
-    auto texturePath = gWomanCollada->GetTexturePath(i);
-    std::unique_ptr<AETextureImage> texture(
-            new AETextureImage(gDevice, (AEDrawObject::GetRootDirName(gTargetModelPath) +
-                                         gWomanCollada->GetTexturePath(i)).c_str(), gCommandPool,
-                               gQueue, app));
-    texture->CreateSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
-    gWomanTextures.push_back(std::move(texture));
-  }
   //gltf model
-  gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(yardGrassGltfPath.c_str(), app, gDevice, gScale);
-  gltfTextureImage = std::make_unique<AETextureImage>(gDevice, "yard_grass/material_baseColor.png", gCommandPool, gQueue, androidAppCtx);
+  gPhoenixGltf = std::make_unique<AEDrawObjectBaseGltf>(yardGrassGltfPath.c_str(), app, gDevice.get(), gScale);
+  gltfTextureImage = std::make_unique<AETextureImage>(gDevice.get(), "yard_grass/material_baseColor.png", gCommandPool.get(), gQueue.get(), androidAppCtx);
   InitModelView(&modelview);
   InitModelView(&phoenixModelView);
   InitModelView(&gltfModelView);
@@ -667,7 +601,7 @@ bool InitVulkan(android_app* app) {
   //create buffers
   CreateBuffers();
   //create camera buffer
-  cameraPosBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(glm::vec3));
+  cameraPosBuffer = std::make_unique<AEBufferUniform>(gDevice.get(), sizeof(glm::vec3));
   cameraPosBuffer->CreateBuffer();
   cameraPosBuffer->CopyData((void*)&cameraPos, sizeof(glm::vec3));
 
@@ -675,12 +609,13 @@ bool InitVulkan(android_app* app) {
   CreateGraphicsPipeline();
   //prepare matrix
   //create image
-  gStorageImage = std::make_unique<AEStorageImage>(gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gCommandPool, gQueue,
+  gStorageImage = std::make_unique<AEStorageImage>(gDevice.get(), gSwapchain->GetExtents()[0].width, gSwapchain->GetExtents()[0].height,
+                                                   gCommandPool.get(), gQueue.get(),
                                                    VkImageUsageFlagBits (VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
   //change image layout
-  AECommandBuffer singletime(gDevice, gCommandPool);
+  AECommandBuffer singletime(gDevice.get(), gCommandPool.get());
   AECommand::BeginCommand(&singletime);
-  AEImage::TransitionImageLayout(gDevice, &singletime, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, gStorageImage->GetImage());
+  AEImage::TransitionImageLayout(gDevice.get(), &singletime, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, gStorageImage->GetImage());
   VkSubmitInfo submitInfo =
           {
           .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -688,42 +623,31 @@ bool InitVulkan(android_app* app) {
           .pCommandBuffers = singletime.GetCommandBuffer()
           };
   AECommand::EndCommand(&singletime);
-  vkQueueSubmit(gQueue->GetQueue(0), 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueSubmit(gQueue.get()->GetQueue(0), 1, &submitInfo, VK_NULL_HANDLE);
   //uniform buffer
   uboRT.viewInverse = glm::inverse(modelview.view);
   uboRT.projInverse = glm::inverse(modelview.proj);
   uboRT.modelViewProj = modelview.translate * modelview.rotate * modelview.scale;
   uboRT.normalMatrix = glm::mat4(0.5f);
-  gUboRTBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(UBORT));
+  gUboRTBuffer = std::make_unique<AEBufferUniform>(gDevice.get(), sizeof(UBORT));
   gUboRTBuffer->CreateBuffer();
   gUboRTBuffer->CopyData((void*)&uboRT, sizeof(UBORT));
   //geometry indices
-  if (isCollada) {
-    gGeometryIndices = std::make_unique<AEBufferUtilOnGPU>(gDevice, sizeof(uint32_t) *
-                                                                    gWomanCollada->GetGeometrySize(),
-                                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    gGeometryIndices->CreateBuffer();
-    std::vector<uint32_t> geometries;
-    gWomanCollada->SetGeometrySize(geometries);
-    gGeometryIndices->CopyData((void *) geometries.data(), 0,
-                               sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), gQueue,
-                               gCommandPool);
-  }
   if(isGltf){
-    gGeometryIndices = std::make_unique<AEBufferUtilOnGPU>(gDevice, sizeof(uint32_t) *
-                                                                    gWomanCollada->GetGeometrySize(),
+    gGeometryIndices = std::make_unique<AEBufferUtilOnGPU>(gDevice.get(), sizeof(uint32_t) *
+                                                                    gPhoenixGltf->GetGeometrySize(),
                                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     gGeometryIndices->CreateBuffer();
     std::vector<uint32_t> geometries;
     geometries.emplace_back(gPhoenixGltf->GetVertexAddress().size());
     gGeometryIndices->CopyData((void *) geometries.data(), 0,
-                               sizeof(uint32_t) * gWomanCollada->GetGeometrySize(), gQueue,
-                               gCommandPool);
+                               sizeof(uint32_t) * gPhoenixGltf->GetGeometrySize(), gQueue.get(),
+                               gCommandPool.get());
   }
   //texture count buffer
-  gTextureCountBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(uint32_t));
+  gTextureCountBuffer = std::make_unique<AEBufferUniform>(gDevice.get(), sizeof(uint32_t));
   gTextureCountBuffer->CreateBuffer();
-  uint32_t tc = gWomanCollada->GetTextureCount();
+  uint32_t tc = 1;
   if(isGltf)
     tc = 1;
   gTextureCountBuffer->CopyData((void*)&tc, sizeof(uint32_t));
@@ -731,11 +655,11 @@ bool InitVulkan(android_app* app) {
   light = std::make_unique<Light>();
   light->lightPosition = LIGHT_ORIGIN;
   light->intensity = 5.0f;
-  lightBuffer = std::make_unique<AEBufferUniform>(gDevice, sizeof(Light));
+  lightBuffer = std::make_unique<AEBufferUniform>(gDevice.get(), sizeof(Light));
   lightBuffer->CreateBuffer();
   lightBuffer->CopyData((void*)light.get(), sizeof(Light));
   //descriptor set
-  gDescriptorSet = new AEDescriptorSet(gDevice, gLayouts[0], gDescriptorPool);
+  std::unique_ptr<AEDescriptorSet> gDescriptorSet = std::make_unique<AEDescriptorSet>(gDevice.get(), gLayouts[0], gDescriptorPool.get());
   gDescriptorSet->BindAccelerationStructure(0, astop.get());
   gDescriptorSet->BindDescriptorImage(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, gStorageImage->GetImageView(),
                                       nullptr);
@@ -752,14 +676,6 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorBuffers(4, {*gIndexBuffer->GetBuffer(), *gibPlane->GetBuffer()},
                                         {gCubes[0]->GetIndexBufferSize(), gXZPlane->GetIndexBufferSize()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  if(isCollada) {
-    gDescriptorSet->BindDescriptorBuffer(5, gvbWoman->GetBuffer(),
-                                         gWomanCollada->GetVertexBufferSize(),
-                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    gDescriptorSet->BindDescriptorBuffer(6, gibWomans[0]->GetBuffer(),
-                                         gWomanCollada->GetIndexBufferSize(),
-                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  }
   if(isGltf){
     gDescriptorSet->BindDescriptorBuffer(5, gvbModelGltf->GetBuffer(),
                                          gPhoenixGltf->GetVertexBufferSize(),
@@ -776,20 +692,10 @@ bool InitVulkan(android_app* app) {
   gDescriptorSet->BindDescriptorBuffers(10, {*gibWater->GetBuffer()},
                                         {gWater->GetIndexBufferSize()},
                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-  gDescriptorSets.push_back(gDescriptorSet);
+  gDescriptorSets.emplace_back(std::move(gDescriptorSet));
   //woman texture images
-  gWomanTextureSets = new AEDescriptorSet(gDevice, gLayouts[1], gDescriptorPool);
-  if(isCollada) {
-    for (uint32_t i = 0; i < gWomanCollada->GetTextureCount(); i++) {
-      imageViews.emplace_back(*gWomanTextures[i]->GetImageView());
-      samplers.emplace_back(*gWomanTextures[i]->GetSampler());
-    }
-    gWomanTextureSets->BindDescriptorImages(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                            gWomanCollada->GetTextureCount(),
-                                            imageViews,
-                                            samplers);
-  }
-  sand = std::make_unique<AETextureImage>(gDevice, sandPath.c_str(), gCommandPool, gQueue, androidAppCtx);
+  std::unique_ptr<AEDescriptorSet> gWomanTextureSets = std::make_unique<AEDescriptorSet>(gDevice.get(), gLayouts[1], gDescriptorPool.get());
+  sand = std::make_unique<AETextureImage>(gDevice.get(), sandPath.c_str(), gCommandPool.get(), gQueue.get(), androidAppCtx);
   if(isGltf){
     imageViews.emplace_back(*gltfTextureImage->GetImageView());
     imageViews.emplace_back(*sand->GetImageView());
@@ -800,11 +706,11 @@ bool InitVulkan(android_app* app) {
                                             imageViews,
                                             samplers);
   }
-  gDescriptorSets.push_back(gWomanTextureSets);
+  gDescriptorSets.emplace_back(std::move(gWomanTextureSets));
   //create binding table buffer
-  raygenSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 0, gQueue, gCommandPool);
-  missSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 1, 3, gQueue, gCommandPool);
-  chitSBT = std::make_unique<AEBufferSBT>(gDevice, (VkBufferUsageFlagBits)0, gPipelineRT.get(), 4, 2, gQueue, gCommandPool);
+  raygenSBT = std::make_unique<AEBufferSBT>(gDevice.get(), (VkBufferUsageFlagBits)0, gPipelineRT.get(), 0, gQueue.get(), gCommandPool.get());
+  missSBT = std::make_unique<AEBufferSBT>(gDevice.get(), (VkBufferUsageFlagBits)0, gPipelineRT.get(), 1, 3, gQueue.get(), gCommandPool.get());
+  chitSBT = std::make_unique<AEBufferSBT>(gDevice.get(), (VkBufferUsageFlagBits)0, gPipelineRT.get(), 4, 2, gQueue.get(), gCommandPool.get());
   gSbts.push_back(raygenSBT.get());
   gSbts.push_back(missSBT.get());
   gSbts.push_back(chitSBT.get());
@@ -815,8 +721,8 @@ bool InitVulkan(android_app* app) {
   constantRT.lightType = 0;
   // -----------------------------------------------
   // Create a pool of command buffers to allocate command buffer from
-  render.cmdBufferLen_ = swapchain.swapchainLength_;
-  render.cmdBuffer_ = new VkCommandBuffer[swapchain.swapchainLength_];
+  render.cmdBufferLen_ = gSwapchain->GetSize();
+  render.cmdBuffer_ = new VkCommandBuffer[gSwapchain->GetSize()];
 //  VkCommandBufferAllocateInfo cmdBufferCreateInfo{
 //      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 //      .pNext = nullptr,
@@ -828,19 +734,26 @@ bool InitVulkan(android_app* app) {
 //                                   render.cmdBuffer_));
   for(uint32_t i = 0; i < render.cmdBufferLen_; i++)
   {
-    AECommandBuffer* cb = new AECommandBuffer(gDevice, gCommandPool);
-    gCommandBuffers.push_back(cb);
+    std::unique_ptr<AECommandBuffer> cb(new AECommandBuffer(gDevice.get(), gCommandPool.get()));
+    gCommandBuffers.emplace_back(std::move(cb));
     render.cmdBuffer_[i] = *gCommandBuffers[i]->GetCommandBuffer();
   }
   //init imgui
-  gImgui = new MyImgui(app->window, gInstance, gDevice, gSwapchain, gQueue, gQueue, gSurface, &gFrameBuffers,
-                       &gDepthImages, gSwapchainImageView, gRenderPass);
+  std::vector<AEFrameBuffer*> fbs;
+  for(auto& f : gFrameBuffers)
+      fbs.emplace_back(f.get());
+  std::vector<AEDepthImage*> dps;
+  for(auto& dp : gDepthImages)
+      dps.emplace_back(dp.get());
+  gImgui = std::make_unique<MyImgui>(app->window, gInstance.get(), gDevice.get(), gSwapchain.get(),
+                                     gQueue.get(), gQueue.get(), gSurface.get(),
+                                     &fbs, &dps, gSwapchainImageView.get(), gRenderPass.get());
   //create event
-  gComputeEvent = std::make_unique<AEEvent>(gDevice);
+  gComputeEvent = std::make_unique<AEEvent>(gDevice.get());
   //register commands
-  for (int bufferIndex = 0; bufferIndex < swapchain.swapchainLength_;
+  for (int bufferIndex = 0; bufferIndex < gSwapchain->GetSize();
        bufferIndex++) {
-    AECommand::BeginCommand(gCommandBuffers[bufferIndex]);
+    AECommand::BeginCommand(gCommandBuffers[bufferIndex].get());
     if(isAnimation) {
       vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1,
                       gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -851,10 +764,14 @@ bool InitVulkan(android_app* app) {
                            (VkDependencyFlagBits) 0, 0, nullptr, 0, nullptr, 0, nullptr);
     }
     //dispatch ray tracing command
-    AECommand::CommandTraceRays(gCommandBuffers[bufferIndex], gDevice, swapchain.displaySize_.width, swapchain.displaySize_.height,gSbts,
-                                gPipelineRT.get(), gDescriptorSets, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
-                                gQueue, gCommandPool);
-    AECommand::EndCommand(gCommandBuffers[bufferIndex]);
+    std::vector<AEDescriptorSet*> ds;
+    for(auto& d : gDescriptorSets)
+        ds.emplace_back(d.get());
+    AECommand::CommandTraceRays(gCommandBuffers[bufferIndex].get(), gDevice.get(), gSwapchain->GetExtents()[0].width,
+                                gSwapchain->GetExtents()[0].height,gSbts,
+                                gPipelineRT.get(), ds, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
+                                gQueue.get(), gCommandPool.get());
+    AECommand::EndCommand(gCommandBuffers[bufferIndex].get());
   }
   // We need to create a fence to be able, in the main loop, to wait for our
   // draw command(s) to finish before swapping the framebuffers
@@ -880,8 +797,8 @@ bool InitVulkan(android_app* app) {
   lastTime = GetTime();
   startTime = lastTime;
   //animation semaphore
-  gAnimationFence = std::make_unique<AEFence>(gDevice);
-  gComputeSemaphore = std::make_unique<AESemaphore>(gDevice);
+  gAnimationFence = std::make_unique<AEFence>(gDevice.get());
+  gComputeSemaphore = std::make_unique<AESemaphore>(gDevice.get());
   //imgui font adjust
 //  {
 //    ImGuiIO &io = ImGui::GetIO();
@@ -900,6 +817,7 @@ bool InitVulkan(android_app* app) {
 bool IsVulkanReady(void) { return device.initialized_; }
 
 void DeleteVulkan(void) {
+    /*
   vkDestroySemaphore(device.device_, render.semaphore_, nullptr);
   vkDestroyFence(device.device_, render.fence_, nullptr);
   vkFreeCommandBuffers(device.device_, render.cmdPool_, render.cmdBufferLen_,
@@ -907,30 +825,17 @@ void DeleteVulkan(void) {
   delete[] render.cmdBuffer_;
   gDepthImages.clear();
   //vkDestroyCommandPool(device.device_, render.cmdPool_, nullptr);
-  delete gCommandPool;
   //vkDestroyRenderPass(device.device_, render.renderPass_, nullptr);
-  delete gRenderPass;
   gFrameBuffers.clear();
   //DeleteSwapChain();
   gDescriptorSetLayout.reset();
-  delete gDescriptorSet;
-  delete gDescriptorPool;
-  delete gSwapchainImageView;
-  delete gSwapchain;
-  delete gSurface;
   DeleteGraphicsPipeline();
   //DeleteBuffers();
-  delete gVertexBuffer;
-  delete gIndexBuffer;
   gCubes.clear();
-  delete gModelViewBuffer;
 //  vkDestroyDevice(device.device_, nullptr);
-  delete gDevice;
+  delete gDevice.get();
 //  vkDestroyInstance(device.instance_, nullptr);
-  delete gInstance;
-  //clear ventors
-  swapchain.displayViews_.clear();
-  swapchain.framebuffers_.clear();
+     */
   device.initialized_ = false;
 }
 
@@ -977,21 +882,21 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   }
   //debug position
   if(gAnimationIndex == 1){
-      gPhoenixGltf->OutputPosition(gAnimationIndex, gvbModelGltf.get(), gQueue, gCommandPool);
+      gPhoenixGltf->OutputPosition(gAnimationIndex, gvbModelGltf.get(), gQueue.get(), gCommandPool.get());
   }
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
-  VkResult resNextImage = vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
+  VkResult resNextImage = vkAcquireNextImageKHR(device.device_, *gSwapchain->GetSwapchain(),
                                 UINT64_MAX, render.semaphore_, VK_NULL_HANDLE,
                                 &nextIndex);
   if(resNextImage != VK_SUCCESS){
     __android_log_print(ANDROID_LOG_ERROR, "Aqoole", (std::string("failed at vkAcquireNextImageKHR code = ") + std::to_string(resNextImage)).c_str(), 0);
   }
   CALL_VK(vkResetFences(device.device_, 1, &render.fence_));
-  vkResetFences(*gDevice->GetDevice(), 1, gAnimationFence->GetFence());
+  vkResetFences(*gDevice.get()->GetDevice(), 1, gAnimationFence->GetFence());
   RecordImguiCommand(nextIndex, touchPositions, isTouched);
   //animation dispatch
-  float maxKeyFrame = gWomanCollada->GetMaxKeyFrame();
+  float maxKeyFrame = 1.0f;
   if(isGltf)
       maxKeyFrame = gPhoenixGltf->GetMaxKeyframe();
   float fracpart = std::fmodf((float)passedTime, maxKeyFrame);
@@ -1000,38 +905,33 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("frac time = ") + std::to_string(fracpart)).c_str(), 0);
   __android_log_print(ANDROID_LOG_DEBUG, "animation", (std::string("key frame = ") + std::to_string(gAnimationIndex)).c_str(), 0);
   if(isAnimation) {
-//    gWomanCollada->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool,
-//                                     gAnimationIndex,
-//                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
     if(isMorph)
-        gPhoenixGltf->AnimationDispatchMorph(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool, gAnimationIndex,
+        gPhoenixGltf->AnimationDispatchMorph(gDevice.get(), gComputeCommandBuffer.get(), gQueue.get(), gCommandPool.get(), gAnimationIndex,
                                             nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
       else
-          gPhoenixGltf->AnimationDispatch(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool, gAnimationIndex,
+          gPhoenixGltf->AnimationDispatch(gDevice.get(), gComputeCommandBuffer.get(), gQueue.get(), gCommandPool.get(), gAnimationIndex,
                                     nullptr, nullptr, nullptr, fracpart, gComputeEvent.get());
-    //gWomanCollada->Debug(gQueue, gCommandPool);
-    //gWomanCollada->DebugWeights(gQueue, gCommandPool);
   }
   if(isCollada) {
-    aslsWoman->Update(0, &phoenixModelView, gQueue, gCommandPool);
+    aslsWoman->Update(0, &phoenixModelView, gQueue.get(), gCommandPool.get());
   }
   if(isGltf){
-    aslsWoman->Update(0, &gltfModelView, gQueue, gCommandPool);
+    aslsWoman->Update(0, &gltfModelView, gQueue.get(), gCommandPool.get());
   }
-//  gWater->DispatchWave(gDevice, gComputeCommandBuffer.get(), gQueue, gCommandPool, nullptr, nullptr,
+//  gWater->DispatchWave(gDevice.get(), gComputeCommandBuffer.get(), gQueue.get(), gCommandPool.get(), nullptr, nullptr,
 //                       nullptr, passedTime, gComputeEvent.get());
   gWater->SeaLevel((float)passedTime);
-  gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue, gCommandPool);
-  aslsOpaque->Update({cubeMV, planeMV}, gQueue, gCommandPool);
-  aslsNoOpaque->Update({modelview}, gQueue, gCommandPool);
-  astop->Update(gQueue, gCommandPool);
+  gvbWater->CopyData((void*)gWater->GetVertexAddress().data(), 0, gWater->GetVertexBufferSize(), gQueue.get(), gCommandPool.get());
+  aslsOpaque->Update({cubeMV, planeMV}, gQueue.get(), gCommandPool.get());
+  aslsNoOpaque->Update({modelview}, gQueue.get(), gCommandPool.get());
+  astop->Update(gQueue.get(), gCommandPool.get());
   VkPipelineStageFlags waitStageMasks = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSemaphore waitSemaphores = render.semaphore_;
   VkCommandBuffer cmdBuffers[2] = {*gCommandBuffers[nextIndex]->GetCommandBuffer(), *gImgui->GetCommandBuffer()->GetCommandBuffer()};
   VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                               .pNext = nullptr,
-                              .waitSemaphoreCount = 1,
-                              .pWaitSemaphores = &waitSemaphores,
+                              .waitSemaphoreCount = 0,
+                              .pWaitSemaphores = nullptr,
                               .pWaitDstStageMask = &waitStageMasks,
                               .commandBufferCount = 2,
                               .pCommandBuffers = cmdBuffers,
@@ -1048,7 +948,7 @@ bool VulkanDrawFrame(android_app *app, uint32_t currentFrame, bool& isTouched, b
       .waitSemaphoreCount = 1,
       .pWaitSemaphores = &render.presentSemaphore_,
       .swapchainCount = 1,
-      .pSwapchains = &swapchain.swapchain_,
+      .pSwapchains = gSwapchain->GetSwapchain(),
       .pImageIndices = &nextIndex,
       .pResults = &result,
   };
@@ -1284,8 +1184,8 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
   VkRenderPassBeginInfo renderPassBeginInfo{
           .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
           .pNext = nullptr,
-          .renderPass = render.renderPass_,
-          .framebuffer = swapchain.framebuffers_[imageNum],
+          .renderPass = *gRenderPass->GetRenderPass(),
+          .framebuffer = *gFrameBuffers[imageNum]->GetFrameBuffer(),
           .renderArea = {.offset { .x = 0, .y = 0,},
                   .extent = {.width = 0, .height = 0}},
           .clearValueCount = 2,
@@ -1323,9 +1223,6 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
   if (isTouchButton(touchPositions, pauseButtonPos, buttonSize))        // Buttons return true when clicked (most widgets return true when edited/activated)
   {
       isPaused = !isPaused;
-      gWomanCollada->Animation();
-      gvbWoman->CopyData((void *) gWomanCollada->GetVertexAddress().data(), 0,
-                         gWomanCollada->GetVertexBufferSize(), gQueue, gCommandPool);
   }
   ImGui::SameLine();
   ImGui::End();

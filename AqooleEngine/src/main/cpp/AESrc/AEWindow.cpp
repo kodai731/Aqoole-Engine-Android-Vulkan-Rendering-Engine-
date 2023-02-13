@@ -173,8 +173,11 @@ AESwapchain::AESwapchain(AELogicalDevice* device, AESurface *surface, VkImageUsa
 		throw std::runtime_error("failed in create swap chain");
 	//images
 	vkGetSwapchainImagesKHR(*mDevice->GetDevice(), mSwapchain, &imageCount, nullptr);
-	mSwapchainImages = new VkImage[imageCount];
-	vkGetSwapchainImagesKHR(*mDevice->GetDevice(), mSwapchain, &imageCount, mSwapchainImages);
+	//mSwapchainImages = new VkImage[imageCount];
+	for(uint32_t i = 0; i < imageCount; i++) {
+		mSwapchainImages.emplace_back(VkImage());
+	}
+	vkGetSwapchainImagesKHR(*mDevice->GetDevice(), mSwapchain, &imageCount, mSwapchainImages.data());
 	mSize = imageCount;
 	//store
 	mFormat = surfaceformat.format;
@@ -239,8 +242,11 @@ AESwapchain::AESwapchain(AELogicalDevice* device, AESurface *surface, float widt
 #endif
     //images
     vkGetSwapchainImagesKHR(*mDevice->GetDevice(), mSwapchain, &imageCount, nullptr);
-    mSwapchainImages = new VkImage[imageCount];
-    vkGetSwapchainImagesKHR(*mDevice->GetDevice(), mSwapchain, &imageCount, mSwapchainImages);
+    //mSwapchainImages = new VkImage[imageCount];
+	for(uint32_t i = 0; i < imageCount; i++) {
+		mSwapchainImages.emplace_back(VkImage());
+	}
+	vkGetSwapchainImagesKHR(*mDevice->GetDevice(), mSwapchain, &imageCount, mSwapchainImages.data());
     mSize = imageCount;
     //store
     mFormat = surfaceformat.format;
@@ -255,6 +261,8 @@ destructor
  */
 AESwapchain::~AESwapchain()
 {
+	for(auto& image : mSwapchainImages)
+		vkDestroyImage(*mDevice->GetDevice(), image, nullptr);
 	vkDestroySwapchainKHR(*mDevice->GetDevice(), mSwapchain, nullptr);
 }
 

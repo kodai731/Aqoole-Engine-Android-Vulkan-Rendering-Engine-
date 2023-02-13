@@ -55,17 +55,17 @@ class AEDescriptorPool
 class AEDescriptorSet
 {
     private:
-    AELogicalDevice const* mDevice;
+    AELogicalDevice* mDevice;
     //VkDescriptorSetLayout const* mLayout;
-    AEDescriptorSetLayout const* mLayout;
-    AEDescriptorPool const* mPool;
+    AEDescriptorSetLayout* mLayout;
+    AEDescriptorPool* mPool;
     VkDescriptorSet mDescriptorSet;
     //std::vector<std::string> mBufferName;
     public:
-    AEDescriptorSet(AELogicalDevice const* device, std::unique_ptr<AEDescriptorSetLayout> const& layout,
-        AEDescriptorPool const* pool);
-    AEDescriptorSet(AELogicalDevice const* device, AEDescriptorSetLayout const* layout,
-                        AEDescriptorPool const* pool);
+    AEDescriptorSet(AELogicalDevice* device, std::unique_ptr<AEDescriptorSetLayout>& layout,
+        AEDescriptorPool* pool);
+    AEDescriptorSet(AELogicalDevice* device, AEDescriptorSetLayout* layout,
+                        AEDescriptorPool* pool);
     ~AEDescriptorSet();
     //iterator
     //AEDescriptorSetLayout const* GetLayout()const{return mLayout;}
