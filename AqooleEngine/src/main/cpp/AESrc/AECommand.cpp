@@ -232,6 +232,11 @@ void AECommand::EndSingleTimeCommands(AECommandBuffer *commandBuffer, AEDeviceQu
     vkQueueWaitIdle(queue->GetQueue(0));
 }
 
+void AECommand::ResetCommand(AECommandBuffer *cb, bool releaseResources)
+{
+	vkResetCommandBuffer(*cb->GetCommandBuffer(), releaseResources ? VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT : 0);
+}
+
 #ifdef __RAY_TRACING__
 #ifndef __ANDROID__
 /*

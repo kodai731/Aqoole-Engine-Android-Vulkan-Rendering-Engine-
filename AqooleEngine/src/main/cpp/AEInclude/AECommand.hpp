@@ -82,6 +82,7 @@ namespace AECommand
 	    VkDescriptorSet *descriptorSets);
     void CommandDrawIndexed(AECommandBuffer *commandBuffer, uint32_t indexCount, uint32_t firstIndex,
 	    uint32_t vertexOffset);
+	void ResetCommand(AECommandBuffer *cb, bool releaseResources);
     //for single time
     void BeginSingleTimeCommands(AECommandBuffer *commandBuffer);
     void EndSingleTimeCommands(AECommandBuffer *commandBuffer, AEDeviceQueue *queue);

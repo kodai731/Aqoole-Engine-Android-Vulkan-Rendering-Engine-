@@ -68,7 +68,7 @@ struct VulkanDeviceInfo {
   VkDevice device_;
   uint32_t queueFamilyIndex_;
 
-  VkSurfaceKHR surface_;
+  VkSurfaceKHR surface__;
   VkQueue queue_;
 };
 VulkanDeviceInfo device;
@@ -232,6 +232,7 @@ glm::vec4 Camera2TouchScreen(glm::vec2* touchPos);
 bool isTouchObject(glm::vec2* touchPos, glm::vec3 objectPos);
 void MoveObject(glm::vec2* touchPos);
 void InitModelView(ModelView* mv);
+void RecordRayTracingCommand();
 /*
  * setImageLayout():
  *    Helper function to transition color buffer layout
@@ -281,8 +282,6 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
   gInstance = std::make_unique<AEInstance>(appInfo, instance_extension_s, true, layers_s);
   gInstance->SetupDebugMessage();
   device.instance_ = *gInstance->GetInstance();
-  gSurface = std::make_unique<AESurface>(platformWindow, gInstance.get());
-  device.surface_ = *gSurface->GetSurface();
   gPhysicalDevice = std::make_unique<AEPhysicalDevices>(gInstance.get());
   device.gpuDevice_  = *gPhysicalDevice->GetPhysicalDevice(0);
   gQueue = std::make_unique<AEDeviceQueue>(device.gpuDevice_,VK_QUEUE_GRAPHICS_BIT, 0, 1);
@@ -302,6 +301,7 @@ void CreateSwapChain(void) {
     //   - It contains the minimal and max length of the chain, we will need it
     //   - It's necessary to query the supported surface format (R8G8B8A8 for
     //   instance ...)
+    gSurface = std::make_unique<AESurface>(androidAppCtx->window, gInstance.get());
     gSwapchain = std::make_unique<AESwapchain>(gDevice.get(), gSurface.get(), VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     gSwapchainImageView = std::make_unique<AESwapchainImageView>(gSwapchain.get());
     gRenderPass = std::make_unique<AERenderPass>(gSwapchain.get(), true);
@@ -310,7 +310,6 @@ void CreateSwapChain(void) {
         gDepthImages.emplace_back(std::move(depthImage));
         std::unique_ptr<AEFrameBuffer> fb(new AEFrameBuffer(i, gSwapchainImageView.get(),
                                                             gRenderPass.get(), gDepthImages[i].get()));
-        //swapchain.framebuffers_.emplace_back(*fb->GetFrameBuffer());
         gFrameBuffers.emplace_back(std::move(fb));
     }
     LOGI("<-createSwapChain");
@@ -319,14 +318,14 @@ void CreateSwapChain(void) {
 void DeleteSwapChain(void) {
   for (int i = 0; i < gSwapchain->GetSize(); i++) {
     vkDestroyFramebuffer(device.device_, *gFrameBuffers[i]->GetFrameBuffer(), nullptr);
-//    vkDestroyImageView(device.device_, gSwapchainImageView->GetImageView()[i], nullptr);
-//    vkDestroyImage(device.device_, *gSwapchain->GetImages(), nullptr);
     vkDestroyImage(*gDevice->GetDevice(), *gDepthImages[i]->GetImage(), nullptr);
   }
-  //vkDestroySwapchainKHR(device.device_, swapchain.swapchain_, nullptr);
-  //swapchain imageview
+  gFrameBuffers.clear();
+  gDepthImages.clear();
+  gRenderPass.release();
   gSwapchainImageView.release();
   gSwapchain.release();
+  gSurface.release();
 }
 
 // A helper function
@@ -523,6 +522,21 @@ void DeleteGraphicsPipeline(void) {
 bool InitVulkan(android_app* app) {
   if(androidAppCtx != nullptr) {
       //already initialized
+      CreateSwapChain();
+      //ray tracing command
+      for(auto& cb : gCommandBuffers)
+          AECommand::ResetCommand(cb.get(), false);
+      RecordRayTracingCommand();
+      //imgui command
+    std::vector<AEFrameBuffer*> fbs;
+    for(auto& f : gFrameBuffers)
+      fbs.emplace_back(f.get());
+    std::vector<AEDepthImage*> dps;
+    for(auto& dp : gDepthImages)
+      dps.emplace_back(dp.get());
+    gImgui = std::make_unique<MyImgui>(app->window, gInstance.get(), gDevice.get(), gSwapchain.get(),
+                                       gQueue.get(), gQueue.get(), gSurface.get(),
+                                       &fbs, &dps, gSwapchainImageView.get(), gRenderPass.get());
     device.initialized_ = true;
     return true;
   }
@@ -714,11 +728,6 @@ bool InitVulkan(android_app* app) {
   gSbts.push_back(raygenSBT.get());
   gSbts.push_back(missSBT.get());
   gSbts.push_back(chitSBT.get());
-  //push constants
-  ConstantsRT constantRT{};
-  //bgra
-  constantRT.clearColor = glm::vec4(1.0f - 245.0f / 255.0f, 1.0f - 235.0f / 255.0f, 1.0f - 230.0f / 255.0f, 1.0f);
-  constantRT.lightType = 0;
   // -----------------------------------------------
   // Create a pool of command buffers to allocate command buffer from
   render.cmdBufferLen_ = gSwapchain->GetSize();
@@ -750,29 +759,8 @@ bool InitVulkan(android_app* app) {
                                      &fbs, &dps, gSwapchainImageView.get(), gRenderPass.get());
   //create event
   gComputeEvent = std::make_unique<AEEvent>(gDevice.get());
-  //register commands
-  for (int bufferIndex = 0; bufferIndex < gSwapchain->GetSize();
-       bufferIndex++) {
-    AECommand::BeginCommand(gCommandBuffers[bufferIndex].get());
-    if(isAnimation) {
-      vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1,
-                      gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                      VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-                      0, nullptr, 0, nullptr, 0, nullptr);
-      vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(),
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                           (VkDependencyFlagBits) 0, 0, nullptr, 0, nullptr, 0, nullptr);
-    }
-    //dispatch ray tracing command
-    std::vector<AEDescriptorSet*> ds;
-    for(auto& d : gDescriptorSets)
-        ds.emplace_back(d.get());
-    AECommand::CommandTraceRays(gCommandBuffers[bufferIndex].get(), gDevice.get(), gSwapchain->GetExtents()[0].width,
-                                gSwapchain->GetExtents()[0].height,gSbts,
-                                gPipelineRT.get(), ds, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
-                                gQueue.get(), gCommandPool.get());
-    AECommand::EndCommand(gCommandBuffers[bufferIndex].get());
-  }
+  //redord command
+  RecordRayTracingCommand();
   // We need to create a fence to be able, in the main loop, to wait for our
   // draw command(s) to finish before swapping the framebuffers
   VkFenceCreateInfo fenceCreateInfo{
@@ -827,7 +815,7 @@ void DeleteVulkan(void) {
   //vkDestroyCommandPool(device.device_, render.cmdPool_, nullptr);
   //vkDestroyRenderPass(device.device_, render.renderPass_, nullptr);
   gFrameBuffers.clear();
-  //DeleteSwapChain();
+  DeleteSwapChain();
   gDescriptorSetLayout.reset();
   DeleteGraphicsPipeline();
   //DeleteBuffers();
@@ -836,7 +824,9 @@ void DeleteVulkan(void) {
   delete gDevice.get();
 //  vkDestroyInstance(device.instance_, nullptr);
      */
-  device.initialized_ = false;
+    DeleteSwapChain();
+    gImgui.release();
+    device.initialized_ = false;
 }
 
 // Draw one frame
@@ -1356,4 +1346,36 @@ void InitModelView(ModelView* mv)
                           (float)gSwapchain->GetExtents()[0].width / (float)gSwapchain->GetExtents()[0].height,
                           0.1f, 100.0f);
     AEMatrix::View(mv->view, cameraPos, cameraDirection, cameraUp);
+}
+
+void RecordRayTracingCommand()
+{
+    //push constants
+    ConstantsRT constantRT{};
+    //bgra
+    constantRT.clearColor = glm::vec4(1.0f - 245.0f / 255.0f, 1.0f - 235.0f / 255.0f, 1.0f - 230.0f / 255.0f, 1.0f);
+    constantRT.lightType = 0;
+    //register commands
+    for (int bufferIndex = 0; bufferIndex < gSwapchain->GetSize();
+         bufferIndex++) {
+        AECommand::BeginCommand(gCommandBuffers[bufferIndex].get());
+        if(isAnimation) {
+            vkCmdWaitEvents(*gCommandBuffers[bufferIndex]->GetCommandBuffer(), 1,
+                            gComputeEvent->GetEvent(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                            VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                            0, nullptr, 0, nullptr, 0, nullptr);
+            vkCmdPipelineBarrier(*gCommandBuffers[bufferIndex]->GetCommandBuffer(),
+                                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                                 (VkDependencyFlagBits) 0, 0, nullptr, 0, nullptr, 0, nullptr);
+        }
+        //dispatch ray tracing command
+        std::vector<AEDescriptorSet*> ds;
+        for(auto& d : gDescriptorSets)
+            ds.emplace_back(d.get());
+        AECommand::CommandTraceRays(gCommandBuffers[bufferIndex].get(), gDevice.get(), gSwapchain->GetExtents()[0].width,
+                                    gSwapchain->GetExtents()[0].height,gSbts,
+                                    gPipelineRT.get(), ds, (void*)&constantRT, gSwapchain->GetImageEdit(bufferIndex), gStorageImage.get(),
+                                    gQueue.get(), gCommandPool.get());
+        AECommand::EndCommand(gCommandBuffers[bufferIndex].get());
+    }
 }
