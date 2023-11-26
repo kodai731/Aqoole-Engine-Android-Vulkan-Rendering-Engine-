@@ -98,6 +98,7 @@ VulkanRenderInfo render;
 
 // Android Native App pointer...
 android_app* androidAppCtx = nullptr;
+static JavaVM* jvm = nullptr;
 
 
 std::unique_ptr<AEInstance> gInstance;
@@ -242,6 +243,20 @@ void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image, VkImageAspectFlags
                     VkPipelineStageFlags srcStages,
                     VkPipelineStageFlags destStages);
 uint32_t SelectKeyframe(double frac, std::vector<float>& keyFrames);
+
+/*
+ * jni functions and interfaces
+ */
+void selectFile(JNIEnv* env){
+  jclass jc = env->FindClass("com/aqoole/vulkanNativeActivity$Companion");
+  jmethodID mid = env->GetMethodID(jc, "testFun", "()V");
+  int bp = 1000;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aqoole_vulkanNativeActivity(JNIEnv* env, jobject thisj){
+  selectFile(env);
+}
 
 // Create vulkan device
 void CreateVulkanDevice(ANativeWindow* platformWindow,
@@ -1216,11 +1231,41 @@ void RecordImguiCommand(uint32_t imageNum, glm::vec2* touchPositions, bool& isTo
   }
   ImGui::SameLine();
   ImGui::End();
+  //file selector
   ImVec2 frameButtonPos(380 * 2, gSwapchain->GetExtents()[0].height - 150);
   ImGui::SetNextWindowPos(frameButtonPos, ImGuiCond_FirstUseEver);
-  ImGui::Begin("button3");
-  ImGui::Button("frame", ImVec2(buttonSize.x - 50, buttonSize.y));
-  ImGui::Text("frame = %u", gAnimationIndex);
+  ImGui::Begin("file select");
+  ImGui::Button("file select", ImVec2(buttonSize.x - 50, buttonSize.y));
+  if(isTouchButton(touchPositions, frameButtonPos, ImVec2(350.0f, 100.0f))){
+      jint res;
+      //JavaVM* vm = androidAppCtx->activity->vm;
+      JavaVM* vm = nullptr;
+      res = JNI_GetDefaultJavaVMInitArgs((void*)vm);
+      JNIEnv* env;
+      res = vm->GetEnv((void**)&env, JNI_VERSION_1_6);
+      if(env == nullptr){
+        __android_log_print(ANDROID_LOG_ERROR, "aqoole kotlin", "failed to getenv");
+      }
+      res = vm->AttachCurrentThread(&env, NULL);
+      if(env == nullptr){
+          __android_log_print(ANDROID_LOG_ERROR, "aqoole kotlin", "failed to attach env");
+      }
+      jthrowable e = env->ExceptionOccurred();
+      env->ExceptionClear();
+      jclass jc = env->FindClass("com/aqoole/vulkanNativeActivity$Companion");
+      if(env->ExceptionCheck()){
+          env->ExceptionDescribe();
+          __android_log_print(ANDROID_LOG_DEBUG, "aqoole kotlin", "kotlin error");
+      }
+      jmethodID mid = env->GetMethodID(jc, "testFun", "()V");
+      env->CallVoidMethod(jc, mid);
+//      if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+//          int aaaa = 1;
+//      }
+//      jclass jc = env->FindClass("com/aqoole/vulkanNativeActivity$Companion");
+//      jmethodID mid = env->GetMethodID(jc, "testFun", "()V");
+//      int bp = 1000;
+  }
   ImGui::SameLine();
   ImGui::End();
   //light intensity
@@ -1379,3 +1424,16 @@ void RecordRayTracingCommand()
         AECommand::EndCommand(gCommandBuffers[bufferIndex].get());
     }
 }
+
+/*
+ * jni onload
+ */
+jint JNI_Onload(JavaVM* vm, void*){
+    JNIEnv* env;
+    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        return JNI_ERR;
+    }
+    jvm = vm;
+    return JNI_VERSION_1_6;
+}
+

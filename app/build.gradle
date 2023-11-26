@@ -1,4 +1,7 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-kapt'
+//apply plugin: 'kotlin-android-extensions'
 
 /**
  * this file is modified by Shigeoka Kodai
@@ -75,6 +78,7 @@ android {
            }
        }
    }
+    namespace 'com.aqoole'
 }
 
 dependencies {
@@ -85,6 +89,8 @@ dependencies {
             builtBy 'unzip'
         }
     }
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
 }
 
 //buildTypes {

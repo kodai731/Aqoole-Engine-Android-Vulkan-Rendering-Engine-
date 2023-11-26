@@ -2,8 +2,7 @@
 <!-- this file is modified by Shigeoka Kodai -->
 <!-- the original is here https://github.com/googlesamples/android-vulkan-tutorials -->
 <!-- BEGIN_INCLUDE(manifest) -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-        package="com.aqoole">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
         android:label="@string/app_name"

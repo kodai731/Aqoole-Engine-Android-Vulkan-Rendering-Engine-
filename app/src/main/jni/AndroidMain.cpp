@@ -52,6 +52,7 @@ glm::vec3 laData(0.0f);
 glm::vec3 lastLaData(0.0f);
 
 ASensorEvent* tempSensorEvent = new ASensorEvent();
+static JavaVM* jvm;
 
 // Process the next main command.
 void handle_cmd(android_app* app, int32_t cmd) {
@@ -139,9 +140,21 @@ void InitSensor(struct android_app* app)
 //    ASensorEventQueue_setEventRate(gSensors.gSensorQueue, gSensors.gSensorGravity, delaytime);
 }
 
+/*
+ * jni onload
+ */
+extern "C" {
+JNIEXPORT jint JNI_Onload(JavaVM *vm, void *) {
+    JNIEnv *env;
+    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        return JNI_ERR;
+    }
+    jvm = vm;
+    return JNI_VERSION_1_6;
+}
+}
 
 void android_main(struct android_app* app) {
-
   // Set the callback to process system events
   app->userData = &gSensors;
   app->onAppCmd = handle_cmd;
